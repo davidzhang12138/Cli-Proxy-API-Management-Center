@@ -45,6 +45,7 @@ interface LogEntry {
   maskedKey: string;
   failed: boolean;
   inputTokens: number;
+  cachedTokens: number;
   outputTokens: number;
   totalTokens: number;
   authIndex: string;
@@ -78,6 +79,13 @@ const parseLatencyMs = (value: unknown): number | null => {
   return null;
 };
 
+const parseCachedTokens = (value: unknown, fallback: unknown): number => {
+  const primary = typeof value === 'number' && Number.isFinite(value) ? Math.max(value, 0) : 0;
+  const alternate =
+    typeof fallback === 'number' && Number.isFinite(fallback) ? Math.max(fallback, 0) : 0;
+  return Math.max(primary, alternate);
+};
+
 export function RequestLogs({ data, loading: parentLoading, providerMap, providerTypeMap, sourceInfoMap, authFileMap: propAuthFileMap, apiFilter }: RequestLogsProps) {
   const { t } = useTranslation();
   const [filterApi, setFilterApi] = useState('');
@@ -104,7 +112,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
   }, []);
 
   // 时间范围状态
-  const [timeRange, setTimeRange] = useState<TimeRange>(7);
+  const [timeRange, setTimeRange] = useState<TimeRange>(1);
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
 
   // 日志独立数据状态
@@ -294,6 +302,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
             maskedKey: masked,
             failed: detail.failed,
             inputTokens: detail.tokens.input_tokens || 0,
+            cachedTokens: parseCachedTokens(detail.tokens.cached_tokens, detail.tokens.cache_tokens),
             outputTokens: detail.tokens.output_tokens || 0,
             totalTokens: detail.tokens.total_tokens || 0,
             authIndex: detail.auth_index || '',
@@ -478,6 +487,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
         <td>{formatNumber(stats.totalCount)}</td>
         <td>{formatLatencySeconds(entry.latencyMs)}</td>
         <td>{formatNumber(entry.inputTokens)}</td>
+        <td>{formatNumber(entry.cachedTokens)}</td>
         <td>{formatNumber(entry.outputTokens)}</td>
         <td>{formatNumber(entry.totalTokens)}</td>
         <td>{formatTimestamp(entry.timestamp)}</td>
@@ -620,6 +630,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
                       <th>{t('monitor.logs.header_count')}</th>
                       <th>{t('monitor.logs.header_latency')}</th>
                       <th>{t('monitor.logs.header_input')}</th>
+                      <th>{t('monitor.logs.header_cached')}</th>
                       <th>{t('monitor.logs.header_output')}</th>
                       <th>{t('monitor.logs.header_total')}</th>
                       <th>{t('monitor.logs.header_time')}</th>

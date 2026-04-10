@@ -349,6 +349,36 @@
   }
 }
 
+.deferredPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-lg;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
+    var(--bg-primary);
+  box-shadow: var(--shadow-lg);
+  padding: 24px;
+}
+
+.deferredPlaceholderContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.deferredPlaceholderSpinner {
+  border-color: rgba(59, 130, 246, 0.22);
+  border-top-color: var(--primary-color);
+}
+
+.deferredPlaceholderText {
+  color: var(--text-tertiary);
+}
+
 // 图表卡片
 .chartCard {
   background: var(--bg-primary);

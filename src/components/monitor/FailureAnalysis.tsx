@@ -53,7 +53,7 @@ export function FailureAnalysis({ data, loading, providerMap, providerModels, so
   const [filterModel, setFilterModel] = useState('');
 
   // 时间范围状态
-  const [timeRange, setTimeRange] = useState<TimeRange>(7);
+  const [timeRange, setTimeRange] = useState<TimeRange>(1);
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
 
   // 使用禁用模型 Hook

@@ -18,9 +18,7 @@ export function TimeRangeSelector({ value, onChange, customRange }: TimeRangeSel
     if (customRange?.start) {
       return formatDateForInput(customRange.start);
     }
-    const date = new Date();
-    date.setDate(date.getDate() - 6);
-    return formatDateForInput(date);
+    return formatDateForInput(new Date());
   });
   const [endDate, setEndDate] = useState(() => {
     if (customRange?.end) {

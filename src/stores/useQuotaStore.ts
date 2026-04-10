@@ -3,6 +3,7 @@
  */
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type {
   AntigravityQuotaState,
   ClaudeQuotaState,
@@ -11,6 +12,7 @@ import type {
   KimiQuotaState,
   KiroQuotaState,
 } from '@/types';
+import { STORAGE_KEY_QUOTA } from '@/utils/constants';
 
 type QuotaUpdater<T> = T | ((prev: T) => T);
 
@@ -30,6 +32,16 @@ interface QuotaStoreState {
   clearQuotaCache: () => void;
 }
 
+type PersistedQuotaStoreState = Pick<
+  QuotaStoreState,
+  | 'antigravityQuota'
+  | 'claudeQuota'
+  | 'codexQuota'
+  | 'geminiCliQuota'
+  | 'kiroQuota'
+  | 'kimiQuota'
+>;
+
 const resolveUpdater = <T,>(updater: QuotaUpdater<T>, prev: T): T => {
   if (typeof updater === 'function') {
     return (updater as (value: T) => T)(prev);
@@ -37,44 +49,82 @@ const resolveUpdater = <T,>(updater: QuotaUpdater<T>, prev: T): T => {
   return updater;
 };
 
-export const useQuotaStore = create<QuotaStoreState>((set) => ({
-  antigravityQuota: {},
-  claudeQuota: {},
-  codexQuota: {},
-  geminiCliQuota: {},
-  kiroQuota: {},
-  kimiQuota: {},
-  setAntigravityQuota: (updater) =>
-    set((state) => ({
-      antigravityQuota: resolveUpdater(updater, state.antigravityQuota)
-    })),
-  setClaudeQuota: (updater) =>
-    set((state) => ({
-      claudeQuota: resolveUpdater(updater, state.claudeQuota)
-    })),
-  setCodexQuota: (updater) =>
-    set((state) => ({
-      codexQuota: resolveUpdater(updater, state.codexQuota)
-    })),
-  setGeminiCliQuota: (updater) =>
-    set((state) => ({
-      geminiCliQuota: resolveUpdater(updater, state.geminiCliQuota)
-    })),
-  setKiroQuota: (updater) =>
-    set((state) => ({
-      kiroQuota: resolveUpdater(updater, state.kiroQuota)
-    })),
-  setKimiQuota: (updater) =>
-    set((state) => ({
-      kimiQuota: resolveUpdater(updater, state.kimiQuota)
-    })),
-  clearQuotaCache: () =>
-    set({
+const sanitizeQuotaMap = <T extends { status?: string }>(quotaMap: Record<string, T>) =>
+  Object.fromEntries(
+    Object.entries(quotaMap).filter(([, value]) => value && value.status !== 'loading')
+  ) as Record<string, T>;
+
+const sanitizePersistedQuotaState = (
+  state: PersistedQuotaStoreState | Partial<PersistedQuotaStoreState>
+): PersistedQuotaStoreState => ({
+  antigravityQuota: sanitizeQuotaMap(state.antigravityQuota ?? {}),
+  claudeQuota: sanitizeQuotaMap(state.claudeQuota ?? {}),
+  codexQuota: sanitizeQuotaMap(state.codexQuota ?? {}),
+  geminiCliQuota: sanitizeQuotaMap(state.geminiCliQuota ?? {}),
+  kiroQuota: sanitizeQuotaMap(state.kiroQuota ?? {}),
+  kimiQuota: sanitizeQuotaMap(state.kimiQuota ?? {}),
+});
+
+export const useQuotaStore = create<QuotaStoreState>()(
+  persist(
+    (set) => ({
       antigravityQuota: {},
       claudeQuota: {},
       codexQuota: {},
       geminiCliQuota: {},
       kiroQuota: {},
-      kimiQuota: {}
-    })
-}));
+      kimiQuota: {},
+      setAntigravityQuota: (updater) =>
+        set((state) => ({
+          antigravityQuota: resolveUpdater(updater, state.antigravityQuota)
+        })),
+      setClaudeQuota: (updater) =>
+        set((state) => ({
+          claudeQuota: resolveUpdater(updater, state.claudeQuota)
+        })),
+      setCodexQuota: (updater) =>
+        set((state) => ({
+          codexQuota: resolveUpdater(updater, state.codexQuota)
+        })),
+      setGeminiCliQuota: (updater) =>
+        set((state) => ({
+          geminiCliQuota: resolveUpdater(updater, state.geminiCliQuota)
+        })),
+      setKiroQuota: (updater) =>
+        set((state) => ({
+          kiroQuota: resolveUpdater(updater, state.kiroQuota)
+        })),
+      setKimiQuota: (updater) =>
+        set((state) => ({
+          kimiQuota: resolveUpdater(updater, state.kimiQuota)
+        })),
+      clearQuotaCache: () =>
+        set({
+          antigravityQuota: {},
+          claudeQuota: {},
+          codexQuota: {},
+          geminiCliQuota: {},
+          kiroQuota: {},
+          kimiQuota: {}
+        })
+    }),
+    {
+      name: STORAGE_KEY_QUOTA,
+      partialize: (state) =>
+        sanitizePersistedQuotaState({
+          antigravityQuota: state.antigravityQuota,
+          claudeQuota: state.claudeQuota,
+          codexQuota: state.codexQuota,
+          geminiCliQuota: state.geminiCliQuota,
+          kiroQuota: state.kiroQuota,
+          kimiQuota: state.kimiQuota,
+        }),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...sanitizePersistedQuotaState(
+          (persistedState as Partial<PersistedQuotaStoreState>) ?? {}
+        ),
+      }),
+    }
+  )
+);

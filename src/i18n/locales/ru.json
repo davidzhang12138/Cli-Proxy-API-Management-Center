@@ -1566,10 +1566,13 @@
       "title": "Model Usage Distribution",
       "by_requests": "By Requests",
       "by_tokens": "By Tokens",
+      "by_cost": "By Cost",
       "requests": "Requests",
       "tokens": "Tokens",
+      "cost": "Cost",
       "request_share": "Request Share",
-      "token_share": "Token Share"
+      "token_share": "Token Share",
+      "cost_share": "Cost Share"
     },
     "trend": {
       "title": "Daily Usage Trend",
@@ -1670,6 +1673,7 @@
       "header_rate": "Success Rate",
       "header_count": "Requests",
       "header_input": "Input",
+      "header_cached": "Cached",
       "header_output": "Output",
       "header_total": "Total Tokens",
       "header_latency": "Duration",

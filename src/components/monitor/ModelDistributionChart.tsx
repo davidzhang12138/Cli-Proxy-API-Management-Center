@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Doughnut } from 'react-chartjs-2';
+import { calculateCost, formatUsd, loadModelPrices } from '@/utils/usage';
 import type { UsageData } from '@/pages/MonitorPage';
 import styles from '@/pages/MonitorPage.module.scss';
 
@@ -25,11 +26,13 @@ const COLORS = [
   '#6366f1', // 靛蓝
 ];
 
-type ViewMode = 'request' | 'token';
+type ViewMode = 'request' | 'token' | 'cost';
 
 export function ModelDistributionChart({ data, loading, isDark, timeRange }: ModelDistributionChartProps) {
   const { t } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('request');
+  const modelPrices = useMemo(() => loadModelPrices(), []);
+  const hasModelPrices = Object.keys(modelPrices).length > 0;
 
   const timeRangeLabel = timeRange === 1
     ? t('monitor.today')
@@ -39,16 +42,24 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
   const distributionData = useMemo(() => {
     if (!data?.apis) return [];
 
-    const modelStats: Record<string, { requests: number; tokens: number }> = {};
+    const modelStats: Record<string, { requests: number; tokens: number; cost: number }> = {};
 
     Object.values(data.apis).forEach((apiData) => {
       Object.entries(apiData.models).forEach(([modelName, modelData]) => {
         if (!modelStats[modelName]) {
-          modelStats[modelName] = { requests: 0, tokens: 0 };
+          modelStats[modelName] = { requests: 0, tokens: 0, cost: 0 };
         }
         modelData.details.forEach((detail) => {
           modelStats[modelName].requests++;
           modelStats[modelName].tokens += detail.tokens.total_tokens || 0;
+          modelStats[modelName].cost += calculateCost(
+            {
+              ...detail,
+              auth_index: Number(detail.auth_index) || 0,
+              __modelName: modelName,
+            },
+            modelPrices
+          );
         });
       });
     });
@@ -59,22 +70,32 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
         name,
         requests: stats.requests,
         tokens: stats.tokens,
+        cost: stats.cost,
       }))
       .sort((a, b) => {
         if (viewMode === 'request') {
           return b.requests - a.requests;
         }
-        return b.tokens - a.tokens;
+        if (viewMode === 'token') {
+          return b.tokens - a.tokens;
+        }
+        return b.cost - a.cost;
       });
 
     // 取 Top 10
     return sorted.slice(0, 10);
-  }, [data, viewMode]);
+  }, [data, modelPrices, viewMode]);
 
   // 计算总数
   const total = useMemo(() => {
     return distributionData.reduce((sum, item) => {
-      return sum + (viewMode === 'request' ? item.requests : item.tokens);
+      if (viewMode === 'request') {
+        return sum + item.requests;
+      }
+      if (viewMode === 'token') {
+        return sum + item.tokens;
+      }
+      return sum + item.cost;
     }, 0);
   }, [distributionData, viewMode]);
 
@@ -85,7 +106,11 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
       datasets: [
         {
           data: distributionData.map((item) =>
-            viewMode === 'request' ? item.requests : item.tokens
+            viewMode === 'request'
+              ? item.requests
+              : viewMode === 'token'
+                ? item.tokens
+                : item.cost
           ),
           backgroundColor: COLORS.slice(0, distributionData.length),
           borderColor: isDark ? '#1f2937' : '#ffffff',
@@ -113,12 +138,15 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
         padding: 12,
         callbacks: {
           label: (context: any) => {
-            const value = context.raw;
+            const value = Number(context.raw) || 0;
             const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
             if (viewMode === 'request') {
               return `${value.toLocaleString()} ${t('monitor.requests')} (${percentage}%)`;
             }
-            return `${value.toLocaleString()} tokens (${percentage}%)`;
+            if (viewMode === 'token') {
+              return `${value.toLocaleString()} tokens (${percentage}%)`;
+            }
+            return `${formatUsd(value)} (${percentage}%)`;
           },
         },
       },
@@ -127,6 +155,9 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
 
   // 格式化数值
   const formatValue = (value: number) => {
+    if (viewMode === 'cost') {
+      return formatUsd(value);
+    }
     if (value >= 1000000) {
       return (value / 1000000).toFixed(1) + 'M';
     }
@@ -136,13 +167,32 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
     return value.toString();
   };
 
+  const subtitleLabel =
+    viewMode === 'request'
+      ? t('monitor.distribution.by_requests')
+      : viewMode === 'token'
+        ? t('monitor.distribution.by_tokens')
+        : t('monitor.distribution.by_cost');
+
+  const centerLabel =
+    viewMode === 'request'
+      ? t('monitor.distribution.request_share')
+      : viewMode === 'token'
+        ? t('monitor.distribution.token_share')
+        : t('monitor.distribution.cost_share');
+
+  const emptyMessage =
+    viewMode === 'cost' && !hasModelPrices
+      ? t('usage_stats.cost_need_price')
+      : t('monitor.no_data');
+
   return (
     <div className={styles.chartCard}>
       <div className={styles.chartHeader}>
         <div>
           <h3 className={styles.chartTitle}>{t('monitor.distribution.title')}</h3>
           <p className={styles.chartSubtitle}>
-            {timeRangeLabel} · {viewMode === 'request' ? t('monitor.distribution.by_requests') : t('monitor.distribution.by_tokens')}
+            {timeRangeLabel} · {subtitleLabel}
             {' · Top 10'}
           </p>
         </div>
@@ -159,13 +209,19 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
           >
             {t('monitor.distribution.tokens')}
           </button>
+          <button
+            className={`${styles.chartControlBtn} ${viewMode === 'cost' ? styles.active : ''}`}
+            onClick={() => setViewMode('cost')}
+          >
+            {t('monitor.distribution.cost')}
+          </button>
         </div>
       </div>
 
-      {loading || distributionData.length === 0 ? (
+      {loading || distributionData.length === 0 || (viewMode === 'cost' && !hasModelPrices) ? (
         <div className={styles.chartContent}>
           <div className={styles.chartEmpty}>
-            {loading ? t('common.loading') : t('monitor.no_data')}
+            {loading ? t('common.loading') : emptyMessage}
           </div>
         </div>
       ) : (
@@ -174,13 +230,18 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
             <Doughnut data={chartData} options={chartOptions} />
             <div className={styles.donutCenter}>
               <div className={styles.donutLabel}>
-                {viewMode === 'request' ? t('monitor.distribution.request_share') : t('monitor.distribution.token_share')}
+                {centerLabel}
               </div>
             </div>
           </div>
           <div className={styles.legendList}>
             {distributionData.map((item, index) => {
-              const value = viewMode === 'request' ? item.requests : item.tokens;
+              const value =
+                viewMode === 'request'
+                  ? item.requests
+                  : viewMode === 'token'
+                    ? item.tokens
+                    : item.cost;
               const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0';
               return (
                 <div key={item.name} className={styles.legendItem}>

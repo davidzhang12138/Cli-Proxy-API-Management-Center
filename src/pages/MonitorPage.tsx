@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
@@ -64,6 +64,7 @@ export interface UsageDetail {
     output_tokens: number;
     reasoning_tokens: number;
     cached_tokens: number;
+    cache_tokens?: number;
     total_tokens: number;
   };
 }
@@ -76,6 +77,59 @@ export interface UsageData {
   }>;
 }
 
+function DeferredSection({
+  children,
+  label,
+  minHeight = 320,
+}: {
+  children: ReactNode;
+  label: string;
+  minHeight?: number;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const placeholderRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (mounted) return;
+    const node = placeholderRef.current;
+    if (!node) return;
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setMounted(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setMounted(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: '240px 0px',
+      }
+    );
+
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [mounted]);
+
+  if (mounted) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div ref={placeholderRef} className={styles.deferredPlaceholder} style={{ minHeight }}>
+      <div className={styles.deferredPlaceholderContent}>
+        <LoadingSpinner size={22} className={styles.deferredPlaceholderSpinner} />
+        <span className={styles.deferredPlaceholderText}>{label}</span>
+      </div>
+    </div>
+  );
+}
+
 export function MonitorPage() {
   const { t } = useTranslation();
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
@@ -85,7 +139,7 @@ export function MonitorPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [usageData, setUsageData] = useState<UsageData | null>(null);
-  const [timeRange, setTimeRange] = useState<TimeRange>(7);
+  const [timeRange, setTimeRange] = useState<TimeRange>(1);
   const [apiFilter, setApiFilter] = useState('');
   const [providerMap, setProviderMap] = useState<Record<string, string>>({});
   const [providerModels, setProviderModels] = useState<Record<string, Set<string>>>({});
@@ -349,25 +403,33 @@ export function MonitorPage() {
       </div>
 
       {/* 小时级图表 */}
-      <HourlyModelChart data={apiFilteredData} loading={loading} isDark={isDark} />
-      <HourlyTokenChart data={apiFilteredData} loading={loading} isDark={isDark} />
+      <DeferredSection label={t('monitor.hourly_model.title')} minHeight={360}>
+        <HourlyModelChart data={apiFilteredData} loading={loading} isDark={isDark} />
+      </DeferredSection>
+      <DeferredSection label={t('monitor.hourly_token.title')} minHeight={360}>
+        <HourlyTokenChart data={apiFilteredData} loading={loading} isDark={isDark} />
+      </DeferredSection>
 
       {/* 统计表格 */}
-      <div className={styles.statsGrid}>
-        <ChannelStats data={filteredData} loading={loading} providerMap={providerMap} providerModels={providerModels} sourceInfoMap={sourceInfoMap} authFileMap={authFileMap} />
-        <FailureAnalysis data={filteredData} loading={loading} providerMap={providerMap} providerModels={providerModels} sourceInfoMap={sourceInfoMap} authFileMap={authFileMap} />
-      </div>
+      <DeferredSection label={t('monitor.channel.title')} minHeight={420}>
+        <div className={styles.statsGrid}>
+          <ChannelStats data={filteredData} loading={loading} providerMap={providerMap} providerModels={providerModels} sourceInfoMap={sourceInfoMap} authFileMap={authFileMap} />
+          <FailureAnalysis data={filteredData} loading={loading} providerMap={providerMap} providerModels={providerModels} sourceInfoMap={sourceInfoMap} authFileMap={authFileMap} />
+        </div>
+      </DeferredSection>
 
       {/* 请求日志 */}
-      <RequestLogs
-        data={filteredData}
-        loading={loading}
-        providerMap={providerMap}
-        providerTypeMap={providerTypeMap}
-        sourceInfoMap={sourceInfoMap}
-        authFileMap={authFileMap}
-        apiFilter={apiFilter}
-      />
+      <DeferredSection label={t('monitor.logs.title')} minHeight={520}>
+        <RequestLogs
+          data={filteredData}
+          loading={loading}
+          providerMap={providerMap}
+          providerTypeMap={providerTypeMap}
+          sourceInfoMap={sourceInfoMap}
+          authFileMap={authFileMap}
+          apiFilter={apiFilter}
+        />
+      </DeferredSection>
     </div>
   );
 }
