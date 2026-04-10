@@ -423,6 +423,24 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
     });
   }, [logEntries, filterApi, filterModel, filterSource, filterStatus, filterProviderType]);
 
+  const logSummary = useMemo(() => {
+    return filteredEntries.reduce(
+      (summary, entry) => {
+        summary.inputTokens += entry.inputTokens;
+        summary.cachedTokens += entry.cachedTokens;
+        summary.outputTokens += entry.outputTokens;
+        summary.totalCost += entry.cost ?? 0;
+        return summary;
+      },
+      {
+        inputTokens: 0,
+        cachedTokens: 0,
+        outputTokens: 0,
+        totalCost: 0,
+      }
+    );
+  }, [filteredEntries]);
+
   // 虚拟滚动配置
   const rowVirtualizer = useVirtualizer({
     count: filteredEntries.length,
@@ -710,9 +728,34 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
         {/* 统计信息 */}
         {filteredEntries.length > 0 && (
-          <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>
-            {t('monitor.logs.total_count', { count: filteredEntries.length })}
-          </div>
+          <>
+            <div className={styles.logSummary}>
+              <div className={styles.logSummaryHeader}>
+                <span className={styles.logSummaryTitle}>{t('monitor.logs.summary_title')}</span>
+                <span className={styles.logSummaryCount}>
+                  {t('monitor.logs.total_count', { count: filteredEntries.length })}
+                </span>
+              </div>
+              <div className={styles.logSummaryGrid}>
+                <div className={styles.logSummaryItem}>
+                  <span className={styles.logSummaryLabel}>{t('monitor.logs.header_input')}</span>
+                  <strong className={styles.logSummaryValue}>{formatNumber(logSummary.inputTokens)}</strong>
+                </div>
+                <div className={styles.logSummaryItem}>
+                  <span className={styles.logSummaryLabel}>{t('monitor.logs.header_output')}</span>
+                  <strong className={styles.logSummaryValue}>{formatNumber(logSummary.outputTokens)}</strong>
+                </div>
+                <div className={styles.logSummaryItem}>
+                  <span className={styles.logSummaryLabel}>{t('monitor.logs.header_cached')}</span>
+                  <strong className={styles.logSummaryValue}>{formatNumber(logSummary.cachedTokens)}</strong>
+                </div>
+                <div className={styles.logSummaryItem}>
+                  <span className={styles.logSummaryLabel}>{t('monitor.logs.header_cost')}</span>
+                  <strong className={styles.logSummaryValue}>{formatUsd(logSummary.totalCost)}</strong>
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </Card>
 

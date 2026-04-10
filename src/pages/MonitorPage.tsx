@@ -30,8 +30,6 @@ import { DailyTrendChart } from '@/components/monitor/DailyTrendChart';
 import { HourlyModelChart } from '@/components/monitor/HourlyModelChart';
 import { HourlyTokenChart } from '@/components/monitor/HourlyTokenChart';
 import { HourlyCostChart } from '@/components/monitor/HourlyCostChart';
-import { ChannelStats } from '@/components/monitor/ChannelStats';
-import { FailureAnalysis } from '@/components/monitor/FailureAnalysis';
 import { RequestLogs } from '@/components/monitor/RequestLogs';
 import styles from './MonitorPage.module.scss';
 
@@ -143,7 +141,6 @@ export function MonitorPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>(1);
   const [apiFilter, setApiFilter] = useState('');
   const [providerMap, setProviderMap] = useState<Record<string, string>>({});
-  const [providerModels, setProviderModels] = useState<Record<string, Set<string>>>({});
   const [providerTypeMap, setProviderTypeMap] = useState<Record<string, string>>({});
   const [sourceInfoMap, setSourceInfoMap] = useState<Map<string, import('@/types/sourceInfo').SourceInfo>>(new Map());
   const [authFileMap, setAuthFileMap] = useState<Map<string, CredentialInfo>>(new Map());
@@ -152,7 +149,6 @@ export function MonitorPage() {
   const loadProviderMap = useCallback(async () => {
     try {
       const map: Record<string, string> = {};
-      const modelsMap: Record<string, Set<string>> = {};
       const typeMap: Record<string, string> = {};
 
       // 并行加载所有提供商配置和认证文件
@@ -178,13 +174,11 @@ export function MonitorPage() {
           const apiKey = entry.apiKey;
           if (apiKey) {
             map[apiKey] = providerName;
-            modelsMap[apiKey] = modelSet;
             typeMap[apiKey] = 'OpenAI';
           }
         });
         if (provider.name) {
           map[provider.name] = providerName;
-          modelsMap[provider.name] = modelSet;
           typeMap[provider.name] = 'OpenAI';
         }
       });
@@ -206,15 +200,6 @@ export function MonitorPage() {
           const providerName = config.prefix?.trim() || 'Claude';
           map[apiKey] = providerName;
           typeMap[apiKey] = 'Claude';
-          // 存储模型集合
-          if (config.models && config.models.length > 0) {
-            const modelSet = new Set<string>();
-            config.models.forEach((m) => {
-              if (m.alias) modelSet.add(m.alias);
-              if (m.name) modelSet.add(m.name);
-            });
-            modelsMap[apiKey] = modelSet;
-          }
         }
       });
 
@@ -225,14 +210,6 @@ export function MonitorPage() {
           const providerName = config.prefix?.trim() || 'Codex';
           map[apiKey] = providerName;
           typeMap[apiKey] = 'Codex';
-          if (config.models && config.models.length > 0) {
-            const modelSet = new Set<string>();
-            config.models.forEach((m) => {
-              if (m.alias) modelSet.add(m.alias);
-              if (m.name) modelSet.add(m.name);
-            });
-            modelsMap[apiKey] = modelSet;
-          }
         }
       });
 
@@ -243,19 +220,10 @@ export function MonitorPage() {
           const providerName = config.prefix?.trim() || 'Vertex';
           map[apiKey] = providerName;
           typeMap[apiKey] = 'Vertex';
-          if (config.models && config.models.length > 0) {
-            const modelSet = new Set<string>();
-            config.models.forEach((m) => {
-              if (m.alias) modelSet.add(m.alias);
-              if (m.name) modelSet.add(m.name);
-            });
-            modelsMap[apiKey] = modelSet;
-          }
         }
       });
 
       setProviderMap(map);
-      setProviderModels(modelsMap);
       setProviderTypeMap(typeMap);
 
       // 构建 sourceInfoMap（与请求事件明细相同的解析逻辑）
@@ -409,14 +377,6 @@ export function MonitorPage() {
           <HourlyModelChart data={apiFilteredData} loading={loading} isDark={isDark} />
           <HourlyTokenChart data={apiFilteredData} loading={loading} isDark={isDark} />
           <HourlyCostChart data={apiFilteredData} loading={loading} isDark={isDark} />
-        </div>
-      </DeferredSection>
-
-      {/* 统计表格 */}
-      <DeferredSection label={t('monitor.channel.title')} minHeight={420}>
-        <div className={styles.statsGrid}>
-          <ChannelStats data={filteredData} loading={loading} providerMap={providerMap} providerModels={providerModels} sourceInfoMap={sourceInfoMap} authFileMap={authFileMap} />
-          <FailureAnalysis data={filteredData} loading={loading} providerMap={providerMap} providerModels={providerModels} sourceInfoMap={sourceInfoMap} authFileMap={authFileMap} />
         </div>
       </DeferredSection>
 

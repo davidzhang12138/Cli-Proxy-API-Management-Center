@@ -1678,6 +1678,7 @@
       "header_latency": "Duration",
       "header_time": "Time",
       "header_actions": "Actions",
+      "summary_title": "Filtered Overview",
       "showing": "Showing {{start}}-{{end}} of {{total}}",
       "page_info": "Page {{current}}/{{total}}",
       "first_page": "First",

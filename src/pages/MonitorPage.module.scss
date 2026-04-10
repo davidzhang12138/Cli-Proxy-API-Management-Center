@@ -349,20 +349,6 @@
 }
 
 // 统计表格网格
-.statsGrid {
-  display: grid;
-  gap: 20px;
-  grid-template-columns: repeat(2, 1fr);
-
-  @include tablet {
-    grid-template-columns: 1fr;
-  }
-
-  @include mobile {
-    gap: 16px;
-  }
-}
-
 .deferredPlaceholder {
   display: flex;
   align-items: center;
@@ -945,6 +931,82 @@
     text-align: center;
     font-size: 11px;
   }
+}
+
+.logSummary {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-lg;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+    var(--bg-secondary);
+
+  @include mobile {
+    padding: 12px;
+  }
+}
+
+.logSummaryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+
+  @include mobile {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+}
+
+.logSummaryTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.logSummaryCount {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.logSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+
+  @include tablet {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @include mobile {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+.logSummaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: $radius-md;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+}
+
+.logSummaryLabel {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.logSummaryValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
 }
 
 // 分页

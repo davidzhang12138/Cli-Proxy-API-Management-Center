@@ -1678,6 +1678,7 @@
       "header_latency": "耗时",
       "header_time": "时间",
       "header_actions": "操作",
+      "summary_title": "当前筛选总览",
       "showing": "显示 {{start}}-{{end}} 条，共 {{total}} 条",
       "page_info": "第 {{current}}/{{total}} 页",
       "first_page": "首页",
