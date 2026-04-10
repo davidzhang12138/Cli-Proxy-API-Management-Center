@@ -128,11 +128,25 @@ textarea {
 
 .card-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: $spacing-sm;
   flex-wrap: wrap;
   margin-bottom: $spacing-md;
+  gap: 12px;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
 
   > * {
     min-width: 0;
@@ -144,6 +158,19 @@ textarea {
     font-size: 18px;
     font-weight: 700;
     color: var(--text-primary);
+
+    @media (max-width: 768px) {
+      font-size: 16px;
+    }
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+
+    @media (max-width: 768px) {
+      font-size: 12px;
+    }
   }
 }
 

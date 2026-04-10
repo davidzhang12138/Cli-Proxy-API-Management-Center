@@ -649,7 +649,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
                 >
                   <table className={`${styles.table} ${styles.virtualTable}`}>
                     <tbody>
-                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      {rowVirtualizer.getVirtualItems().map((virtualRow: { index: number; size: number; start: number }) => {
                         const entry = filteredEntries[virtualRow.index];
                         return (
                           <tr
