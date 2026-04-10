@@ -13,7 +13,7 @@ interface HourlyCostChartProps {
 }
 
 type HourRange = 6 | 12 | 24;
-type ViewMode = 'cost' | 'model' | 'token';
+type ViewMode = 'model' | 'cost' | 'token';
 
 const MODEL_COLORS = [
   'rgba(59, 130, 246, 0.7)',
@@ -27,7 +27,7 @@ const MODEL_COLORS = [
 export function HourlyCostChart({ data, loading, isDark }: HourlyCostChartProps) {
   const { t } = useTranslation();
   const [hourRange, setHourRange] = useState<HourRange>(12);
-  const [viewMode, setViewMode] = useState<ViewMode>('cost');
+  const [viewMode, setViewMode] = useState<ViewMode>('model');
   const modelPrices = useMemo(() => loadModelPrices(), []);
   const hasModelPrices = Object.keys(modelPrices).length > 0;
 
@@ -549,16 +549,16 @@ export function HourlyCostChart({ data, loading, isDark }: HourlyCostChartProps)
         <div className={styles.chartControlStack}>
           <div className={styles.chartControls}>
             <button
-              className={`${styles.chartControlBtn} ${viewMode === 'cost' ? styles.active : ''}`}
-              onClick={() => setViewMode('cost')}
-            >
-              {t('monitor.hourly.mode_cost')}
-            </button>
-            <button
               className={`${styles.chartControlBtn} ${viewMode === 'model' ? styles.active : ''}`}
               onClick={() => setViewMode('model')}
             >
               {t('monitor.hourly.mode_model')}
+            </button>
+            <button
+              className={`${styles.chartControlBtn} ${viewMode === 'cost' ? styles.active : ''}`}
+              onClick={() => setViewMode('cost')}
+            >
+              {t('monitor.hourly.mode_cost')}
             </button>
             <button
               className={`${styles.chartControlBtn} ${viewMode === 'token' ? styles.active : ''}`}

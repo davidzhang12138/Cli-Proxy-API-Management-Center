@@ -1353,10 +1353,17 @@ const fetchKiroQuota = async (
     );
   });
 
-  const totalLimit = baseLimit + bonusLimit;
-  const totalUsage = baseUsage + bonusUsage;
   const nextReset = toIsoFromKiroTimestamp(normalizeKiroTimestamp(payload.nextDateReset));
   const bonusNextReset = toIsoFromKiroTimestamp(bonusNextResetTimestamp);
+  const bonusStatusUpper = normalizeStringValue(bonusStatus)?.toUpperCase() ?? '';
+  const bonusExpiredByStatus = ['EXPIRED', 'INACTIVE', 'ENDED', 'TERMINATED'].includes(bonusStatusUpper);
+  const bonusExpiredByTime =
+    bonusNextResetTimestamp !== null && bonusNextResetTimestamp <= Date.now();
+  const hasActiveBonus = bonusLimit > 0 && !bonusExpiredByStatus && !bonusExpiredByTime;
+  const effectiveBonusLimit = hasActiveBonus ? bonusLimit : 0;
+  const effectiveBonusUsage = hasActiveBonus ? bonusUsage : 0;
+  const totalLimit = baseLimit + effectiveBonusLimit;
+  const totalUsage = baseUsage + effectiveBonusUsage;
   const subscriptionType =
     normalizeStringValue(payload.subscriptionInfo?.subscriptionTitle) ??
     normalizeStringValue(payload.subscriptionInfo?.type) ??
@@ -1366,9 +1373,9 @@ const fetchKiroQuota = async (
     baseUsage,
     baseLimit,
     baseRemaining: baseLimit > 0 ? Math.max(0, baseLimit - baseUsage) : null,
-    bonusUsage,
-    bonusLimit,
-    bonusRemaining: bonusLimit > 0 ? Math.max(0, bonusLimit - bonusUsage) : null,
+    bonusUsage: hasActiveBonus ? bonusUsage : null,
+    bonusLimit: hasActiveBonus ? bonusLimit : null,
+    bonusRemaining: hasActiveBonus ? Math.max(0, bonusLimit - bonusUsage) : null,
     bonusStatus,
     bonusNextReset,
     currentUsage: totalUsage,
