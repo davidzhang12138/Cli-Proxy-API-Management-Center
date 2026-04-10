@@ -1588,6 +1588,9 @@
       "last_12h": "Last 12 Hours",
       "last_24h": "Last 24 Hours",
       "all": "All",
+      "mode_cost": "Cost",
+      "mode_model": "Model",
+      "mode_token": "Token",
       "requests": "Requests",
       "success_rate": "Success Rate"
     },

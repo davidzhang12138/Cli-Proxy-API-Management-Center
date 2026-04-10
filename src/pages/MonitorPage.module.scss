@@ -348,6 +348,18 @@
   }
 }
 
+.chartControlStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+
+  @include mobile {
+    width: 100%;
+    align-items: stretch;
+  }
+}
+
 // 统计表格网格
 .deferredPlaceholder {
   display: flex;

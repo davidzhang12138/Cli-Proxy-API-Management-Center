@@ -27,8 +27,6 @@ import type { CredentialInfo } from '@/types/sourceInfo';
 import { KpiCards } from '@/components/monitor/KpiCards';
 import { ModelDistributionChart } from '@/components/monitor/ModelDistributionChart';
 import { DailyTrendChart } from '@/components/monitor/DailyTrendChart';
-import { HourlyModelChart } from '@/components/monitor/HourlyModelChart';
-import { HourlyTokenChart } from '@/components/monitor/HourlyTokenChart';
 import { HourlyCostChart } from '@/components/monitor/HourlyCostChart';
 import { RequestLogs } from '@/components/monitor/RequestLogs';
 import styles from './MonitorPage.module.scss';
@@ -373,11 +371,7 @@ export function MonitorPage() {
 
       {/* 小时级图表 */}
       <DeferredSection label={t('monitor.hourly_cost.title')} minHeight={420}>
-        <div className={styles.hourlyGrid}>
-          <HourlyModelChart data={apiFilteredData} loading={loading} isDark={isDark} />
-          <HourlyTokenChart data={apiFilteredData} loading={loading} isDark={isDark} />
-          <HourlyCostChart data={apiFilteredData} loading={loading} isDark={isDark} />
-        </div>
+        <HourlyCostChart data={apiFilteredData} loading={loading} isDark={isDark} />
       </DeferredSection>
 
       {/* 请求日志 */}

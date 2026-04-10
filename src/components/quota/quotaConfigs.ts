@@ -1347,8 +1347,7 @@ const fetchKiroQuota = async (
       freeTrialInfo.expiryDate,
       freeTrialInfo.expiry_date,
       freeTrialInfo.endAt,
-      freeTrialInfo.end_at,
-      breakdown.nextDateReset
+      freeTrialInfo.end_at
     );
   });
 
@@ -1407,7 +1406,7 @@ const renderKiroItems = (
   }
 
   const resetLabel = formatQuotaResetTime(quota.nextReset);
-  const bonusResetLabel = formatQuotaResetTime(quota.bonusNextReset ?? quota.nextReset);
+  const bonusResetLabel = formatQuotaResetTime(quota.bonusNextReset);
   const buildRemainingPercent = (remaining: number | null, limit: number | null) => {
     if (remaining === null || limit === null || limit <= 0) return 0;
     return Math.round((remaining / limit) * 100);

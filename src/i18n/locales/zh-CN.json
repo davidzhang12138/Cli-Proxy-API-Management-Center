@@ -1583,6 +1583,9 @@
       "last_12h": "最近 12 小时",
       "last_24h": "最近 24 小时",
       "all": "全部",
+      "mode_cost": "花费",
+      "mode_model": "模型",
+      "mode_token": "Token",
       "requests": "请求数",
       "success_rate": "成功率"
     },
