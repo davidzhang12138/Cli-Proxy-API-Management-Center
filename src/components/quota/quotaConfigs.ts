@@ -1250,11 +1250,33 @@ type KiroQuotaData = {
   bonusLimit: number | null;
   bonusRemaining: number | null;
   bonusStatus?: string;
+  bonusNextReset?: string;
   currentUsage: number | null;
   usageLimit: number | null;
   remainingCredits: number | null;
   nextReset?: string;
   subscriptionType?: string;
+};
+
+const normalizeKiroTimestamp = (...values: unknown[]): number | null => {
+  for (const value of values) {
+    const normalized = normalizeNumberValue(value);
+    if (normalized === null || normalized <= 0) continue;
+    if (normalized > 1_000_000_000_000) {
+      return Math.round(normalized);
+    }
+    if (normalized > 1_000_000_000) {
+      return Math.round(normalized * 1000);
+    }
+  }
+  return null;
+};
+
+const toIsoFromKiroTimestamp = (value: number | null): string | undefined => {
+  if (value === null) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
 };
 
 const fetchKiroQuota = async (
@@ -1289,6 +1311,7 @@ const fetchKiroQuota = async (
   let bonusLimit = 0;
   let bonusUsage = 0;
   let bonusStatus: string | undefined;
+  let bonusNextResetTimestamp: number | null = null;
 
   breakdownList.forEach((breakdown) => {
     const limit = normalizeNumberValue(
@@ -1314,18 +1337,25 @@ const fetchKiroQuota = async (
     if (freeTrialInfo.freeTrialStatus) {
       bonusStatus = freeTrialInfo.freeTrialStatus;
     }
+    bonusNextResetTimestamp ??= normalizeKiroTimestamp(
+      freeTrialInfo.nextDateReset,
+      freeTrialInfo.next_date_reset,
+      freeTrialInfo.expiresAt,
+      freeTrialInfo.expires_at,
+      freeTrialInfo.expirationDate,
+      freeTrialInfo.expiration_date,
+      freeTrialInfo.expiryDate,
+      freeTrialInfo.expiry_date,
+      freeTrialInfo.endAt,
+      freeTrialInfo.end_at,
+      breakdown.nextDateReset
+    );
   });
 
   const totalLimit = baseLimit + bonusLimit;
   const totalUsage = baseUsage + bonusUsage;
-  const nextResetTimestamp = normalizeNumberValue(payload.nextDateReset);
-  let nextReset: string | undefined;
-  if (nextResetTimestamp !== null) {
-    const resetDate = new Date(nextResetTimestamp * 1000);
-    if (!Number.isNaN(resetDate.getTime())) {
-      nextReset = resetDate.toISOString();
-    }
-  }
+  const nextReset = toIsoFromKiroTimestamp(normalizeKiroTimestamp(payload.nextDateReset));
+  const bonusNextReset = toIsoFromKiroTimestamp(bonusNextResetTimestamp);
   const subscriptionType =
     normalizeStringValue(payload.subscriptionInfo?.subscriptionTitle) ??
     normalizeStringValue(payload.subscriptionInfo?.type) ??
@@ -1339,6 +1369,7 @@ const fetchKiroQuota = async (
     bonusLimit,
     bonusRemaining: bonusLimit > 0 ? Math.max(0, bonusLimit - bonusUsage) : null,
     bonusStatus,
+    bonusNextReset,
     currentUsage: totalUsage,
     usageLimit: totalLimit,
     remainingCredits: totalLimit > 0 ? Math.max(0, totalLimit - totalUsage) : null,
@@ -1376,6 +1407,7 @@ const renderKiroItems = (
   }
 
   const resetLabel = formatQuotaResetTime(quota.nextReset);
+  const bonusResetLabel = formatQuotaResetTime(quota.bonusNextReset ?? quota.nextReset);
   const buildRemainingPercent = (remaining: number | null, limit: number | null) => {
     if (remaining === null || limit === null || limit <= 0) return 0;
     return Math.round((remaining / limit) * 100);
@@ -1434,7 +1466,8 @@ const renderKiroItems = (
                   { className: styleMap.quotaAmount },
                   t('kiro_quota.remaining_credits', { count: Math.round(quota.bonusRemaining) })
                 )
-              : null
+              : null,
+            h('span', { className: styleMap.quotaReset }, bonusResetLabel)
           )
         ),
         h(QuotaProgressBar, {
@@ -1499,6 +1532,7 @@ export const KIRO_CONFIG: QuotaConfig<KiroQuotaState, KiroQuotaData> = {
     bonusUsage: null,
     bonusLimit: null,
     bonusRemaining: null,
+    bonusNextReset: undefined,
     currentUsage: null,
     usageLimit: null,
     remainingCredits: null,
@@ -1512,6 +1546,7 @@ export const KIRO_CONFIG: QuotaConfig<KiroQuotaState, KiroQuotaData> = {
     bonusLimit: data.bonusLimit,
     bonusRemaining: data.bonusRemaining,
     bonusStatus: data.bonusStatus,
+    bonusNextReset: data.bonusNextReset,
     currentUsage: data.currentUsage,
     usageLimit: data.usageLimit,
     remainingCredits: data.remainingCredits,
@@ -1526,6 +1561,7 @@ export const KIRO_CONFIG: QuotaConfig<KiroQuotaState, KiroQuotaData> = {
     bonusUsage: null,
     bonusLimit: null,
     bonusRemaining: null,
+    bonusNextReset: undefined,
     currentUsage: null,
     usageLimit: null,
     remainingCredits: null,

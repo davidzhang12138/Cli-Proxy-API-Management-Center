@@ -313,6 +313,16 @@ export interface KiroFreeTrialInfo {
   currentUsage?: number;
   usageLimitWithPrecision?: number;
   currentUsageWithPrecision?: number;
+  nextDateReset?: number | string;
+  next_date_reset?: number | string;
+  expiresAt?: number | string;
+  expires_at?: number | string;
+  expirationDate?: number | string;
+  expiration_date?: number | string;
+  expiryDate?: number | string;
+  expiry_date?: number | string;
+  endAt?: number | string;
+  end_at?: number | string;
 }
 
 export interface KiroUsageBreakdown {
@@ -349,6 +359,7 @@ export interface KiroQuotaState {
   bonusLimit: number | null;
   bonusRemaining: number | null;
   bonusStatus?: string;
+  bonusNextReset?: string;
   currentUsage: number | null;
   usageLimit: number | null;
   remainingCredits: number | null;
