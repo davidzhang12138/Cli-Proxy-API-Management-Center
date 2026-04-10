@@ -274,9 +274,9 @@ export function HourlyModelChart({ data, loading, isDark }: HourlyModelChartProp
   }), [isDark, t]);
 
   return (
-    <div className={styles.chartCard}>
+    <div className={`${styles.chartCard} ${styles.chartCardCompact}`}>
       <div className={styles.chartHeader}>
-        <div>
+        <div className={styles.chartHeaderMain}>
           <h3 className={styles.chartTitle}>{t('monitor.hourly_model.title')}</h3>
           <p className={styles.chartSubtitle}>
             {hourRangeLabel}
@@ -304,7 +304,7 @@ export function HourlyModelChart({ data, loading, isDark }: HourlyModelChartProp
         </div>
       </div>
 
-      <div className={styles.chartContent}>
+      <div className={`${styles.chartContent} ${styles.chartContentCompact}`}>
         {loading || hourlyData.hours.length === 0 ? (
           <div className={styles.chartEmpty}>
             {loading ? t('common.loading') : t('monitor.no_data')}

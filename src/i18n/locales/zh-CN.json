@@ -1599,6 +1599,9 @@
       "reasoning": "思考",
       "cached": "缓存"
     },
+    "hourly_cost": {
+      "title": "每小时金额花费用量表"
+    },
     "channel": {
       "title": "渠道统计",
       "subtitle": "按来源渠道分类",
@@ -1671,6 +1674,7 @@
       "header_cached": "缓存",
       "header_output": "输出",
       "header_total": "总 Token",
+      "header_cost": "花费",
       "header_latency": "耗时",
       "header_time": "时间",
       "header_actions": "操作",

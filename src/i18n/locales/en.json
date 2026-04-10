@@ -1599,6 +1599,9 @@
       "reasoning": "Reasoning",
       "cached": "Cached"
     },
+    "hourly_cost": {
+      "title": "Hourly Cost Usage"
+    },
     "channel": {
       "title": "Channel Statistics",
       "subtitle": "Grouped by source channel",
@@ -1671,6 +1674,7 @@
       "header_cached": "Cached",
       "header_output": "Output",
       "header_total": "Total Tokens",
+      "header_cost": "Cost",
       "header_latency": "Duration",
       "header_time": "Time",
       "header_actions": "Actions",

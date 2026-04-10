@@ -4,7 +4,13 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Card } from '@/components/ui/Card';
 import { usageApi, authFilesApi } from '@/services/api';
 import { useDisableModel } from '@/hooks';
-import { normalizeUsageSourceId, normalizeAuthIndex } from '@/utils/usage';
+import {
+  normalizeUsageSourceId,
+  normalizeAuthIndex,
+  calculateCost,
+  formatUsd,
+  loadModelPrices,
+} from '@/utils/usage';
 import { resolveSourceDisplay } from '@/utils/sourceResolver';
 import type { SourceInfo, CredentialInfo } from '@/types/sourceInfo';
 import { TimeRangeSelector, formatTimeRangeCaption, type TimeRange } from './TimeRangeSelector';
@@ -48,6 +54,7 @@ interface LogEntry {
   cachedTokens: number;
   outputTokens: number;
   totalTokens: number;
+  cost: number | null;
   authIndex: string;
 }
 
@@ -88,6 +95,7 @@ const parseCachedTokens = (value: unknown, fallback: unknown): number => {
 
 export function RequestLogs({ data, loading: parentLoading, providerMap, providerTypeMap, sourceInfoMap, authFileMap: propAuthFileMap, apiFilter }: RequestLogsProps) {
   const { t } = useTranslation();
+  const modelPrices = useMemo(() => loadModelPrices(), []);
   const [filterApi, setFilterApi] = useState('');
   const [filterModel, setFilterModel] = useState('');
   const [filterSource, setFilterSource] = useState('');
@@ -305,6 +313,16 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
             cachedTokens: parseCachedTokens(detail.tokens.cached_tokens, detail.tokens.cache_tokens),
             outputTokens: detail.tokens.output_tokens || 0,
             totalTokens: detail.tokens.total_tokens || 0,
+            cost: modelPrices[modelName]
+              ? calculateCost(
+                {
+                  ...detail,
+                  auth_index: Number(detail.auth_index) || 0,
+                  __modelName: modelName,
+                },
+                modelPrices
+              )
+              : null,
             authIndex: detail.auth_index || '',
           });
         });
@@ -313,7 +331,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
     // 按时间倒序排序
     return entries.sort((a, b) => b.timestampMs - a.timestampMs);
-  }, [effectiveData, providerMap, providerTypeMap, sourceInfoMap, authFileMap]);
+  }, [effectiveData, providerMap, providerTypeMap, sourceInfoMap, authFileMap, modelPrices]);
 
   // 预计算所有条目的统计数据（一次性计算，避免渲染时重复计算）
   const precomputedStats = useMemo(() => {
@@ -490,6 +508,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
         <td>{formatNumber(entry.cachedTokens)}</td>
         <td>{formatNumber(entry.outputTokens)}</td>
         <td>{formatNumber(entry.totalTokens)}</td>
+        <td>{entry.cost === null ? '--' : formatUsd(entry.cost)}</td>
         <td>{formatTimestamp(entry.timestamp)}</td>
         <td>
           {entry.providerType.toLowerCase() === 'openai' && entry.source && entry.source !== '-' && entry.source !== 'unknown' ? (
@@ -633,6 +652,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
                       <th>{t('monitor.logs.header_cached')}</th>
                       <th>{t('monitor.logs.header_output')}</th>
                       <th>{t('monitor.logs.header_total')}</th>
+                      <th>{t('monitor.logs.header_cost')}</th>
                       <th>{t('monitor.logs.header_time')}</th>
                       <th>{t('monitor.logs.header_actions')}</th>
                     </tr>

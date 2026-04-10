@@ -29,6 +29,7 @@ import { ModelDistributionChart } from '@/components/monitor/ModelDistributionCh
 import { DailyTrendChart } from '@/components/monitor/DailyTrendChart';
 import { HourlyModelChart } from '@/components/monitor/HourlyModelChart';
 import { HourlyTokenChart } from '@/components/monitor/HourlyTokenChart';
+import { HourlyCostChart } from '@/components/monitor/HourlyCostChart';
 import { ChannelStats } from '@/components/monitor/ChannelStats';
 import { FailureAnalysis } from '@/components/monitor/FailureAnalysis';
 import { RequestLogs } from '@/components/monitor/RequestLogs';
@@ -403,11 +404,12 @@ export function MonitorPage() {
       </div>
 
       {/* 小时级图表 */}
-      <DeferredSection label={t('monitor.hourly_model.title')} minHeight={360}>
-        <HourlyModelChart data={apiFilteredData} loading={loading} isDark={isDark} />
-      </DeferredSection>
-      <DeferredSection label={t('monitor.hourly_token.title')} minHeight={360}>
-        <HourlyTokenChart data={apiFilteredData} loading={loading} isDark={isDark} />
+      <DeferredSection label={t('monitor.hourly_cost.title')} minHeight={420}>
+        <div className={styles.hourlyGrid}>
+          <HourlyModelChart data={apiFilteredData} loading={loading} isDark={isDark} />
+          <HourlyTokenChart data={apiFilteredData} loading={loading} isDark={isDark} />
+          <HourlyCostChart data={apiFilteredData} loading={loading} isDark={isDark} />
+        </div>
       </DeferredSection>
 
       {/* 统计表格 */}

@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Chart } from 'react-chartjs-2';
 import type { UsageData } from '@/pages/MonitorPage';
+import { calculateCost, formatUsd, loadModelPrices } from '@/utils/usage';
 import { formatLocalHourKey, getHourlyRangeBounds } from '@/utils/monitor';
 import styles from '@/pages/MonitorPage.module.scss';
 
-interface HourlyTokenChartProps {
+interface HourlyCostChartProps {
   data: UsageData | null;
   loading: boolean;
   isDark: boolean;
@@ -13,40 +14,33 @@ interface HourlyTokenChartProps {
 
 type HourRange = 6 | 12 | 24;
 
-export function HourlyTokenChart({ data, loading, isDark }: HourlyTokenChartProps) {
+export function HourlyCostChart({ data, loading, isDark }: HourlyCostChartProps) {
   const { t } = useTranslation();
   const [hourRange, setHourRange] = useState<HourRange>(12);
+  const modelPrices = useMemo(() => loadModelPrices(), []);
+  const hasModelPrices = Object.keys(modelPrices).length > 0;
 
-  // 按小时聚合 Token 数据
   const hourlyData = useMemo(() => {
-    if (!data?.apis) return { hours: [], totalTokens: [], inputTokens: [], outputTokens: [], reasoningTokens: [], cachedTokens: [] };
+    if (!data?.apis || !hasModelPrices) {
+      return { hours: [], costs: [], requestCounts: [], totalCost: 0 };
+    }
 
     const { start: cutoffTime, end: currentHour, bucketCount } = getHourlyRangeBounds(hourRange);
-
-    // 生成所有小时的时间点
     const allHours: string[] = [];
+
     for (let i = 0; i < bucketCount; i++) {
       const hourTime = new Date(cutoffTime.getTime() + i * 60 * 60 * 1000);
       allHours.push(formatLocalHourKey(hourTime));
     }
 
-    // 初始化所有小时的数据为0
-    const hourlyStats: Record<string, {
-      total: number;
-      input: number;
-      output: number;
-      reasoning: number;
-      cached: number;
-    }> = {};
+    const hourlyStats: Record<string, { cost: number; requests: number }> = {};
     allHours.forEach((hour) => {
-      hourlyStats[hour] = { total: 0, input: 0, output: 0, reasoning: 0, cached: 0 };
+      hourlyStats[hour] = { cost: 0, requests: 0 };
     });
 
-    // 收集每小时的 Token 数据（只统计成功请求）
     Object.values(data.apis).forEach((apiData) => {
-      Object.values(apiData.models).forEach((modelData) => {
+      Object.entries(apiData.models).forEach(([modelName, modelData]) => {
         modelData.details.forEach((detail) => {
-          // 跳过失败请求，失败请求的 Token 数据不准确
           if (detail.failed) return;
 
           const timestamp = new Date(detail.timestamp);
@@ -54,89 +48,71 @@ export function HourlyTokenChart({ data, loading, isDark }: HourlyTokenChartProp
           if (timestamp < cutoffTime || timestamp > currentHour) return;
 
           const hourKey = formatLocalHourKey(timestamp);
-          if (!hourlyStats[hourKey]) {
-            hourlyStats[hourKey] = { total: 0, input: 0, output: 0, reasoning: 0, cached: 0 };
-          }
-          hourlyStats[hourKey].total += detail.tokens.total_tokens || 0;
-          hourlyStats[hourKey].input += detail.tokens.input_tokens || 0;
-          hourlyStats[hourKey].output += detail.tokens.output_tokens || 0;
-          hourlyStats[hourKey].reasoning += detail.tokens.reasoning_tokens || 0;
-          hourlyStats[hourKey].cached += detail.tokens.cached_tokens || 0;
+          hourlyStats[hourKey].requests += 1;
+          hourlyStats[hourKey].cost += calculateCost(
+            {
+              ...detail,
+              auth_index: Number(detail.auth_index) || 0,
+              __modelName: modelName,
+            },
+            modelPrices
+          );
         });
       });
     });
 
-    // 获取排序后的小时列表
     const hours = allHours.sort();
+    const costs = hours.map((hour) => hourlyStats[hour]?.cost || 0);
+    const requestCounts = hours.map((hour) => hourlyStats[hour]?.requests || 0);
 
     return {
       hours,
-      totalTokens: hours.map((h) => (hourlyStats[h]?.total || 0) / 1000),
-      inputTokens: hours.map((h) => (hourlyStats[h]?.input || 0) / 1000),
-      outputTokens: hours.map((h) => (hourlyStats[h]?.output || 0) / 1000),
-      reasoningTokens: hours.map((h) => (hourlyStats[h]?.reasoning || 0) / 1000),
-      cachedTokens: hours.map((h) => (hourlyStats[h]?.cached || 0) / 1000),
+      costs,
+      requestCounts,
+      totalCost: costs.reduce((sum, value) => sum + value, 0),
     };
-  }, [data, hourRange]);
+  }, [data, hasModelPrices, hourRange, modelPrices]);
 
-  // 获取时间范围标签
   const hourRangeLabel = useMemo(() => {
     if (hourRange === 6) return t('monitor.hourly.last_6h');
     if (hourRange === 12) return t('monitor.hourly.last_12h');
     return t('monitor.hourly.last_24h');
   }, [hourRange, t]);
 
-  // 图表数据
   const chartData = useMemo(() => {
-    const labels = hourlyData.hours.map((hour) => {
-      return `${Number(hour.slice(11, 13))}:00`;
-    });
+    const labels = hourlyData.hours.map((hour) => `${Number(hour.slice(11, 13))}:00`);
 
     return {
       labels,
       datasets: [
         {
           type: 'line' as const,
-          label: t('monitor.hourly_token.input'),
-          data: hourlyData.inputTokens,
-          borderColor: '#22c55e',
-          backgroundColor: '#22c55e',
-          borderWidth: 2,
-          tension: 0.4,
+          label: t('usage_stats.total_cost'),
+          data: hourlyData.costs,
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.2)',
+          borderWidth: 2.5,
+          tension: 0.35,
+          fill: true,
           yAxisID: 'y',
-          order: 0,
           pointRadius: 3,
-          pointBackgroundColor: '#22c55e',
-        },
-        {
-          type: 'line' as const,
-          label: t('monitor.hourly_token.output'),
-          data: hourlyData.outputTokens,
-          borderColor: '#f97316',
-          backgroundColor: '#f97316',
-          borderWidth: 2,
-          tension: 0.4,
-          yAxisID: 'y',
-          order: 0,
-          pointRadius: 3,
-          pointBackgroundColor: '#f97316',
+          pointHoverRadius: 4,
+          pointBackgroundColor: '#f59e0b',
         },
         {
           type: 'bar' as const,
-          label: t('monitor.hourly_token.total'),
-          data: hourlyData.totalTokens,
-          backgroundColor: 'rgba(59, 130, 246, 0.6)',
-          borderColor: 'rgba(59, 130, 246, 0.6)',
+          label: t('monitor.requests'),
+          data: hourlyData.requestCounts,
+          backgroundColor: 'rgba(59, 130, 246, 0.22)',
+          borderColor: 'rgba(59, 130, 246, 0.35)',
           borderWidth: 1,
           borderRadius: 4,
-          yAxisID: 'y',
-          order: 1,
+          yAxisID: 'y1',
         },
       ],
     };
   }, [hourlyData, t]);
 
-  // 图表配置
   const chartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -151,24 +127,21 @@ export function HourlyTokenChart({ data, loading, isDark }: HourlyTokenChartProp
         labels: {
           color: isDark ? '#9ca3af' : '#6b7280',
           usePointStyle: true,
-          padding: 12,
+          padding: 10,
+          boxWidth: 8,
           font: {
             size: 11,
           },
-          generateLabels: (chart: any) => {
-            return chart.data.datasets.map((dataset: any, i: number) => {
-              const isLine = dataset.type === 'line';
-              return {
-                text: dataset.label,
-                fillStyle: dataset.backgroundColor,
-                strokeStyle: dataset.borderColor,
-                lineWidth: 0,
-                hidden: !chart.isDatasetVisible(i),
-                datasetIndex: i,
-                pointStyle: isLine ? 'circle' : 'rect',
-              };
-            });
-          },
+          generateLabels: (chart: any) =>
+            chart.data.datasets.map((dataset: any, i: number) => ({
+              text: dataset.label,
+              fillStyle: dataset.backgroundColor,
+              strokeStyle: dataset.borderColor,
+              lineWidth: 0,
+              hidden: !chart.isDatasetVisible(i),
+              datasetIndex: i,
+              pointStyle: dataset.type === 'line' ? 'circle' : 'rect',
+            })),
         },
       },
       tooltip: {
@@ -180,9 +153,10 @@ export function HourlyTokenChart({ data, loading, isDark }: HourlyTokenChartProp
         padding: 12,
         callbacks: {
           label: (context: any) => {
-            const label = context.dataset.label || '';
-            const value = context.raw;
-            return `${label}: ${value.toFixed(1)}K`;
+            if (context.dataset.yAxisID === 'y') {
+              return `${context.dataset.label}: ${formatUsd(Number(context.raw) || 0)}`;
+            }
+            return `${context.dataset.label}: ${(Number(context.raw) || 0).toLocaleString()}`;
           },
         },
       },
@@ -190,7 +164,7 @@ export function HourlyTokenChart({ data, loading, isDark }: HourlyTokenChartProp
     scales: {
       x: {
         grid: {
-          color: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)',
+          color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
         },
         ticks: {
           color: isDark ? '#9ca3af' : '#6b7280',
@@ -202,18 +176,38 @@ export function HourlyTokenChart({ data, loading, isDark }: HourlyTokenChartProp
       y: {
         position: 'left' as const,
         grid: {
-          color: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)',
+          color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
         },
         ticks: {
           color: isDark ? '#9ca3af' : '#6b7280',
           font: {
             size: 11,
           },
-          callback: (value: string | number) => `${value}K`,
+          callback: (value: string | number) => formatUsd(Number(value)),
         },
         title: {
           display: true,
-          text: 'Tokens (K)',
+          text: t('usage_stats.cost_axis_label'),
+          color: isDark ? '#9ca3af' : '#6b7280',
+          font: {
+            size: 11,
+          },
+        },
+      },
+      y1: {
+        position: 'right' as const,
+        grid: {
+          drawOnChartArea: false,
+        },
+        ticks: {
+          color: isDark ? '#9ca3af' : '#6b7280',
+          font: {
+            size: 11,
+          },
+        },
+        title: {
+          display: true,
+          text: t('monitor.hourly.requests'),
           color: isDark ? '#9ca3af' : '#6b7280',
           font: {
             size: 11,
@@ -221,15 +215,19 @@ export function HourlyTokenChart({ data, loading, isDark }: HourlyTokenChartProp
         },
       },
     },
-  }), [isDark]);
+  }), [isDark, t]);
 
   return (
     <div className={`${styles.chartCard} ${styles.chartCardCompact}`}>
       <div className={styles.chartHeader}>
         <div className={styles.chartHeaderMain}>
-          <h3 className={styles.chartTitle}>{t('monitor.hourly_token.title')}</h3>
+          <div className={styles.chartTitleRow}>
+            <h3 className={styles.chartTitle}>{t('monitor.hourly_cost.title')}</h3>
+            <span className={styles.chartBadge}>$/h</span>
+          </div>
           <p className={styles.chartSubtitle}>
             {hourRangeLabel}
+            {hasModelPrices && hourlyData.totalCost > 0 ? ` · ${formatUsd(hourlyData.totalCost)}` : ''}
           </p>
         </div>
         <div className={styles.chartControls}>
@@ -255,12 +253,14 @@ export function HourlyTokenChart({ data, loading, isDark }: HourlyTokenChartProp
       </div>
 
       <div className={`${styles.chartContent} ${styles.chartContentCompact}`}>
-        {loading || hourlyData.hours.length === 0 ? (
-          <div className={styles.chartEmpty}>
-            {loading ? t('common.loading') : t('monitor.no_data')}
-          </div>
+        {loading ? (
+          <div className={styles.chartEmpty}>{t('common.loading')}</div>
+        ) : !hasModelPrices ? (
+          <div className={styles.chartEmpty}>{t('usage_stats.cost_need_price')}</div>
+        ) : hourlyData.hours.length === 0 || hourlyData.costs.every((cost) => cost <= 0) ? (
+          <div className={styles.chartEmpty}>{t('usage_stats.cost_no_data')}</div>
         ) : (
-          <Chart type="bar" data={chartData} options={chartOptions} />
+          <Chart type="line" data={chartData} options={chartOptions} />
         )}
       </div>
     </div>
