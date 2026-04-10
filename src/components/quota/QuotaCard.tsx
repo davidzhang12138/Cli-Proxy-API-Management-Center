@@ -7,6 +7,7 @@ import type { ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import { TYPE_COLORS } from '@/utils/quota';
+import { formatCompactNumber } from '@/utils/usage';
 import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -56,9 +57,30 @@ export interface QuotaRenderHelpers {
   QuotaProgressBar: (props: QuotaProgressBarProps) => ReactElement;
 }
 
+export interface QuotaUsageModelSummary {
+  model: string;
+  totalTokens: number;
+}
+
+const USAGE_DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false
+};
+
 interface QuotaCardProps<TState extends QuotaStatusState> {
   item: AuthFileItem;
   quota?: TState;
+  usedTokens?: number | null;
+  usageStartedAtMs?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  cachedTokens?: number | null;
+  reasoningTokens?: number | null;
+  topModels?: QuotaUsageModelSummary[];
   resolvedTheme: ResolvedTheme;
   i18nPrefix: string;
   cardIdleMessageKey?: string;
@@ -72,6 +94,13 @@ interface QuotaCardProps<TState extends QuotaStatusState> {
 export function QuotaCard<TState extends QuotaStatusState>({
   item,
   quota,
+  usedTokens = null,
+  usageStartedAtMs = null,
+  inputTokens = null,
+  outputTokens = null,
+  cachedTokens = null,
+  reasoningTokens = null,
+  topModels = [],
   resolvedTheme,
   i18nPrefix,
   cardIdleMessageKey,
@@ -81,7 +110,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
   onRefresh,
   renderQuotaItems
 }: QuotaCardProps<TState>) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const displayType = item.type || item.provider || defaultType;
   const typeColorSet = TYPE_COLORS[displayType] || TYPE_COLORS.unknown;
@@ -94,7 +123,24 @@ export function QuotaCard<TState extends QuotaStatusState>({
     quota?.errorStatus,
     quota?.error || t('common.unknown_error')
   );
+  const usageStartedAt =
+    usageStartedAtMs === null
+      ? null
+      : new Intl.DateTimeFormat(i18n.resolvedLanguage, USAGE_DATE_FORMAT_OPTIONS).format(
+          usageStartedAtMs
+        );
+  const usageMetaText = usageStartedAt
+    ? t('quota_management.usage_since', { time: usageStartedAt })
+    : usedTokens === 0
+      ? t('quota_management.usage_no_data')
+      : t('system_info.not_loaded');
   const idleMessageKey = onRefresh ? `${i18nPrefix}.idle` : (cardIdleMessageKey ?? `${i18nPrefix}.idle`);
+  const usageBreakdownItems = [
+    { key: 'input', label: t('usage_stats.input_tokens'), value: inputTokens },
+    { key: 'output', label: t('usage_stats.output_tokens'), value: outputTokens },
+    { key: 'cached', label: t('usage_stats.cached_tokens'), value: cachedTokens },
+    { key: 'reasoning', label: t('usage_stats.reasoning_tokens'), value: reasoningTokens }
+  ];
 
   const getTypeLabel = (type: string): string => {
     const key = `auth_files.filter_${type}`;
@@ -118,6 +164,53 @@ export function QuotaCard<TState extends QuotaStatusState>({
           {getTypeLabel(displayType)}
         </span>
         <span className={styles.fileName}>{item.name}</span>
+      </div>
+
+      <div className={styles.cardUsageRow}>
+        <div className={styles.cardUsageMeta}>
+          <span className={styles.cardUsageLabel}>{t('quota_management.used_tokens')}</span>
+          <span className={styles.cardUsageSubtext} title={usageStartedAt ?? undefined}>
+            {usageMetaText}
+          </span>
+        </div>
+        <span
+          className={styles.cardUsageValue}
+          title={usedTokens === null ? '--' : usedTokens.toLocaleString()}
+        >
+          {usedTokens === null ? '--' : `${formatCompactNumber(usedTokens)} Tokens`}
+        </span>
+
+        <div className={styles.cardUsageBreakdown}>
+          {usageBreakdownItems.map((item) => (
+            <div key={item.key} className={styles.cardUsageStat}>
+              <span className={styles.cardUsageStatLabel}>{item.label}</span>
+              <span
+                className={styles.cardUsageStatValue}
+                title={item.value === null ? undefined : item.value.toLocaleString()}
+              >
+                {item.value === null ? '--' : formatCompactNumber(item.value)}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {topModels.length > 0 && (
+          <div className={styles.cardUsageModels}>
+            <span className={styles.cardUsageModelsLabel}>{t('quota_management.top_models')}</span>
+            <div className={styles.cardUsageModelList}>
+              {topModels.map((model) => (
+                <span
+                  key={model.model}
+                  className={styles.cardUsageModelChip}
+                  title={`${model.model}: ${model.totalTokens.toLocaleString()} Tokens`}
+                >
+                  {model.model}
+                  <strong>{formatCompactNumber(model.totalTokens)}</strong>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={styles.quotaSection}>

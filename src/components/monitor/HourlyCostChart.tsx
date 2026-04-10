@@ -555,16 +555,16 @@ export function HourlyCostChart({ data, loading, isDark }: HourlyCostChartProps)
               {t('monitor.hourly.mode_model')}
             </button>
             <button
-              className={`${styles.chartControlBtn} ${viewMode === 'cost' ? styles.active : ''}`}
-              onClick={() => setViewMode('cost')}
-            >
-              {t('monitor.hourly.mode_cost')}
-            </button>
-            <button
               className={`${styles.chartControlBtn} ${viewMode === 'token' ? styles.active : ''}`}
               onClick={() => setViewMode('token')}
             >
               {t('monitor.hourly.mode_token')}
+            </button>
+            <button
+              className={`${styles.chartControlBtn} ${viewMode === 'cost' ? styles.active : ''}`}
+              onClick={() => setViewMode('cost')}
+            >
+              {t('monitor.hourly.mode_cost')}
             </button>
           </div>
           <div className={styles.chartControls}>

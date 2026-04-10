@@ -666,7 +666,7 @@
 // 虚拟滚动表格固定列宽
 .virtualTable {
   table-layout: fixed;
-  min-width: 1540px;
+  min-width: 1720px;
 
   th, td {
     overflow: hidden;
@@ -695,13 +695,13 @@
   // 耗时
   th:nth-child(10), td:nth-child(10) { width: 80px; }
   // 输入
-  th:nth-child(11), td:nth-child(11) { width: 60px; }
+  th:nth-child(11), td:nth-child(11) { width: 96px; }
   // 缓存
-  th:nth-child(12), td:nth-child(12) { width: 60px; }
+  th:nth-child(12), td:nth-child(12) { width: 96px; }
   // 输出
-  th:nth-child(13), td:nth-child(13) { width: 60px; }
+  th:nth-child(13), td:nth-child(13) { width: 96px; }
   // 总 Token
-  th:nth-child(14), td:nth-child(14) { width: 70px; }
+  th:nth-child(14), td:nth-child(14) { width: 110px; }
   // 花费
   th:nth-child(15), td:nth-child(15) { width: 84px; }
   // 时间

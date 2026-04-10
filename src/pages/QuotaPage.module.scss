@@ -13,6 +13,48 @@
   gap: $spacing-sm;
 }
 
+.filterToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-md;
+  align-items: flex-end;
+  padding: $spacing-md;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-lg;
+  background: var(--bg-secondary);
+}
+
+.filterControl {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+  flex: 1 1 220px;
+
+  label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+}
+
+.filterStatus {
+  margin-left: auto;
+  padding: 8px 12px;
+  border-radius: $radius-md;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+
+  @include mobile {
+    width: 100%;
+    margin-left: 0;
+    white-space: normal;
+  }
+}
+
 .pageTitle {
   font-size: 28px;
   font-weight: 700;
@@ -639,6 +681,119 @@
   color: var(--text-primary);
   word-break: break-all;
   line-height: 1.4;
+}
+
+.cardUsageRow {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  padding: 8px 10px;
+  border-radius: $radius-md;
+  background: var(--bg-secondary);
+  border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+}
+
+.cardUsageMeta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-sm;
+
+  @include mobile {
+    flex-direction: column;
+  }
+}
+
+.cardUsageLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.cardUsageSubtext {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.cardUsageValue {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  align-self: flex-end;
+}
+
+.cardUsageBreakdown {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+
+  @include tablet {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @include mobile {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cardUsageStat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: $radius-md;
+  background: color-mix(in srgb, var(--bg-primary) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+}
+
+.cardUsageStatLabel {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.cardUsageStatValue {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cardUsageModels {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardUsageModelsLabel {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.cardUsageModelList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cardUsageModelChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--bg-primary));
+  border: 1px solid color-mix(in srgb, var(--primary-color) 16%, var(--border-color));
+  color: var(--text-primary);
+  font-size: 11px;
+
+  strong {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary-color);
+  }
 }
 
 .pagination {

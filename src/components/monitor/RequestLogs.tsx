@@ -17,7 +17,6 @@ import type { SourceInfo, CredentialInfo } from '@/types/sourceInfo';
 import { TimeRangeSelector, formatTimeRangeCaption, type TimeRange } from './TimeRangeSelector';
 import { DisableModelModal } from './DisableModelModal';
 import {
-  maskSecret,
   formatProviderDisplay,
   formatTimestamp,
   getRateClassName,
@@ -92,6 +91,17 @@ const parseCachedTokens = (value: unknown, fallback: unknown): number => {
   const alternate =
     typeof fallback === 'number' && Number.isFinite(fallback) ? Math.max(fallback, 0) : 0;
   return Math.max(primary, alternate);
+};
+
+const maskApiKeyWithTail = (value: string, tailLength = 10): string => {
+  if (!value || value === '-' || value === 'unknown') {
+    return value || '-';
+  }
+  const safeTailLength = Math.max(1, tailLength);
+  if (value.length <= safeTailLength) {
+    return value;
+  }
+  return `***${value.slice(-safeTailLength)}`;
 };
 
 export function RequestLogs({ data, loading: parentLoading, providerMap, providerTypeMap, sourceInfoMap, authFileMap: propAuthFileMap, apiFilter }: RequestLogsProps) {
@@ -491,7 +501,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
           {authDisplayName}
         </td>
         <td title={entry.apiKey}>
-          {maskSecret(entry.apiKey)}
+          {maskApiKeyWithTail(entry.apiKey)}
         </td>
         <td>{entry.providerType}</td>
         <td title={entry.model}>
@@ -583,9 +593,9 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
           >
             <option value="">{t('monitor.logs.all_apis')}</option>
             {apis.map((api) => (
-              <option key={api} value={api}>
-                {maskSecret(api)}
-              </option>
+                  <option key={api} value={api}>
+                    {maskApiKeyWithTail(api)}
+                  </option>
             ))}
           </select>
           <select
