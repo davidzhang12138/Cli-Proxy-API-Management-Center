@@ -221,5 +221,13 @@ export const providersApi = {
     apiClient.patch('/openai-compatibility', { index, value: serializeOpenAIProvider(value) }),
 
   deleteOpenAIProvider: (name: string) =>
-    apiClient.delete(`/openai-compatibility?name=${encodeURIComponent(name)}`)
+    apiClient.delete(`/openai-compatibility?name=${encodeURIComponent(name)}`),
+
+  patchOpenAIProviderByName: (name: string, value: Partial<OpenAIProviderConfig>) => {
+    const payload: Record<string, unknown> = {};
+    if (value.models !== undefined) {
+      payload.models = serializeModelAliases(value.models);
+    }
+    return apiClient.patch('/openai-compatibility', { name, value: payload });
+  }
 };

@@ -15,6 +15,10 @@ Since version 6.0.19, the Web UI ships with the main program; access it via `/ma
 - This repository is the Web UI only. It talks to the CLI Proxy API **Management API** (`/v0/management`) to read/update config, upload credentials, view logs, and inspect usage.
 - It is **not** a proxy and does not forward traffic.
 
+## Imported page sources
+
+- Monitor Center page source: https://github.com/kongkongyo/Cli-Proxy-API-Management-Center.git
+
 ## Quick start
 
 ### Option A: Use the Web UI bundled in CLI Proxy API (recommended)

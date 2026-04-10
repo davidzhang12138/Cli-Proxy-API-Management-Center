@@ -347,8 +347,9 @@ export function AuthFilesPage() {
   const existingTypes = useMemo(() => {
     const types = new Set<string>(['all']);
     files.forEach((file) => {
-      if (file.type) {
-        types.add(file.type);
+      const type = String(file.type ?? file.provider ?? '').trim();
+      if (type) {
+        types.add(type);
       }
     });
     return Array.from(types);
@@ -371,8 +372,9 @@ export function AuthFilesPage() {
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = { all: filesMatchingProblemFilter.length };
     filesMatchingProblemFilter.forEach((file) => {
-      if (!file.type) return;
-      counts[file.type] = (counts[file.type] || 0) + 1;
+      const type = String(file.type ?? file.provider ?? '').trim();
+      if (!type) return;
+      counts[type] = (counts[type] || 0) + 1;
     });
     return counts;
   }, [filesMatchingProblemFilter]);
@@ -384,7 +386,8 @@ export function AuthFilesPage() {
     const normalizedTerm = normalizedSearch.toLowerCase();
 
     return filesMatchingProblemFilter.filter((item) => {
-      const matchType = filter === 'all' || item.type === filter;
+      const itemType = String(item.type ?? item.provider ?? '').trim();
+      const matchType = filter === 'all' || itemType === filter;
       const matchSearch =
         !normalizedSearch ||
         [item.name, item.type, item.provider].some((value) => {

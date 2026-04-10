@@ -15,6 +15,10 @@
 - 本仓库只包含 Web 管理界面本身，通过 CLI Proxy API 的 **Management API**（`/v0/management`）读取/修改配置、上传凭据、查看日志与使用统计。
 - 它 **不是** 代理本体，不参与流量转发。
 
+## 页面来源
+
+- 监控中心页面来源： https://github.com/kongkongyo/Cli-Proxy-API-Management-Center.git
+
 ## 快速开始
 
 ### 方式 A：使用 CLI Proxy API 自带的 Web UI（推荐）

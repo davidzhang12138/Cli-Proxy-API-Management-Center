@@ -306,3 +306,54 @@ export interface KimiQuotaState {
   error?: string;
   errorStatus?: number;
 }
+
+export interface KiroFreeTrialInfo {
+  freeTrialStatus?: string;
+  usageLimit?: number;
+  currentUsage?: number;
+  usageLimitWithPrecision?: number;
+  currentUsageWithPrecision?: number;
+}
+
+export interface KiroUsageBreakdown {
+  usageLimit?: number;
+  currentUsage?: number;
+  usageLimitWithPrecision?: number;
+  currentUsageWithPrecision?: number;
+  nextDateReset?: number;
+  displayName?: string;
+  resourceType?: string;
+  freeTrialInfo?: KiroFreeTrialInfo;
+}
+
+export interface KiroQuotaPayload {
+  daysUntilReset?: number;
+  nextDateReset?: number;
+  userInfo?: {
+    email?: string;
+    userId?: string;
+  };
+  subscriptionInfo?: {
+    subscriptionTitle?: string;
+    type?: string;
+  };
+  usageBreakdownList?: KiroUsageBreakdown[];
+}
+
+export interface KiroQuotaState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  baseUsage: number | null;
+  baseLimit: number | null;
+  baseRemaining: number | null;
+  bonusUsage: number | null;
+  bonusLimit: number | null;
+  bonusRemaining: number | null;
+  bonusStatus?: string;
+  currentUsage: number | null;
+  usageLimit: number | null;
+  remainingCredits: number | null;
+  nextReset?: string;
+  subscriptionType?: string;
+  error?: string;
+  errorStatus?: number;
+}

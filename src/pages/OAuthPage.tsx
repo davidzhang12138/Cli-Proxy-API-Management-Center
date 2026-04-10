@@ -3,15 +3,17 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { useNotificationStore, useThemeStore } from '@/stores';
+import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
 import { oauthApi, type OAuthProvider, type IFlowCookieAuthResponse } from '@/services/api/oauth';
 import { vertexApi, type VertexImportResponse } from '@/services/api/vertex';
 import { copyToClipboard } from '@/utils/clipboard';
+import { normalizeApiBase } from '@/utils/connection';
 import styles from './OAuthPage.module.scss';
 import iconCodex from '@/assets/icons/codex.svg';
 import iconClaude from '@/assets/icons/claude.svg';
 import iconAntigravity from '@/assets/icons/antigravity.svg';
 import iconGemini from '@/assets/icons/gemini.svg';
+import iconKiro from '@/assets/icons/kiro.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
 import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconQwen from '@/assets/icons/qwen.svg';
@@ -56,6 +58,15 @@ interface VertexImportState {
   result?: VertexImportResult;
 }
 
+interface KiroState {
+  startUrl: string;
+  region: string;
+  token: string;
+  loading: boolean;
+  error?: string;
+  success?: boolean;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object';
 }
@@ -92,6 +103,8 @@ const getIcon = (icon: string | { light: string; dark: string }, theme: 'light' 
 export function OAuthPage() {
   const { t } = useTranslation();
   const { showNotification } = useNotificationStore();
+  const apiBase = useAuthStore((state) => state.apiBase);
+  const managementKey = useAuthStore((state) => state.managementKey);
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const [states, setStates] = useState<Record<OAuthProvider, ProviderState>>({} as Record<OAuthProvider, ProviderState>);
   const [iflowCookie, setIflowCookie] = useState<IFlowCookieState>({ cookie: '', loading: false });
@@ -100,8 +113,16 @@ export function OAuthPage() {
     location: '',
     loading: false
   });
+  const [kiroState, setKiroState] = useState<KiroState>({
+    startUrl: '',
+    region: '',
+    token: '',
+    loading: false,
+  });
   const timers = useRef<Record<string, number>>({});
   const vertexFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const resolvedKiroBase = normalizeApiBase(apiBase || window.location.origin);
 
   const clearTimers = useCallback(() => {
     Object.values(timers.current).forEach((timer) => window.clearInterval(timer));
@@ -336,6 +357,66 @@ export function OAuthPage() {
     }
   };
 
+  const openKiroOAuth = (method: 'builder-id' | 'idc') => {
+    let url = `${resolvedKiroBase}/v0/oauth/kiro/start?method=${method}`;
+    if (method === 'idc') {
+      const startUrl = kiroState.startUrl.trim();
+      const region = kiroState.region.trim();
+      if (startUrl) {
+        url += `&start_url=${encodeURIComponent(startUrl)}`;
+      }
+      if (region) {
+        url += `&region=${encodeURIComponent(region)}`;
+      }
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const importKiroToken = async () => {
+    const token = kiroState.token.trim();
+    if (!token) {
+      showNotification(t('auth_login.kiro_token_required'), 'warning');
+      return;
+    }
+
+    setKiroState((prev) => ({
+      ...prev,
+      loading: true,
+      error: undefined,
+      success: undefined,
+    }));
+
+    try {
+      const response = await fetch(`${resolvedKiroBase}/v0/oauth/kiro/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(managementKey ? { Authorization: `Bearer ${managementKey}` } : {}),
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) {
+        const errorData = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      setKiroState((prev) => ({ ...prev, loading: false, success: true }));
+      showNotification(t('auth_login.kiro_token_import_success'), 'success');
+    } catch (err: unknown) {
+      const message = getErrorMessage(err);
+      setKiroState((prev) => ({
+        ...prev,
+        loading: false,
+        error: message || t('common.unknown_error'),
+      }));
+      showNotification(
+        `${t('auth_login.kiro_token_import_error')} ${message || ''}`.trim(),
+        'error'
+      );
+    }
+  };
+
   return (
     <div className={styles.container}>
       <h1 className={styles.pageTitle}>{t('nav.oauth', { defaultValue: 'OAuth' })}</h1>
@@ -452,6 +533,94 @@ export function OAuthPage() {
             </div>
           );
         })}
+
+        <Card
+          title={
+            <span className={styles.cardTitle}>
+              <img src={iconKiro} alt="" className={styles.cardTitleIcon} />
+              {t('auth_login.kiro_oauth_title')}
+            </span>
+          }
+        >
+          <div className={styles.cardContent}>
+            <div className={styles.cardHint}>{t('auth_login.kiro_oauth_hint')}</div>
+
+            <div className={styles.formItem}>
+              <label className={styles.formItemLabel}>
+                {t('auth_login.kiro_builder_id_label')}
+              </label>
+              <div className={styles.cardHintSecondary}>
+                {t('auth_login.kiro_builder_id_hint')}
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => openKiroOAuth('builder-id')}>
+                {t('auth_login.kiro_builder_id_button')}
+              </Button>
+            </div>
+
+            <div className={styles.formItem}>
+              <label className={styles.formItemLabel}>{t('auth_login.kiro_idc_label')}</label>
+              <div className={styles.cardHintSecondary}>{t('auth_login.kiro_idc_hint')}</div>
+              <Input
+                label={t('auth_login.kiro_idc_start_url_label')}
+                value={kiroState.startUrl}
+                onChange={(e) =>
+                  setKiroState((prev) => ({ ...prev, startUrl: e.target.value }))
+                }
+                placeholder={t('auth_login.kiro_idc_start_url_placeholder')}
+              />
+              <Input
+                label={t('auth_login.kiro_idc_region_label')}
+                value={kiroState.region}
+                onChange={(e) =>
+                  setKiroState((prev) => ({ ...prev, region: e.target.value }))
+                }
+                placeholder={t('auth_login.kiro_idc_region_placeholder')}
+              />
+              <Button variant="secondary" size="sm" onClick={() => openKiroOAuth('idc')}>
+                {t('auth_login.kiro_idc_button')}
+              </Button>
+            </div>
+
+            <div className={styles.formItem}>
+              <label className={styles.formItemLabel}>
+                {t('auth_login.kiro_token_import_label')}
+              </label>
+              <div className={styles.cardHintSecondary}>
+                {t('auth_login.kiro_token_import_hint')}
+              </div>
+              <Input
+                value={kiroState.token}
+                onChange={(e) =>
+                  setKiroState((prev) => ({
+                    ...prev,
+                    token: e.target.value,
+                    error: undefined,
+                    success: undefined,
+                  }))
+                }
+                placeholder={t('auth_login.kiro_token_placeholder')}
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={importKiroToken}
+                loading={kiroState.loading}
+              >
+                {t('auth_login.kiro_token_import_button')}
+              </Button>
+              {kiroState.success && (
+                <div className="status-badge success">
+                  {t('auth_login.kiro_token_import_success')}
+                </div>
+              )}
+              {kiroState.error && (
+                <div className="status-badge error">
+                  {t('auth_login.kiro_token_import_error')} {kiroState.error}
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
 
         {/* Vertex JSON 登录 */}
         <Card

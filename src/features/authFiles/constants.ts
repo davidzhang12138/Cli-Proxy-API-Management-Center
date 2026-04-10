@@ -4,6 +4,7 @@ import iconClaude from '@/assets/icons/claude.svg';
 import iconCodex from '@/assets/icons/codex.svg';
 import iconGemini from '@/assets/icons/gemini.svg';
 import iconIflow from '@/assets/icons/iflow.svg';
+import iconKiro from '@/assets/icons/kiro.svg';
 import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
 import iconQwen from '@/assets/icons/qwen.svg';
@@ -27,13 +28,20 @@ export type AuthFileModelItem = {
 };
 export type AuthFileIconAsset = string | { light: string; dark: string };
 
-export type QuotaProviderType = 'antigravity' | 'claude' | 'codex' | 'gemini-cli' | 'kimi';
+export type QuotaProviderType =
+  | 'antigravity'
+  | 'claude'
+  | 'codex'
+  | 'gemini-cli'
+  | 'kiro'
+  | 'kimi';
 
 export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'antigravity',
   'claude',
   'codex',
   'gemini-cli',
+  'kiro',
   'kimi',
 ]);
 
@@ -82,6 +90,10 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#eae7ff', text: '#3538d4' },
     dark: { bg: '#262395', text: '#b5b0ff' },
   },
+  kiro: {
+    light: { bg: '#fff8e1', text: '#ff8f00' },
+    dark: { bg: '#5f3700', text: '#ffe082' },
+  },
   // Antigravity logo: 多色（主色 #3789F9 蓝 + #53A89A 青绿），用青色区分
   antigravity: {
     light: { bg: '#e0f7fa', text: '#006064' },
@@ -115,6 +127,7 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   gemini: iconGemini,
   'gemini-cli': iconGemini,
   iflow: iconIflow,
+  kiro: iconKiro,
   kimi: { light: iconKimiLight, dark: iconKimiDark },
   qwen: iconQwen,
   vertex: iconVertex,

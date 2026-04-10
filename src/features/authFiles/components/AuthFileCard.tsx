@@ -80,13 +80,14 @@ export function AuthFileCard(props: AuthFileCardProps) {
     onToggleSelect,
   } = props;
 
+  const displayType = String(file.type ?? file.provider ?? 'unknown');
   const fileStats = resolveAuthFileStats(file, keyStats);
   const isRuntimeOnly = isRuntimeOnlyAuthFile(file);
-  const isAistudio = (file.type || '').toLowerCase() === 'aistudio';
+  const isAistudio = displayType.toLowerCase() === 'aistudio';
   const showModelsButton = !isRuntimeOnly || isAistudio;
-  const typeColor = getTypeColor(file.type || 'unknown', resolvedTheme);
-  const typeLabel = getTypeLabel(t, file.type || 'unknown');
-  const providerIcon = getAuthFileIcon(file.type || 'unknown', resolvedTheme);
+  const typeColor = getTypeColor(displayType, resolvedTheme);
+  const typeLabel = getTypeLabel(t, displayType);
+  const providerIcon = getAuthFileIcon(displayType, resolvedTheme);
 
   const quotaType =
     quotaFilterType && resolveQuotaType(file) === quotaFilterType ? quotaFilterType : null;
@@ -100,6 +101,8 @@ export function AuthFileCard(props: AuthFileCardProps) {
         ? styles.claudeCard
         : quotaType === 'codex'
           ? styles.codexCard
+          : quotaType === 'kiro'
+            ? styles.kiroCard
           : quotaType === 'gemini-cli'
             ? styles.geminiCliCard
             : quotaType === 'kimi'

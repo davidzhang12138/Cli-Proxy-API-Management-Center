@@ -6,6 +6,7 @@
 export type AuthFileType =
   | 'qwen'
   | 'kimi'
+  | 'kiro'
   | 'gemini'
   | 'gemini-cli'
   | 'aistudio'

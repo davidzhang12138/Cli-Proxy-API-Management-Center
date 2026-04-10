@@ -28,6 +28,7 @@ import type {
   GeminiCliUserTier,
   KimiQuotaRow,
   KimiQuotaState,
+  KiroQuotaState,
 } from '@/types';
 import { apiCallApi, authFilesApi, getApiCallErrorMessage } from '@/services/api';
 import { useQuotaStore } from '@/stores';
@@ -45,6 +46,8 @@ import {
   GEMINI_CLI_REQUEST_HEADERS,
   KIMI_USAGE_URL,
   KIMI_REQUEST_HEADERS,
+  KIRO_QUOTA_URL,
+  KIRO_REQUEST_HEADERS,
   normalizeGeminiCliModelId,
   normalizeNumberValue,
   normalizePlanType,
@@ -56,6 +59,7 @@ import {
   parseGeminiCliQuotaPayload,
   parseGeminiCliCodeAssistPayload,
   parseKimiUsagePayload,
+  parseKiroQuotaPayload,
   resolveCodexChatgptAccountId,
   resolveCodexPlanType,
   resolveGeminiCliProjectId,
@@ -73,6 +77,7 @@ import {
   isDisabledAuthFile,
   isGeminiCliFile,
   isKimiFile,
+  isKiroFile,
   isRuntimeOnlyAuthFile,
 } from '@/utils/quota';
 import { normalizeAuthIndex } from '@/utils/usage';
@@ -81,7 +86,7 @@ import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaUpdater<T> = T | ((prev: T) => T);
 
-type QuotaType = 'antigravity' | 'claude' | 'codex' | 'gemini-cli' | 'kimi';
+type QuotaType = 'antigravity' | 'claude' | 'codex' | 'gemini-cli' | 'kiro' | 'kimi';
 
 const DEFAULT_ANTIGRAVITY_PROJECT_ID = 'bamboo-precept-lgxtn';
 const QUOTA_PROGRESS_HIGH_THRESHOLD = 70;
@@ -97,11 +102,13 @@ export interface QuotaStore {
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
   geminiCliQuota: Record<string, GeminiCliQuotaState>;
+  kiroQuota: Record<string, KiroQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setGeminiCliQuota: (updater: QuotaUpdater<Record<string, GeminiCliQuotaState>>) => void;
+  setKiroQuota: (updater: QuotaUpdater<Record<string, KiroQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   clearQuotaCache: () => void;
 }
@@ -1233,6 +1240,303 @@ export const GEMINI_CLI_CONFIG: QuotaConfig<
   controlClassName: styles.geminiCliControl,
   gridClassName: styles.geminiCliGrid,
   renderQuotaItems: renderGeminiCliItems,
+};
+
+type KiroQuotaData = {
+  baseUsage: number | null;
+  baseLimit: number | null;
+  baseRemaining: number | null;
+  bonusUsage: number | null;
+  bonusLimit: number | null;
+  bonusRemaining: number | null;
+  bonusStatus?: string;
+  currentUsage: number | null;
+  usageLimit: number | null;
+  remainingCredits: number | null;
+  nextReset?: string;
+  subscriptionType?: string;
+};
+
+const fetchKiroQuota = async (
+  file: AuthFileItem,
+  t: TFunction
+): Promise<KiroQuotaData> => {
+  const rawAuthIndex = file['auth_index'] ?? file.authIndex;
+  const authIndex = normalizeAuthIndex(rawAuthIndex);
+  if (!authIndex) {
+    throw new Error(t('kiro_quota.missing_auth_index'));
+  }
+
+  const result = await apiCallApi.request({
+    authIndex,
+    method: 'GET',
+    url: KIRO_QUOTA_URL,
+    header: { ...KIRO_REQUEST_HEADERS },
+  });
+
+  if (result.statusCode < 200 || result.statusCode >= 300) {
+    throw createStatusError(getApiCallErrorMessage(result), result.statusCode);
+  }
+
+  const payload = parseKiroQuotaPayload(result.body ?? result.bodyText);
+  if (!payload) {
+    throw new Error(t('kiro_quota.empty_data'));
+  }
+
+  const breakdownList = Array.isArray(payload.usageBreakdownList) ? payload.usageBreakdownList : [];
+  let baseLimit = 0;
+  let baseUsage = 0;
+  let bonusLimit = 0;
+  let bonusUsage = 0;
+  let bonusStatus: string | undefined;
+
+  breakdownList.forEach((breakdown) => {
+    const limit = normalizeNumberValue(
+      breakdown.usageLimitWithPrecision ?? breakdown.usageLimit
+    );
+    const usage = normalizeNumberValue(
+      breakdown.currentUsageWithPrecision ?? breakdown.currentUsage
+    );
+    if (limit !== null) baseLimit += limit;
+    if (usage !== null) baseUsage += usage;
+
+    const freeTrialInfo = breakdown.freeTrialInfo;
+    if (!freeTrialInfo) return;
+
+    const freeLimit = normalizeNumberValue(
+      freeTrialInfo.usageLimitWithPrecision ?? freeTrialInfo.usageLimit
+    );
+    const freeUsage = normalizeNumberValue(
+      freeTrialInfo.currentUsageWithPrecision ?? freeTrialInfo.currentUsage
+    );
+    if (freeLimit !== null) bonusLimit += freeLimit;
+    if (freeUsage !== null) bonusUsage += freeUsage;
+    if (freeTrialInfo.freeTrialStatus) {
+      bonusStatus = freeTrialInfo.freeTrialStatus;
+    }
+  });
+
+  const totalLimit = baseLimit + bonusLimit;
+  const totalUsage = baseUsage + bonusUsage;
+  const nextResetTimestamp = normalizeNumberValue(payload.nextDateReset);
+  let nextReset: string | undefined;
+  if (nextResetTimestamp !== null) {
+    const resetDate = new Date(nextResetTimestamp * 1000);
+    if (!Number.isNaN(resetDate.getTime())) {
+      nextReset = resetDate.toISOString();
+    }
+  }
+  const subscriptionType =
+    normalizeStringValue(payload.subscriptionInfo?.subscriptionTitle) ??
+    normalizeStringValue(payload.subscriptionInfo?.type) ??
+    undefined;
+
+  return {
+    baseUsage,
+    baseLimit,
+    baseRemaining: baseLimit > 0 ? Math.max(0, baseLimit - baseUsage) : null,
+    bonusUsage,
+    bonusLimit,
+    bonusRemaining: bonusLimit > 0 ? Math.max(0, bonusLimit - bonusUsage) : null,
+    bonusStatus,
+    currentUsage: totalUsage,
+    usageLimit: totalLimit,
+    remainingCredits: totalLimit > 0 ? Math.max(0, totalLimit - totalUsage) : null,
+    nextReset,
+    subscriptionType,
+  };
+};
+
+const renderKiroItems = (
+  quota: KiroQuotaState,
+  t: TFunction,
+  helpers: QuotaRenderHelpers
+): ReactNode => {
+  const { styles: styleMap, QuotaProgressBar } = helpers;
+  const { createElement: h, Fragment } = React;
+  const nodes: ReactNode[] = [];
+
+  if (quota.subscriptionType) {
+    nodes.push(
+      h(
+        'div',
+        { key: 'subscription', className: styleMap.codexPlan },
+        h('span', { className: styleMap.codexPlanLabel }, t('kiro_quota.subscription_label')),
+        h('span', { className: styleMap.codexPlanValue }, quota.subscriptionType)
+      )
+    );
+  }
+
+  const usageLimit = quota.usageLimit;
+  if (usageLimit === null || usageLimit === 0) {
+    nodes.push(
+      h('div', { key: 'empty', className: styleMap.quotaMessage }, t('kiro_quota.empty_data'))
+    );
+    return h(Fragment, null, ...nodes);
+  }
+
+  const resetLabel = formatQuotaResetTime(quota.nextReset);
+  const buildRemainingPercent = (remaining: number | null, limit: number | null) => {
+    if (remaining === null || limit === null || limit <= 0) return 0;
+    return Math.round((remaining / limit) * 100);
+  };
+
+  const baseRemainingPercent = buildRemainingPercent(quota.baseRemaining, quota.baseLimit);
+  if (quota.baseLimit !== null && quota.baseLimit > 0) {
+    nodes.push(
+      h(
+        'div',
+        { key: 'base-credits', className: styleMap.quotaRow },
+        h(
+          'div',
+          { className: styleMap.quotaRowHeader },
+          h('span', { className: styleMap.quotaModel }, t('kiro_quota.base_credits_label')),
+          h(
+            'div',
+            { className: styleMap.quotaMeta },
+            h('span', { className: styleMap.quotaPercent }, `${baseRemainingPercent}%`),
+            quota.baseRemaining !== null
+              ? h(
+                  'span',
+                  { className: styleMap.quotaAmount },
+                  t('kiro_quota.remaining_credits', { count: Math.round(quota.baseRemaining) })
+                )
+              : null,
+            h('span', { className: styleMap.quotaReset }, resetLabel)
+          )
+        ),
+        h(QuotaProgressBar, {
+          percent: baseRemainingPercent,
+          highThreshold: 60,
+          mediumThreshold: 20,
+        })
+      )
+    );
+  }
+
+  const bonusRemainingPercent = buildRemainingPercent(quota.bonusRemaining, quota.bonusLimit);
+  if (quota.bonusLimit !== null && quota.bonusLimit > 0) {
+    nodes.push(
+      h(
+        'div',
+        { key: 'bonus-credits', className: styleMap.quotaRow },
+        h(
+          'div',
+          { className: styleMap.quotaRowHeader },
+          h('span', { className: styleMap.quotaModel }, t('kiro_quota.bonus_credits_label')),
+          h(
+            'div',
+            { className: styleMap.quotaMeta },
+            h('span', { className: styleMap.quotaPercent }, `${bonusRemainingPercent}%`),
+            quota.bonusRemaining !== null
+              ? h(
+                  'span',
+                  { className: styleMap.quotaAmount },
+                  t('kiro_quota.remaining_credits', { count: Math.round(quota.bonusRemaining) })
+                )
+              : null
+          )
+        ),
+        h(QuotaProgressBar, {
+          percent: bonusRemainingPercent,
+          highThreshold: 60,
+          mediumThreshold: 20,
+        })
+      )
+    );
+  }
+
+  const totalRemainingPercent =
+    quota.currentUsage !== null && usageLimit > 0
+      ? Math.max(0, 100 - Math.round((quota.currentUsage / usageLimit) * 100))
+      : 0;
+
+  nodes.push(
+    h(
+      'div',
+      { key: 'total-credits', className: styleMap.quotaRow },
+      h(
+        'div',
+        { className: styleMap.quotaRowHeader },
+        h('span', { className: styleMap.quotaModel }, t('kiro_quota.total_credits_label')),
+        h(
+          'div',
+          { className: styleMap.quotaMeta },
+          h('span', { className: styleMap.quotaPercent }, `${totalRemainingPercent}%`),
+          quota.remainingCredits !== null
+            ? h(
+                'span',
+                { className: styleMap.quotaAmount },
+                t('kiro_quota.remaining_credits', { count: Math.round(quota.remainingCredits) })
+              )
+            : null
+        )
+      ),
+      h(QuotaProgressBar, {
+        percent: totalRemainingPercent,
+        highThreshold: 60,
+        mediumThreshold: 20,
+      })
+    )
+  );
+
+  return h(Fragment, null, ...nodes);
+};
+
+export const KIRO_CONFIG: QuotaConfig<KiroQuotaState, KiroQuotaData> = {
+  type: 'kiro',
+  i18nPrefix: 'kiro_quota',
+  cardIdleMessageKey: 'quota_management.card_idle_hint',
+  filterFn: (file) => isKiroFile(file) && !isDisabledAuthFile(file),
+  fetchQuota: fetchKiroQuota,
+  storeSelector: (state) => state.kiroQuota,
+  storeSetter: 'setKiroQuota',
+  buildLoadingState: () => ({
+    status: 'loading',
+    baseUsage: null,
+    baseLimit: null,
+    baseRemaining: null,
+    bonusUsage: null,
+    bonusLimit: null,
+    bonusRemaining: null,
+    currentUsage: null,
+    usageLimit: null,
+    remainingCredits: null,
+  }),
+  buildSuccessState: (data) => ({
+    status: 'success',
+    baseUsage: data.baseUsage,
+    baseLimit: data.baseLimit,
+    baseRemaining: data.baseRemaining,
+    bonusUsage: data.bonusUsage,
+    bonusLimit: data.bonusLimit,
+    bonusRemaining: data.bonusRemaining,
+    bonusStatus: data.bonusStatus,
+    currentUsage: data.currentUsage,
+    usageLimit: data.usageLimit,
+    remainingCredits: data.remainingCredits,
+    nextReset: data.nextReset,
+    subscriptionType: data.subscriptionType,
+  }),
+  buildErrorState: (message, status) => ({
+    status: 'error',
+    baseUsage: null,
+    baseLimit: null,
+    baseRemaining: null,
+    bonusUsage: null,
+    bonusLimit: null,
+    bonusRemaining: null,
+    currentUsage: null,
+    usageLimit: null,
+    remainingCredits: null,
+    error: message,
+    errorStatus: status,
+  }),
+  cardClassName: styles.kiroCard,
+  controlsClassName: styles.kiroControls,
+  controlClassName: styles.kiroControl,
+  gridClassName: styles.kiroGrid,
+  renderQuotaItems: renderKiroItems,
 };
 
 const fetchKimiQuota = async (

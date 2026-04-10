@@ -34,6 +34,10 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#eae7ff', text: '#3538d4' },
     dark: { bg: '#262395', text: '#b5b0ff' },
   },
+  kiro: {
+    light: { bg: '#fff8e1', text: '#ff8f00' },
+    dark: { bg: '#5f3700', text: '#ffe082' },
+  },
   kimi: {
     light: { bg: '#dce8ff', text: '#0560cf' },
     dark: { bg: '#003880', text: '#70b5ff' },
@@ -190,6 +194,18 @@ export const CODEX_REQUEST_HEADERS = {
   Authorization: 'Bearer $TOKEN$',
   'Content-Type': 'application/json',
   'User-Agent': 'codex_cli_rs/0.76.0 (Debian 13.0.0; x86_64) WindowsTerminal',
+};
+
+export const KIRO_QUOTA_URL =
+  'https://codewhisperer.us-east-1.amazonaws.com/getUsageLimits?isEmailRequired=true&origin=AI_EDITOR&resourceType=AGENTIC_REQUEST';
+
+export const KIRO_REQUEST_HEADERS = {
+  Authorization: 'Bearer $TOKEN$',
+  'x-amz-user-agent': 'aws-sdk-js/1.0.0 KiroIDE-0.6.18-cpamc',
+  'User-Agent':
+    'aws-sdk-js/1.0.0 ua/2.1 os/windows lang/js md/nodejs#20.16.0 api/codewhispererruntime#1.0.0 m/E KiroIDE-0.6.18-cpamc',
+  'amz-sdk-request': 'attempt=1; max=1',
+  Connection: 'close',
 };
 
 // Kimi API configuration
