@@ -93,6 +93,33 @@ const buildEmptyUsageSummary = (ready: boolean): FileUsageSummary => ({
   models: []
 });
 
+const quotaStateMatchesModel = (
+  quotaType: QuotaConfig<QuotaStatusState, unknown>['type'],
+  quotaState: QuotaStatusState | undefined,
+  normalizedSelectedModel: string
+): boolean | null => {
+  if (!normalizedSelectedModel || !quotaState || quotaState.status !== 'success') {
+    return null;
+  }
+
+  switch (quotaType) {
+    case 'antigravity': {
+      const state = quotaState as AntigravityQuotaState;
+      return state.groups.some((group) =>
+        group.models.some((model) => normalizeModelKey(model) === normalizedSelectedModel)
+      );
+    }
+    case 'gemini-cli': {
+      const state = quotaState as GeminiCliQuotaState;
+      return state.buckets.some((bucket) =>
+        (bucket.modelIds ?? []).some((model) => normalizeModelKey(model) === normalizedSelectedModel)
+      );
+    }
+    default:
+      return null;
+  }
+};
+
 const getQuotaRemainingRatio = (
   quotaType: QuotaConfig<QuotaStatusState, unknown>['type'],
   quotaState: QuotaStatusState | undefined
@@ -259,6 +286,8 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const providerFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [files, config]);
 
   const usageSummaryByFileName = useMemo(() => {
+    const normalizedSelectedModel =
+      selectedModel && selectedModel !== 'all' ? normalizeModelKey(selectedModel) : '';
     const usageByAuthIndex = new Map<string, FileUsageSummary>();
     const usageBySource = new Map<string, FileUsageSummary>();
 
@@ -291,7 +320,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             ? timestampMs
             : Math.min(summary.startedAtMs, timestampMs);
 
-      if (modelName) {
+      if (modelName && totalTokens > 0) {
         const existing = summary.models.find(
           (model) => normalizeModelKey(model.model) === normalizeModelKey(modelName)
         );
@@ -312,6 +341,13 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     };
 
     usageDetails.forEach((detail) => {
+      if (
+        normalizedSelectedModel &&
+        normalizeModelKey(String(detail.__modelName ?? '')) !== normalizedSelectedModel
+      ) {
+        return;
+      }
+
       const authIndexKey = normalizeAuthIndex(detail.auth_index);
       if (authIndexKey) {
         accumulateDetail(usageByAuthIndex, authIndexKey, detail);
@@ -349,7 +385,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     });
 
     return summaryByFile;
-  }, [providerFiles, usageDetails, usageStatsReady]);
+  }, [providerFiles, selectedModel, usageDetails, usageStatsReady]);
 
   const visibleFiles = useMemo(() => {
     const normalizedSelectedModel =
@@ -374,6 +410,15 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
         if (!normalizedSelectedModel) {
           return true;
+        }
+
+        const quotaModelMatch = quotaStateMatchesModel(
+          config.type,
+          quota[file.name] as QuotaStatusState | undefined,
+          normalizedSelectedModel
+        );
+        if (quotaModelMatch !== null) {
+          return quotaModelMatch;
         }
 
         const supportedModels = fileModelsByName[file.name] ?? [];
