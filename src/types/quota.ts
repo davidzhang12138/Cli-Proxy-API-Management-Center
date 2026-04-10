@@ -309,6 +309,8 @@ export interface KimiQuotaState {
 
 export interface KiroFreeTrialInfo {
   freeTrialStatus?: string;
+  freeTrialExpiry?: number | string;
+  free_trial_expiry?: number | string;
   usageLimit?: number;
   currentUsage?: number;
   usageLimitWithPrecision?: number;

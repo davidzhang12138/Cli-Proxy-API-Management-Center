@@ -361,7 +361,7 @@ export function MonitorPage() {
       </div>
 
       {/* KPI 卡片 */}
-      <KpiCards data={filteredData} loading={loading} timeRange={timeRange} />
+      <KpiCards data={filteredData} loading={loading} />
 
       {/* 图表区域 */}
       <div className={styles.chartsGrid}>

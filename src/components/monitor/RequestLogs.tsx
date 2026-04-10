@@ -8,6 +8,7 @@ import {
   normalizeUsageSourceId,
   normalizeAuthIndex,
   calculateCost,
+  formatCompactNumber,
   formatUsd,
   loadModelPrices,
 } from '@/utils/usage';
@@ -454,6 +455,10 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
     return num.toLocaleString('zh-CN');
   };
 
+  const formatSummaryTokens = (num: number) => {
+    return `${formatCompactNumber(num)} Tokens`;
+  };
+
   // 将毫秒格式化为秒（固定 1 位小数）
   const formatLatencySeconds = (latencyMs: number | null) => {
     if (latencyMs === null) {
@@ -557,7 +562,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
         title={t('monitor.logs.title')}
         subtitle={
           <span>
-            {formatTimeRangeCaption(timeRange, customRange, t)} · {t('monitor.logs.total_count', { count: logEntries.length })}
+            {formatTimeRangeCaption(timeRange, customRange, t)}
             <span style={{ color: 'var(--text-tertiary)' }}> · {t('monitor.logs.scroll_hint')}</span>
           </span>
         }
@@ -739,15 +744,21 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
               <div className={styles.logSummaryGrid}>
                 <div className={styles.logSummaryItem}>
                   <span className={styles.logSummaryLabel}>{t('monitor.logs.header_input')}</span>
-                  <strong className={styles.logSummaryValue}>{formatNumber(logSummary.inputTokens)}</strong>
+                  <strong className={styles.logSummaryValue} title={formatNumber(logSummary.inputTokens)}>
+                    {formatSummaryTokens(logSummary.inputTokens)}
+                  </strong>
                 </div>
                 <div className={styles.logSummaryItem}>
                   <span className={styles.logSummaryLabel}>{t('monitor.logs.header_output')}</span>
-                  <strong className={styles.logSummaryValue}>{formatNumber(logSummary.outputTokens)}</strong>
+                  <strong className={styles.logSummaryValue} title={formatNumber(logSummary.outputTokens)}>
+                    {formatSummaryTokens(logSummary.outputTokens)}
+                  </strong>
                 </div>
                 <div className={styles.logSummaryItem}>
                   <span className={styles.logSummaryLabel}>{t('monitor.logs.header_cached')}</span>
-                  <strong className={styles.logSummaryValue}>{formatNumber(logSummary.cachedTokens)}</strong>
+                  <strong className={styles.logSummaryValue} title={formatNumber(logSummary.cachedTokens)}>
+                    {formatSummaryTokens(logSummary.cachedTokens)}
+                  </strong>
                 </div>
                 <div className={styles.logSummaryItem}>
                   <span className={styles.logSummaryLabel}>{t('monitor.logs.header_cost')}</span>

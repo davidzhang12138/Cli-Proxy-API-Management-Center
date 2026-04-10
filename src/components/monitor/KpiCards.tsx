@@ -6,7 +6,6 @@ import styles from '@/pages/MonitorPage.module.scss';
 interface KpiCardsProps {
   data: UsageData | null;
   loading: boolean;
-  timeRange: number;
 }
 
 // 格式化数字
@@ -23,7 +22,7 @@ function formatNumber(num: number): string {
   return num.toLocaleString();
 }
 
-export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
+export function KpiCards({ data, loading }: KpiCardsProps) {
   const { t } = useTranslation();
 
   // 计算统计数据
@@ -113,17 +112,12 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
     };
   }, [data]);
 
-  const timeRangeLabel = timeRange === 1
-    ? t('monitor.today')
-    : t('monitor.last_n_days', { n: timeRange });
-
   return (
     <div className={styles.kpiGrid}>
       {/* 请求数 */}
       <div className={styles.kpiCard}>
         <div className={styles.kpiTitle}>
           <span className={styles.kpiLabel}>{t('monitor.kpi.requests')}</span>
-          <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
         <div className={styles.kpiValue}>
           {loading ? '--' : formatNumber(stats.totalRequests)}
@@ -145,7 +139,6 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
       <div className={`${styles.kpiCard} ${styles.green}`}>
         <div className={styles.kpiTitle}>
           <span className={styles.kpiLabel}>{t('monitor.kpi.tokens')}</span>
-          <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
         <div className={styles.kpiValue}>
           {loading ? '--' : formatNumber(stats.totalTokens)}
@@ -160,7 +153,6 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
       <div className={`${styles.kpiCard} ${styles.purple}`}>
         <div className={styles.kpiTitle}>
           <span className={styles.kpiLabel}>{t('monitor.kpi.avg_tpm')}</span>
-          <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
         <div className={styles.kpiValue}>
           {loading ? '--' : formatNumber(stats.avgTpm)}
@@ -174,7 +166,6 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
       <div className={`${styles.kpiCard} ${styles.orange}`}>
         <div className={styles.kpiTitle}>
           <span className={styles.kpiLabel}>{t('monitor.kpi.avg_rpm')}</span>
-          <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
         <div className={styles.kpiValue}>
           {loading ? '--' : stats.avgRpm.toFixed(1)}
@@ -188,7 +179,6 @@ export function KpiCards({ data, loading, timeRange }: KpiCardsProps) {
       <div className={`${styles.kpiCard} ${styles.cyan}`}>
         <div className={styles.kpiTitle}>
           <span className={styles.kpiLabel}>{t('monitor.kpi.avg_rpd')}</span>
-          <span className={styles.kpiTag}>{timeRangeLabel}</span>
         </div>
         <div className={styles.kpiValue}>
           {loading ? '--' : formatNumber(stats.avgRpd)}

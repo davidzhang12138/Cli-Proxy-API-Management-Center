@@ -1338,6 +1338,8 @@ const fetchKiroQuota = async (
       bonusStatus = freeTrialInfo.freeTrialStatus;
     }
     bonusNextResetTimestamp ??= normalizeKiroTimestamp(
+      freeTrialInfo.freeTrialExpiry,
+      freeTrialInfo.free_trial_expiry,
       freeTrialInfo.nextDateReset,
       freeTrialInfo.next_date_reset,
       freeTrialInfo.expiresAt,
