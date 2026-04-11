@@ -425,6 +425,84 @@
   }
 }
 
+.refreshPageButton:global(.btn.btn-sm) {
+  padding-inline: 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-hover) 48%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--border-color) 92%, transparent);
+  color: var(--text-primary);
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--bg-hover) 72%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--primary-color) 20%, var(--border-color));
+  }
+}
+
+.refreshActions {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+
+  @include mobile {
+    width: 100%;
+  }
+}
+
+.pageSizeControl {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: auto;
+
+  label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pageSizeSelect {
+    min-width: 88px;
+    height: 34px;
+    padding: 0 32px 0 10px;
+    border-radius: 10px;
+    background-color: color-mix(in srgb, var(--bg-primary) 82%, var(--bg-secondary));
+    cursor: pointer;
+  }
+
+  @include mobile {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.refreshProgressBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary-color) 10%, var(--bg-secondary));
+  border: 1px solid color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  @include mobile {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 :global([data-theme='dark']) .viewModeToggle {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
@@ -432,6 +510,11 @@
 :global([data-theme='dark']) .refreshAllButton:global(.btn.btn-sm) {
   background: color-mix(in srgb, var(--primary-color) 18%, var(--bg-secondary));
   border-color: color-mix(in srgb, var(--primary-color) 32%, var(--border-color));
+}
+
+:global([data-theme='dark']) .refreshPageButton:global(.btn.btn-sm) {
+  background: color-mix(in srgb, var(--bg-hover) 70%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--border-color) 88%, transparent);
 }
 
 @include mobile {
@@ -978,6 +1061,18 @@
   gap: $spacing-md;
 }
 
+.quotaUsageModalSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quotaUsageModalSectionTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
 .quotaUsageModalSummary {
   display: flex;
   align-items: center;
@@ -1041,12 +1136,96 @@
 
 .pagination {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   gap: $spacing-md;
   margin-top: $spacing-lg;
   padding-top: $spacing-md;
   border-top: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.paginationMeta {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+  flex-wrap: wrap;
+}
+
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+}
+
+.paginationNumbers {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.paginationNumberButton {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+
+  &:hover {
+    background: color-mix(in srgb, var(--bg-hover) 68%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+    color: var(--text-primary);
+  }
+}
+
+.paginationNumberButtonActive {
+  background: color-mix(in srgb, var(--primary-color) 14%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--primary-color) 34%, var(--border-color));
+  color: var(--primary-color);
+}
+
+.paginationEllipsis {
+  padding: 0 4px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.paginationJump {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+}
+
+.paginationJumpInput {
+  width: 88px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+
+  &:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--primary-color) 36%, var(--border-color));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 12%, transparent);
+  }
 }
 
 .pageInfo {
@@ -1055,6 +1234,23 @@
   padding: $spacing-xs $spacing-md;
   background-color: var(--bg-secondary);
   border-radius: $radius-md;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+@include mobile {
+  .pagination {
+    justify-content: center;
+  }
+
+  .paginationMeta,
+  .paginationControls,
+  .paginationJump {
+    justify-content: center;
+    width: 100%;
+  }
 }
 
 .warningOverlay {

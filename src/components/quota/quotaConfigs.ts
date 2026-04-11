@@ -705,7 +705,9 @@ const renderAntigravityItems = (
 ): ReactNode => {
   const { styles: styleMap, QuotaProgressBar } = helpers;
   const { createElement: h } = React;
-  const groups = quota.groups ?? [];
+  const groups = (quota.groups ?? []).filter((group) =>
+    ['claude-gpt', 'gemini-3-1-pro-series', 'gemini-3-flash'].includes(group.id)
+  );
 
   if (groups.length === 0) {
     return h('div', { className: styleMap.quotaMessage }, t('antigravity_quota.empty_models'));

@@ -2,12 +2,11 @@
  * Generic quota section component.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { triggerHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type {
   AntigravityQuotaState,
@@ -35,8 +34,11 @@ type ViewMode = 'paged' | 'all';
 type QuotaAvailabilityFilter = 'all' | 'has' | 'none';
 type QuotaSortMode = 'default' | 'quota_desc' | 'quota_asc';
 
-const MAX_ITEMS_PER_PAGE = 25;
+const DEFAULT_ITEMS_PER_PAGE = 6;
+const PAGE_SIZE_OPTIONS = [6, 12, 24];
+const MAX_ITEMS_PER_PAGE = 24;
 const MAX_SHOW_ALL_THRESHOLD = 30;
+const ANTIGRAVITY_VISIBLE_GROUP_IDS = new Set(['claude-gpt', 'gemini-3-1-pro-series', 'gemini-3-flash']);
 
 interface FileUsageSummary {
   totalTokens: number | null;
@@ -54,6 +56,7 @@ interface QuotaPaginationState<T> {
   currentPage: number;
   pageItems: T[];
   setPageSize: (size: number) => void;
+  goToPage: (page: number) => void;
   goToPrev: () => void;
   goToNext: () => void;
   loading: boolean;
@@ -83,8 +86,44 @@ const clampQuotaRatio = (value: number | null | undefined): number | null => {
   return Math.min(1, Math.max(0, Number(value)));
 };
 
+const isAntigravityQuotaState = (
+  quotaState: QuotaStatusState | undefined
+): quotaState is AntigravityQuotaState =>
+  Boolean(
+    quotaState &&
+      quotaState.status === 'success' &&
+      'groups' in quotaState &&
+      Array.isArray(quotaState.groups)
+  );
+
+const getAntigravityGroups = (
+  quotaState: QuotaStatusState | undefined
+): AntigravityQuotaState['groups'] => {
+  if (!isAntigravityQuotaState(quotaState)) {
+    return [];
+  }
+
+  return quotaState.groups;
+};
+
 const getCodexAvailabilityWindows = (state: CodexQuotaState) =>
   (state.windows ?? []).filter((window) => !window.id.startsWith('code-review-'));
+
+const buildPaginationItems = (currentPage: number, totalPages: number): Array<number | 'ellipsis'> => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, 'ellipsis', totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [1, 'ellipsis', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+
+  return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
+};
 
 const buildEmptyUsageSummary = (ready: boolean): FileUsageSummary => ({
   totalTokens: ready ? 0 : null,
@@ -107,8 +146,7 @@ const quotaStateMatchesModel = (
 
   switch (quotaType) {
     case 'antigravity': {
-      const state = quotaState as AntigravityQuotaState;
-      return state.groups.some((group) =>
+      return getAntigravityGroups(quotaState).some((group) =>
         group.models.some((model) => normalizeModelKey(model) === normalizedSelectedModel)
       );
     }
@@ -134,8 +172,7 @@ const getQuotaRemainingRatioForModel = (
 
   switch (quotaType) {
     case 'antigravity': {
-      const state = quotaState as AntigravityQuotaState;
-      const ratios = state.groups
+      const ratios = getAntigravityGroups(quotaState)
         .filter((group) =>
           group.models.some((model) => normalizeModelKey(model) === normalizedSelectedModel)
         )
@@ -168,8 +205,7 @@ const getQuotaRemainingRatio = (
 
   switch (quotaType) {
     case 'antigravity': {
-      const state = quotaState as AntigravityQuotaState;
-      const ratios = state.groups
+      const ratios = getAntigravityGroups(quotaState)
         .map((group) => clampQuotaRatio(group.remainingFraction))
         .filter((ratio): ratio is number => ratio !== null);
       return ratios.length ? Math.max(...ratios) : null;
@@ -257,6 +293,10 @@ const useQuotaPagination = <T,>(items: T[], defaultPageSize = 6): QuotaPaginatio
     setPage(1);
   }, []);
 
+  const goToPage = useCallback((targetPage: number) => {
+    setPage(Math.min(Math.max(1, targetPage), totalPages));
+  }, [totalPages]);
+
   const goToPrev = useCallback(() => {
     setPage((prev) => Math.max(1, prev - 1));
   }, []);
@@ -276,6 +316,7 @@ const useQuotaPagination = <T,>(items: T[], defaultPageSize = 6): QuotaPaginatio
     currentPage,
     pageItems,
     setPageSize,
+    goToPage,
     goToPrev,
     goToNext,
     loading,
@@ -317,9 +358,11 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   >;
   const { quota, loadQuota } = useQuotaLoader(config);
 
-  const [columns, gridRef] = useGridColumns(380);
+  const [, gridRef] = useGridColumns(380);
   const [viewMode, setViewMode] = useState<ViewMode>('paged');
   const [showTooManyWarning, setShowTooManyWarning] = useState(false);
+  const [pageSizePreference, setPageSizePreference] = useState(DEFAULT_ITEMS_PER_PAGE);
+  const [pageJumpValue, setPageJumpValue] = useState('');
 
   const providerFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [files, config]);
 
@@ -512,16 +555,17 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const effectiveViewMode: ViewMode = viewMode === 'all' && !showAllAllowed ? 'paged' : viewMode;
 
   const {
-    pageSize,
     totalPages,
     currentPage,
     pageItems,
     setPageSize,
+    goToPage,
     goToPrev,
     goToNext,
     loading: sectionLoading,
+    loadingScope,
     setLoading
-  } = useQuotaPagination(visibleFiles);
+  } = useQuotaPagination(visibleFiles, DEFAULT_ITEMS_PER_PAGE);
 
   useEffect(() => {
     if (showAllAllowed) return;
@@ -543,32 +587,56 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     if (effectiveViewMode === 'all') {
       setPageSize(Math.max(1, visibleFiles.length));
     } else {
-      setPageSize(Math.min(columns * 3, MAX_ITEMS_PER_PAGE));
+      setPageSize(Math.min(pageSizePreference, MAX_ITEMS_PER_PAGE));
     }
-  }, [columns, effectiveViewMode, setPageSize, visibleFiles.length]);
+  }, [effectiveViewMode, pageSizePreference, setPageSize, visibleFiles.length]);
 
-  const pendingQuotaRefreshRef = useRef(false);
-  const prevFilesLoadingRef = useRef(loading);
+  const [refreshProgress, setRefreshProgress] = useState<{
+    completedCount: number;
+    total: number;
+  } | null>(null);
 
-  const handleRefresh = useCallback(() => {
-    pendingQuotaRefreshRef.current = true;
-    void triggerHeaderRefresh();
-  }, []);
+  const primeQuotaRefreshState = useCallback(
+    (targets: AuthFileItem[]) => {
+      if (targets.length === 0) return;
+      setQuota((prev) => {
+        const nextState = { ...prev };
+        targets.forEach((file) => {
+          nextState[file.name] = config.buildLoadingState();
+        });
+        return nextState;
+      });
+    },
+    [config, setQuota]
+  );
 
-  useEffect(() => {
-    const wasLoading = prevFilesLoadingRef.current;
-    prevFilesLoadingRef.current = loading;
-
-    if (!pendingQuotaRefreshRef.current) return;
-    if (loading) return;
-    if (!wasLoading) return;
-
-    pendingQuotaRefreshRef.current = false;
-    const scope = effectiveViewMode === 'all' ? 'all' : 'page';
-    const targets = effectiveViewMode === 'all' ? providerFiles : pageItems;
-    if (targets.length === 0) return;
-    loadQuota(targets, scope, setLoading);
-  }, [effectiveViewMode, loadQuota, loading, pageItems, providerFiles, setLoading]);
+  const refreshCurrentPage = useCallback(
+    async () => {
+      const targets = pageItems;
+      if (targets.length === 0) {
+        showNotification(t('notification.data_refreshed'), 'success');
+        return;
+      }
+      primeQuotaRefreshState(targets);
+      setRefreshProgress({ completedCount: 0, total: targets.length });
+      try {
+        const summary = await loadQuota(targets, 'page', setLoading, (progress) => {
+          setRefreshProgress({
+            completedCount: progress.completedCount,
+            total: progress.total
+          });
+        });
+        if (summary && summary.errorCount === 0) {
+          showNotification(t('notification.data_refreshed'), 'success');
+          return;
+        }
+        showNotification(t('notification.refresh_failed'), 'error');
+      } finally {
+        setRefreshProgress(null);
+      }
+    },
+    [loadQuota, pageItems, primeQuotaRefreshState, setLoading, showNotification, t]
+  );
 
   useEffect(() => {
     if (loading) return;
@@ -629,6 +697,16 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   );
 
   const isRefreshing = sectionLoading || loading;
+  const isRefreshingPage = isRefreshing && loadingScope === 'page';
+  const paginationItems = buildPaginationItems(currentPage, totalPages);
+  const refreshProgressLabel =
+    refreshProgress === null
+      ? null
+      : t('quota_management.refresh_progress', {
+          label: t('quota_management.refresh_page_short'),
+          completed: refreshProgress.completedCount,
+          total: refreshProgress.total
+        });
 
   return (
     <Card
@@ -663,19 +741,22 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
               {t('auth_files.view_mode_all')}
             </Button>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            className={styles.refreshAllButton}
-            onClick={handleRefresh}
-            disabled={disabled || isRefreshing}
-            loading={isRefreshing}
-            title={t('quota_management.refresh_all_credentials')}
-            aria-label={t('quota_management.refresh_all_credentials')}
-          >
-            {!isRefreshing && <IconRefreshCw size={16} />}
-            {t('quota_management.refresh_all_credentials')}
-          </Button>
+          {refreshProgressLabel && <div className={styles.refreshProgressBadge}>{refreshProgressLabel}</div>}
+          <div className={styles.refreshActions}>
+            <Button
+              variant="secondary"
+              size="sm"
+              className={styles.refreshPageButton}
+              onClick={() => void refreshCurrentPage()}
+              disabled={disabled || isRefreshing}
+              loading={isRefreshingPage}
+              title={t('quota_management.refresh_page_credentials')}
+              aria-label={t('quota_management.refresh_page_credentials')}
+            >
+              {!isRefreshingPage && <IconRefreshCw size={16} />}
+              {t('quota_management.refresh_page_credentials')}
+            </Button>
+          </div>
         </div>
       }
     >
@@ -697,6 +778,31 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           <div ref={gridRef} className={config.gridClassName}>
             {pageItems.map((item) => {
               const usageSummary = usageSummaryByFileName.get(item.name) ?? buildEmptyUsageSummary(usageStatsReady);
+              const antigravityGroups =
+                config.type === 'antigravity' ? getAntigravityGroups(quota[item.name]) : [];
+              const detailsContent =
+                config.type === 'antigravity' &&
+                antigravityGroups.some((group) => !ANTIGRAVITY_VISIBLE_GROUP_IDS.has(group.id)) ? (
+                  <div className={styles.quotaUsageModalSection}>
+                    <div className={styles.quotaUsageModalSectionTitle}>
+                      {t('quota_management.antigravity_more_quota')}
+                    </div>
+                    <div className={styles.quotaUsageModalList}>
+                      {antigravityGroups
+                        .filter((group) => !ANTIGRAVITY_VISIBLE_GROUP_IDS.has(group.id))
+                        .map((group) => (
+                          <div key={group.id} className={styles.quotaUsageModalItem}>
+                            <span className={styles.quotaUsageModalModel} title={group.models.join(', ')}>
+                              {group.label}
+                            </span>
+                            <span className={styles.quotaUsageModalValue}>
+                              {`${Math.round(Math.max(0, Math.min(1, group.remainingFraction)) * 100)}%`}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ) : null;
 
               return (
                 <QuotaCard
@@ -715,6 +821,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   cardIdleMessageKey={config.cardIdleMessageKey}
                   cardClassName={config.cardClassName}
                   defaultType={config.type}
+                  detailsContent={detailsContent}
                   canRefresh={!disabled && !item.disabled}
                   onRefresh={() => void refreshQuotaForFile(item)}
                   renderQuotaItems={config.renderQuotaItems}
@@ -722,31 +829,113 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
               );
             })}
           </div>
-          {visibleFiles.length > pageSize && effectiveViewMode === 'paged' && (
+          {effectiveViewMode === 'paged' && (
             <div className={styles.pagination}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={goToPrev}
-                disabled={currentPage <= 1}
-              >
-                {t('auth_files.pagination_prev')}
-              </Button>
-              <div className={styles.pageInfo}>
-                {t('auth_files.pagination_info', {
-                  current: currentPage,
-                  total: totalPages,
-                  count: visibleFiles.length
-                })}
+              <div className={styles.paginationMeta}>
+                <div className={styles.pageSizeControl}>
+                  <label htmlFor={`${config.type}-page-size`}>{t('quota_management.page_size_label')}</label>
+                  <select
+                    id={`${config.type}-page-size`}
+                    className={styles.pageSizeSelect}
+                    value={pageSizePreference}
+                    onChange={(event) => setPageSizePreference(Number(event.target.value))}
+                    disabled={isRefreshing}
+                  >
+                    {PAGE_SIZE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {t('quota_management.page_size_option', { count: option })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.pageInfo}>
+                  {t('auth_files.pagination_info', {
+                    current: currentPage,
+                    total: totalPages,
+                    count: visibleFiles.length
+                  })}
+                </div>
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={goToNext}
-                disabled={currentPage >= totalPages}
-              >
-                {t('auth_files.pagination_next')}
-              </Button>
+
+              <div className={styles.paginationControls}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={goToPrev}
+                  disabled={currentPage <= 1}
+                >
+                  {t('auth_files.pagination_prev')}
+                </Button>
+                <div className={styles.paginationNumbers}>
+                  {paginationItems.map((item, index) =>
+                    item === 'ellipsis' ? (
+                      <span
+                        key={`ellipsis-${currentPage}-${index}`}
+                        className={styles.paginationEllipsis}
+                      >
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={item}
+                        type="button"
+                        className={`${styles.paginationNumberButton} ${
+                          item === currentPage ? styles.paginationNumberButtonActive : ''
+                        }`}
+                        onClick={() => goToPage(item)}
+                        aria-current={item === currentPage ? 'page' : undefined}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={goToNext}
+                  disabled={currentPage >= totalPages}
+                >
+                  {t('auth_files.pagination_next')}
+                </Button>
+              </div>
+
+              <div className={styles.paginationJump}>
+                <label htmlFor={`${config.type}-page-jump`}>
+                  {t('quota_management.page_jump_label')}
+                </label>
+                <input
+                  id={`${config.type}-page-jump`}
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  inputMode="numeric"
+                  className={styles.paginationJumpInput}
+                  value={pageJumpValue}
+                  onChange={(event) => setPageJumpValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return;
+                    const targetPage = Number(pageJumpValue);
+                    if (!Number.isFinite(targetPage)) return;
+                    goToPage(targetPage);
+                    setPageJumpValue('');
+                  }}
+                  placeholder={t('quota_management.page_jump_placeholder', { total: totalPages })}
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const targetPage = Number(pageJumpValue);
+                    if (!Number.isFinite(targetPage)) return;
+                    goToPage(targetPage);
+                    setPageJumpValue('');
+                  }}
+                  disabled={!pageJumpValue.trim()}
+                >
+                  {t('quota_management.page_jump_confirm')}
+                </Button>
+              </div>
             </div>
           )}
         </>

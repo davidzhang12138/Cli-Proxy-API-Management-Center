@@ -88,6 +88,7 @@ interface QuotaCardProps<TState extends QuotaStatusState> {
   cardIdleMessageKey?: string;
   cardClassName: string;
   defaultType: string;
+  detailsContent?: ReactNode;
   canRefresh?: boolean;
   onRefresh?: () => void;
   renderQuotaItems: (quota: TState, t: TFunction, helpers: QuotaRenderHelpers) => ReactNode;
@@ -108,6 +109,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
   cardIdleMessageKey,
   cardClassName,
   defaultType,
+  detailsContent,
   canRefresh = false,
   onRefresh,
   renderQuotaItems
@@ -281,9 +283,10 @@ export function QuotaCard<TState extends QuotaStatusState>({
               </div>
             ))}
           </div>
-        ) : !hasUsageData ? (
+        ) : !hasUsageData && !detailsContent ? (
           <div className={styles.quotaMessage}>{t('quota_management.usage_no_data')}</div>
         ) : null}
+        {detailsContent}
       </div>
     </Modal>
     </>

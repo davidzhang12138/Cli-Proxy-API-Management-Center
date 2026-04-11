@@ -23,6 +23,19 @@ interface LoadQuotaResult<TData> {
   errorStatus?: number;
 }
 
+interface LoadQuotaSummary {
+  total: number;
+  successCount: number;
+  errorCount: number;
+}
+
+interface LoadQuotaProgress {
+  completedCount: number;
+  total: number;
+  successCount: number;
+  errorCount: number;
+}
+
 export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>) {
   const { t } = useTranslation();
   const quota = useQuotaStore(config.storeSelector);
@@ -37,15 +50,18 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
     async (
       targets: AuthFileItem[],
       scope: QuotaScope,
-      setLoading: (loading: boolean, scope?: QuotaScope | null) => void
-    ) => {
-      if (loadingRef.current) return;
+      setLoading: (loading: boolean, scope?: QuotaScope | null) => void,
+      onProgress?: (progress: LoadQuotaProgress) => void
+    ): Promise<LoadQuotaSummary | null> => {
+      if (loadingRef.current) return null;
       loadingRef.current = true;
       const requestId = ++requestIdRef.current;
       setLoading(true, scope);
 
       try {
-        if (targets.length === 0) return;
+        if (targets.length === 0) {
+          return { total: 0, successCount: 0, errorCount: 0 };
+        }
 
         setQuota((prev) => {
           const nextState = { ...prev };
@@ -55,20 +71,34 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
           return nextState;
         });
 
+        let completedCount = 0;
+        let successCount = 0;
+        let errorCount = 0;
+
         const results = await Promise.all(
           targets.map(async (file): Promise<LoadQuotaResult<TData>> => {
             try {
               const data = await config.fetchQuota(file, t);
+              successCount += 1;
               return { name: file.name, status: 'success', data };
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : t('common.unknown_error');
               const errorStatus = getStatusFromError(err);
+              errorCount += 1;
               return { name: file.name, status: 'error', error: message, errorStatus };
+            } finally {
+              completedCount += 1;
+              onProgress?.({
+                completedCount,
+                total: targets.length,
+                successCount,
+                errorCount
+              });
             }
           })
         );
 
-        if (requestId !== requestIdRef.current) return;
+        if (requestId !== requestIdRef.current) return null;
 
         setQuota((prev) => {
           const nextState = { ...prev };
@@ -84,6 +114,12 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
           });
           return nextState;
         });
+
+        return {
+          total: results.length,
+          successCount,
+          errorCount
+        };
       } finally {
         if (requestId === requestIdRef.current) {
           setLoading(false);
