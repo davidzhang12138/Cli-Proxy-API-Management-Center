@@ -2,10 +2,17 @@
  * Quota management page.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
+import { IconFilterAll } from '@/components/ui/icons';
+import {
+  getAuthFileIcon,
+  getTypeColor,
+  getTypeLabel,
+  type ResolvedTheme
+} from '@/features/authFiles/constants';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
-import { USAGE_STATS_STALE_TIME_MS, useAuthStore, useUsageStatsStore } from '@/stores';
+import { USAGE_STATS_STALE_TIME_MS, useAuthStore, useThemeStore, useUsageStatsStore } from '@/stores';
 import { authFilesApi, configFileApi } from '@/services/api';
 import {
   QuotaSection,
@@ -31,6 +38,7 @@ const QUOTA_CONFIGS = [
   KIMI_CONFIG
 ] as const;
 type ActiveQuotaType = (typeof QUOTA_CONFIGS)[number]['type'];
+type ActiveQuotaFilter = 'all' | ActiveQuotaType;
 
 const compareModelNames = (left: string, right: string) =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
@@ -117,6 +125,7 @@ const extractInlineModels = (file: AuthFileItem): string[] => {
 export function QuotaPage() {
   const { t } = useTranslation();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
+  const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const usageDetails = useUsageStatsStore((state) => state.usageDetails);
   const usageLastRefreshedAt = useUsageStatsStore((state) => state.lastRefreshedAt);
   const loadUsageStats = useUsageStatsStore((state) => state.loadUsageStats);
@@ -127,7 +136,7 @@ export function QuotaPage() {
   const [availabilityFilter, setAvailabilityFilter] = useState<QuotaAvailabilityFilter>('all');
   const [selectedModel, setSelectedModel] = useState('all');
   const [sortMode, setSortMode] = useState<QuotaSortMode>('default');
-  const [activeQuotaType, setActiveQuotaType] = useState<ActiveQuotaType>(CLAUDE_CONFIG.type);
+  const [activeQuotaFilter, setActiveQuotaFilter] = useState<ActiveQuotaFilter>('all');
   const [fileModelsByName, setFileModelsByName] = useState<Record<string, string[]>>({});
   const [modelCatalogLoading, setModelCatalogLoading] = useState(false);
   const [modelReloadKey, setModelReloadKey] = useState(0);
@@ -145,19 +154,36 @@ export function QuotaPage() {
     () => files.filter((file) => QUOTA_CONFIGS.some((config) => config.filterFn(file))),
     [files]
   );
-  const activeConfig = useMemo(
-    () => QUOTA_CONFIGS.find((config) => config.type === activeQuotaType) ?? CLAUDE_CONFIG,
-    [activeQuotaType]
+  const quotaTypeCounts = useMemo(
+    () =>
+      QUOTA_CONFIGS.reduce<Record<ActiveQuotaType, number>>((result, config) => {
+        result[config.type] = quotaFiles.filter((file) => config.filterFn(file)).length;
+        return result;
+      }, {} as Record<ActiveQuotaType, number>),
+    [quotaFiles]
   );
-  const activeQuotaFiles = useMemo(
-    () => quotaFiles.filter((file) => activeConfig.filterFn(file)),
-    [activeConfig, quotaFiles]
+  const availableQuotaConfigs = useMemo(
+    () => QUOTA_CONFIGS.filter((config) => (quotaTypeCounts[config.type] ?? 0) > 0),
+    [quotaTypeCounts]
   );
+  const selectedQuotaConfigs = useMemo(() => {
+    if (activeQuotaFilter === 'all') {
+      return availableQuotaConfigs;
+    }
+    return availableQuotaConfigs.filter((config) => config.type === activeQuotaFilter);
+  }, [activeQuotaFilter, availableQuotaConfigs]);
+  const scopedQuotaFiles = useMemo(() => {
+    if (activeQuotaFilter === 'all') {
+      return quotaFiles;
+    }
+    const selectedConfig = QUOTA_CONFIGS.find((config) => config.type === activeQuotaFilter);
+    return selectedConfig ? quotaFiles.filter((file) => selectedConfig.filterFn(file)) : [];
+  }, [activeQuotaFilter, quotaFiles]);
 
   const modelOptions = useMemo(() => {
     const models = new Map<string, string>();
 
-    activeQuotaFiles.forEach((file) => {
+    scopedQuotaFiles.forEach((file) => {
       const entries = fileModelsByName[file.name] ?? [];
       entries.forEach((model) => {
         const key = normalizeModelName(model);
@@ -168,7 +194,7 @@ export function QuotaPage() {
 
     usageDetails.forEach((detail) => {
       const authIndexKey = String(detail.auth_index ?? '').trim();
-      const matchesAuthFile = activeQuotaFiles.some((file) => {
+      const matchesAuthFile = scopedQuotaFiles.some((file) => {
         const fileAuthIndex = String(file['auth_index'] ?? file.authIndex ?? '').trim();
         return fileAuthIndex && fileAuthIndex === authIndexKey;
       });
@@ -182,7 +208,13 @@ export function QuotaPage() {
     });
 
     return Array.from(models.values()).sort(compareModelNames);
-  }, [activeQuotaFiles, fileModelsByName, usageDetails]);
+  }, [fileModelsByName, scopedQuotaFiles, usageDetails]);
+
+  useEffect(() => {
+    if (activeQuotaFilter === 'all') return;
+    if (availableQuotaConfigs.some((config) => config.type === activeQuotaFilter)) return;
+    setActiveQuotaFilter('all');
+  }, [activeQuotaFilter, availableQuotaConfigs]);
 
   const loadConfig = useCallback(async () => {
     try {
@@ -313,21 +345,21 @@ export function QuotaPage() {
     fileModelsByName
   };
 
-  const renderActiveSection = () => {
-    switch (activeQuotaType) {
+  const renderQuotaSection = (type: ActiveQuotaType) => {
+    switch (type) {
       case ANTIGRAVITY_CONFIG.type:
-        return <QuotaSection config={ANTIGRAVITY_CONFIG} {...commonSectionProps} />;
+        return <QuotaSection key={type} config={ANTIGRAVITY_CONFIG} {...commonSectionProps} />;
       case CODEX_CONFIG.type:
-        return <QuotaSection config={CODEX_CONFIG} {...commonSectionProps} />;
+        return <QuotaSection key={type} config={CODEX_CONFIG} {...commonSectionProps} />;
       case KIRO_CONFIG.type:
-        return <QuotaSection config={KIRO_CONFIG} {...commonSectionProps} />;
+        return <QuotaSection key={type} config={KIRO_CONFIG} {...commonSectionProps} />;
       case GEMINI_CLI_CONFIG.type:
-        return <QuotaSection config={GEMINI_CLI_CONFIG} {...commonSectionProps} />;
+        return <QuotaSection key={type} config={GEMINI_CLI_CONFIG} {...commonSectionProps} />;
       case KIMI_CONFIG.type:
-        return <QuotaSection config={KIMI_CONFIG} {...commonSectionProps} />;
+        return <QuotaSection key={type} config={KIMI_CONFIG} {...commonSectionProps} />;
       case CLAUDE_CONFIG.type:
       default:
-        return <QuotaSection config={CLAUDE_CONFIG} {...commonSectionProps} />;
+        return <QuotaSection key={type} config={CLAUDE_CONFIG} {...commonSectionProps} />;
     }
   };
 
@@ -340,79 +372,125 @@ export function QuotaPage() {
 
       {error && <div className={styles.errorBox}>{error}</div>}
 
-      <div className={styles.providerTabs}>
-        {QUOTA_CONFIGS.map((config) => {
-          const isActive = config.type === activeQuotaType;
-          const count = quotaFiles.filter((file) => config.filterFn(file)).length;
-          return (
-            <button
-              key={config.type}
-              type="button"
-              className={`${styles.providerTab} ${isActive ? styles.providerTabActive : ''}`}
-              onClick={() => setActiveQuotaType(config.type)}
-            >
-              <span>{t(`${config.i18nPrefix}.title`)}</span>
-              <span className={styles.providerTabCount}>{count}</span>
-            </button>
-          );
-        })}
+      <div className={styles.filterSection}>
+        <div className={styles.filterRail}>
+          <div className={styles.filterTags}>
+            {(
+              [
+                { type: 'all' as const, count: quotaFiles.length },
+                ...availableQuotaConfigs.map((config) => ({
+                  type: config.type,
+                  count: quotaTypeCounts[config.type] ?? 0
+                }))
+              ] as Array<{ type: ActiveQuotaFilter; count: number }>
+            ).map(({ type, count }) => {
+              const isActive = activeQuotaFilter === type;
+              const iconSrc = type === 'all' ? null : getAuthFileIcon(type, resolvedTheme);
+              const color =
+                type === 'all'
+                  ? { bg: 'var(--bg-tertiary)', text: 'var(--text-primary)' }
+                  : getTypeColor(type, resolvedTheme);
+              const buttonStyle = {
+                '--filter-color': color.text,
+                '--filter-surface': color.bg,
+                '--filter-active-text': resolvedTheme === 'dark' ? '#111827' : '#ffffff'
+              } as CSSProperties;
+
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  className={`${styles.filterTag} ${isActive ? styles.filterTagActive : ''}`}
+                  style={buttonStyle}
+                  onClick={() => setActiveQuotaFilter(type)}
+                >
+                  <span className={styles.filterTagLabel}>
+                    {type === 'all' ? (
+                      <span className={`${styles.filterTagIconWrap} ${styles.filterAllIconWrap}`}>
+                        <IconFilterAll className={styles.filterAllIcon} size={16} />
+                      </span>
+                    ) : (
+                      <span className={styles.filterTagIconWrap}>
+                        {iconSrc ? (
+                          <img src={iconSrc} alt="" className={styles.filterTagIcon} />
+                        ) : (
+                          <span className={styles.filterTagIconFallback}>
+                            {getTypeLabel(t, type).slice(0, 1).toUpperCase()}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    <span className={styles.filterTagText}>
+                      {type === 'all' ? t('auth_files.filter_all') : getTypeLabel(t, type)}
+                    </span>
+                  </span>
+                  <span className={styles.filterTagCount}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className={styles.filterControlsPanel}>
+          <div className={styles.filterToolbar}>
+            <div className={styles.filterControl}>
+              <label htmlFor="quota-availability-filter">{t('quota_management.quota_filter_label')}</label>
+              <select
+                id="quota-availability-filter"
+                className={styles.pageSizeSelect}
+                value={availabilityFilter}
+                onChange={(event) =>
+                  setAvailabilityFilter(event.target.value as QuotaAvailabilityFilter)
+                }
+              >
+                <option value="all">{t('quota_management.quota_filter_all')}</option>
+                <option value="has">{t('quota_management.quota_filter_has')}</option>
+                <option value="none">{t('quota_management.quota_filter_none')}</option>
+              </select>
+            </div>
+
+            <div className={styles.filterControl}>
+              <label htmlFor="quota-model-filter">{t('quota_management.model_filter_label')}</label>
+              <select
+                id="quota-model-filter"
+                className={styles.pageSizeSelect}
+                value={selectedModel}
+                onChange={(event) => setSelectedModel(event.target.value)}
+                disabled={modelCatalogLoading && modelOptions.length === 0}
+              >
+                <option value="all">{t('quota_management.model_filter_all')}</option>
+                {modelOptions.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={styles.filterControl}>
+              <label htmlFor="quota-sort-mode">{t('quota_management.sort_label')}</label>
+              <select
+                id="quota-sort-mode"
+                className={styles.pageSizeSelect}
+                value={sortMode}
+                onChange={(event) => setSortMode(event.target.value as QuotaSortMode)}
+              >
+                <option value="default">{t('quota_management.sort_default')}</option>
+                <option value="quota_desc">{t('quota_management.sort_quota_desc')}</option>
+                <option value="quota_asc">{t('quota_management.sort_quota_asc')}</option>
+              </select>
+            </div>
+
+            <div className={styles.filterStatus}>
+              {modelCatalogLoading
+                ? t('quota_management.model_filter_loading')
+                : t('quota_management.model_filter_ready', { count: modelOptions.length })}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className={styles.filterToolbar}>
-        <div className={styles.filterControl}>
-          <label htmlFor="quota-availability-filter">{t('quota_management.quota_filter_label')}</label>
-          <select
-            id="quota-availability-filter"
-            className={styles.pageSizeSelect}
-            value={availabilityFilter}
-            onChange={(event) => setAvailabilityFilter(event.target.value as QuotaAvailabilityFilter)}
-          >
-            <option value="all">{t('quota_management.quota_filter_all')}</option>
-            <option value="has">{t('quota_management.quota_filter_has')}</option>
-            <option value="none">{t('quota_management.quota_filter_none')}</option>
-          </select>
-        </div>
-
-        <div className={styles.filterControl}>
-          <label htmlFor="quota-model-filter">{t('quota_management.model_filter_label')}</label>
-          <select
-            id="quota-model-filter"
-            className={styles.pageSizeSelect}
-            value={selectedModel}
-            onChange={(event) => setSelectedModel(event.target.value)}
-            disabled={modelCatalogLoading && modelOptions.length === 0}
-          >
-            <option value="all">{t('quota_management.model_filter_all')}</option>
-            {modelOptions.map((model) => (
-              <option key={model} value={model}>
-                {model}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className={styles.filterControl}>
-          <label htmlFor="quota-sort-mode">{t('quota_management.sort_label')}</label>
-          <select
-            id="quota-sort-mode"
-            className={styles.pageSizeSelect}
-            value={sortMode}
-            onChange={(event) => setSortMode(event.target.value as QuotaSortMode)}
-          >
-            <option value="default">{t('quota_management.sort_default')}</option>
-            <option value="quota_desc">{t('quota_management.sort_quota_desc')}</option>
-            <option value="quota_asc">{t('quota_management.sort_quota_asc')}</option>
-          </select>
-        </div>
-
-        <div className={styles.filterStatus}>
-          {modelCatalogLoading
-            ? t('quota_management.model_filter_loading')
-            : t('quota_management.model_filter_ready', { count: modelOptions.length })}
-        </div>
-      </div>
-
-      {renderActiveSection()}
+      {selectedQuotaConfigs.map((config) => renderQuotaSection(config.type))}
     </div>
   );
 }
