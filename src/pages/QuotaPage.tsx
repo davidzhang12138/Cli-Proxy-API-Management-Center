@@ -30,6 +30,7 @@ const QUOTA_CONFIGS = [
   GEMINI_CLI_CONFIG,
   KIMI_CONFIG
 ] as const;
+type ActiveQuotaType = (typeof QUOTA_CONFIGS)[number]['type'];
 
 const compareModelNames = (left: string, right: string) =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
@@ -126,6 +127,7 @@ export function QuotaPage() {
   const [availabilityFilter, setAvailabilityFilter] = useState<QuotaAvailabilityFilter>('all');
   const [selectedModel, setSelectedModel] = useState('all');
   const [sortMode, setSortMode] = useState<QuotaSortMode>('default');
+  const [activeQuotaType, setActiveQuotaType] = useState<ActiveQuotaType>(CLAUDE_CONFIG.type);
   const [fileModelsByName, setFileModelsByName] = useState<Record<string, string[]>>({});
   const [modelCatalogLoading, setModelCatalogLoading] = useState(false);
   const [modelReloadKey, setModelReloadKey] = useState(0);
@@ -143,11 +145,20 @@ export function QuotaPage() {
     () => files.filter((file) => QUOTA_CONFIGS.some((config) => config.filterFn(file))),
     [files]
   );
+  const activeConfig = useMemo(
+    () => QUOTA_CONFIGS.find((config) => config.type === activeQuotaType) ?? CLAUDE_CONFIG,
+    [activeQuotaType]
+  );
+  const activeQuotaFiles = useMemo(
+    () => quotaFiles.filter((file) => activeConfig.filterFn(file)),
+    [activeConfig, quotaFiles]
+  );
 
   const modelOptions = useMemo(() => {
     const models = new Map<string, string>();
 
-    Object.values(fileModelsByName).forEach((entries) => {
+    activeQuotaFiles.forEach((file) => {
+      const entries = fileModelsByName[file.name] ?? [];
       entries.forEach((model) => {
         const key = normalizeModelName(model);
         if (!key || models.has(key)) return;
@@ -156,6 +167,14 @@ export function QuotaPage() {
     });
 
     usageDetails.forEach((detail) => {
+      const authIndexKey = String(detail.auth_index ?? '').trim();
+      const matchesAuthFile = activeQuotaFiles.some((file) => {
+        const fileAuthIndex = String(file['auth_index'] ?? file.authIndex ?? '').trim();
+        return fileAuthIndex && fileAuthIndex === authIndexKey;
+      });
+      if (!matchesAuthFile) {
+        return;
+      }
       const modelName = String(detail.__modelName ?? '').trim();
       const key = normalizeModelName(modelName);
       if (!key || models.has(key)) return;
@@ -163,7 +182,7 @@ export function QuotaPage() {
     });
 
     return Array.from(models.values()).sort(compareModelNames);
-  }, [fileModelsByName, usageDetails]);
+  }, [activeQuotaFiles, fileModelsByName, usageDetails]);
 
   const loadConfig = useCallback(async () => {
     try {
@@ -282,6 +301,36 @@ export function QuotaPage() {
     setSelectedModel('all');
   }, [modelOptions, selectedModel]);
 
+  const commonSectionProps = {
+    files,
+    loading,
+    disabled: disableControls,
+    usageDetails,
+    usageStatsReady,
+    availabilityFilter,
+    selectedModel,
+    sortMode,
+    fileModelsByName
+  };
+
+  const renderActiveSection = () => {
+    switch (activeQuotaType) {
+      case ANTIGRAVITY_CONFIG.type:
+        return <QuotaSection config={ANTIGRAVITY_CONFIG} {...commonSectionProps} />;
+      case CODEX_CONFIG.type:
+        return <QuotaSection config={CODEX_CONFIG} {...commonSectionProps} />;
+      case KIRO_CONFIG.type:
+        return <QuotaSection config={KIRO_CONFIG} {...commonSectionProps} />;
+      case GEMINI_CLI_CONFIG.type:
+        return <QuotaSection config={GEMINI_CLI_CONFIG} {...commonSectionProps} />;
+      case KIMI_CONFIG.type:
+        return <QuotaSection config={KIMI_CONFIG} {...commonSectionProps} />;
+      case CLAUDE_CONFIG.type:
+      default:
+        return <QuotaSection config={CLAUDE_CONFIG} {...commonSectionProps} />;
+    }
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.pageHeader}>
@@ -290,6 +339,24 @@ export function QuotaPage() {
       </div>
 
       {error && <div className={styles.errorBox}>{error}</div>}
+
+      <div className={styles.providerTabs}>
+        {QUOTA_CONFIGS.map((config) => {
+          const isActive = config.type === activeQuotaType;
+          const count = quotaFiles.filter((file) => config.filterFn(file)).length;
+          return (
+            <button
+              key={config.type}
+              type="button"
+              className={`${styles.providerTab} ${isActive ? styles.providerTabActive : ''}`}
+              onClick={() => setActiveQuotaType(config.type)}
+            >
+              <span>{t(`${config.i18nPrefix}.title`)}</span>
+              <span className={styles.providerTabCount}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
 
       <div className={styles.filterToolbar}>
         <div className={styles.filterControl}>
@@ -345,78 +412,7 @@ export function QuotaPage() {
         </div>
       </div>
 
-      <QuotaSection
-        config={CLAUDE_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        usageDetails={usageDetails}
-        usageStatsReady={usageStatsReady}
-        availabilityFilter={availabilityFilter}
-        selectedModel={selectedModel}
-        sortMode={sortMode}
-        fileModelsByName={fileModelsByName}
-      />
-      <QuotaSection
-        config={ANTIGRAVITY_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        usageDetails={usageDetails}
-        usageStatsReady={usageStatsReady}
-        availabilityFilter={availabilityFilter}
-        selectedModel={selectedModel}
-        sortMode={sortMode}
-        fileModelsByName={fileModelsByName}
-      />
-      <QuotaSection
-        config={CODEX_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        usageDetails={usageDetails}
-        usageStatsReady={usageStatsReady}
-        availabilityFilter={availabilityFilter}
-        selectedModel={selectedModel}
-        sortMode={sortMode}
-        fileModelsByName={fileModelsByName}
-      />
-      <QuotaSection
-        config={KIRO_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        usageDetails={usageDetails}
-        usageStatsReady={usageStatsReady}
-        availabilityFilter={availabilityFilter}
-        selectedModel={selectedModel}
-        sortMode={sortMode}
-        fileModelsByName={fileModelsByName}
-      />
-      <QuotaSection
-        config={GEMINI_CLI_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        usageDetails={usageDetails}
-        usageStatsReady={usageStatsReady}
-        availabilityFilter={availabilityFilter}
-        selectedModel={selectedModel}
-        sortMode={sortMode}
-        fileModelsByName={fileModelsByName}
-      />
-      <QuotaSection
-        config={KIMI_CONFIG}
-        files={files}
-        loading={loading}
-        disabled={disableControls}
-        usageDetails={usageDetails}
-        usageStatsReady={usageStatsReady}
-        availabilityFilter={availabilityFilter}
-        selectedModel={selectedModel}
-        sortMode={sortMode}
-        fileModelsByName={fileModelsByName}
-      />
+      {renderActiveSection()}
     </div>
   );
 }

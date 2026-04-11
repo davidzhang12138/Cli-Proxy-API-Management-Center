@@ -120,6 +120,41 @@ const quotaStateMatchesModel = (
   }
 };
 
+const getQuotaRemainingRatioForModel = (
+  quotaType: QuotaConfig<QuotaStatusState, unknown>['type'],
+  quotaState: QuotaStatusState | undefined,
+  normalizedSelectedModel: string
+): number | null => {
+  if (!normalizedSelectedModel || !quotaState || quotaState.status !== 'success') {
+    return null;
+  }
+
+  switch (quotaType) {
+    case 'antigravity': {
+      const state = quotaState as AntigravityQuotaState;
+      const ratios = state.groups
+        .filter((group) =>
+          group.models.some((model) => normalizeModelKey(model) === normalizedSelectedModel)
+        )
+        .map((group) => clampQuotaRatio(group.remainingFraction))
+        .filter((ratio): ratio is number => ratio !== null);
+      return ratios.length ? Math.max(...ratios) : null;
+    }
+    case 'gemini-cli': {
+      const state = quotaState as GeminiCliQuotaState;
+      const ratios = state.buckets
+        .filter((bucket) =>
+          (bucket.modelIds ?? []).some((model) => normalizeModelKey(model) === normalizedSelectedModel)
+        )
+        .map((bucket) => clampQuotaRatio(bucket.remainingFraction))
+        .filter((ratio): ratio is number => ratio !== null);
+      return ratios.length ? Math.max(...ratios) : null;
+    }
+    default:
+      return null;
+  }
+};
+
 const getQuotaRemainingRatio = (
   quotaType: QuotaConfig<QuotaStatusState, unknown>['type'],
   quotaState: QuotaStatusState | undefined
@@ -393,10 +428,12 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
     return [...providerFiles]
       .filter((file) => {
-        const ratio = getQuotaRemainingRatio(
-          config.type,
-          quota[file.name] as QuotaStatusState | undefined
-        );
+        const quotaState = quota[file.name] as QuotaStatusState | undefined;
+        const ratio =
+          normalizedSelectedModel
+            ? getQuotaRemainingRatioForModel(config.type, quotaState, normalizedSelectedModel) ??
+              getQuotaRemainingRatio(config.type, quotaState)
+            : getQuotaRemainingRatio(config.type, quotaState);
         const matchesQuota =
           availabilityFilter === 'all'
             ? true
@@ -414,7 +451,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
         const quotaModelMatch = quotaStateMatchesModel(
           config.type,
-          quota[file.name] as QuotaStatusState | undefined,
+          quotaState,
           normalizedSelectedModel
         );
         if (quotaModelMatch !== null) {
@@ -433,14 +470,18 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
         }
 
-        const leftRatio = getQuotaRemainingRatio(
-          config.type,
-          quota[left.name] as QuotaStatusState | undefined
-        );
-        const rightRatio = getQuotaRemainingRatio(
-          config.type,
-          quota[right.name] as QuotaStatusState | undefined
-        );
+        const leftState = quota[left.name] as QuotaStatusState | undefined;
+        const rightState = quota[right.name] as QuotaStatusState | undefined;
+        const leftRatio =
+          normalizedSelectedModel
+            ? getQuotaRemainingRatioForModel(config.type, leftState, normalizedSelectedModel) ??
+              getQuotaRemainingRatio(config.type, leftState)
+            : getQuotaRemainingRatio(config.type, leftState);
+        const rightRatio =
+          normalizedSelectedModel
+            ? getQuotaRemainingRatioForModel(config.type, rightState, normalizedSelectedModel) ??
+              getQuotaRemainingRatio(config.type, rightState)
+            : getQuotaRemainingRatio(config.type, rightState);
 
         if (leftRatio === null && rightRatio === null) {
           return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });

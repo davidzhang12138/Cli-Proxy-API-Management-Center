@@ -13,6 +13,61 @@
   gap: $spacing-sm;
 }
 
+.providerTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.providerTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all $transition-fast;
+  font-size: 13px;
+  font-weight: 600;
+
+  &:hover {
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--primary-color) 32%, var(--border-color));
+    background: color-mix(in srgb, var(--primary-color) 8%, var(--bg-secondary));
+  }
+}
+
+.providerTabActive {
+  color: var(--primary-contrast, #fff);
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  box-shadow: 0 10px 22px -18px rgba(0, 0, 0, 0.45);
+
+  &:hover {
+    color: var(--primary-contrast, #fff);
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+  }
+}
+
+.providerTabCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .filterToolbar {
   display: flex;
   flex-wrap: wrap;
