@@ -1258,6 +1258,63 @@ type KiroQuotaData = {
   subscriptionType?: string;
 };
 
+const KIRO_INACTIVE_BONUS_STATUSES = new Set(['EXPIRED', 'INACTIVE', 'ENDED', 'TERMINATED']);
+
+const isExpiredIsoTimestamp = (value?: string): boolean => {
+  if (!value) return false;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) && timestamp <= Date.now();
+};
+
+export const hasActiveKiroBonus = (quota: Pick<KiroQuotaState, 'bonusLimit' | 'bonusStatus' | 'bonusNextReset'>) => {
+  const bonusStatusUpper = normalizeStringValue(quota.bonusStatus)?.toUpperCase() ?? '';
+  return (
+    typeof quota.bonusLimit === 'number' &&
+    quota.bonusLimit > 0 &&
+    !KIRO_INACTIVE_BONUS_STATUSES.has(bonusStatusUpper) &&
+    !isExpiredIsoTimestamp(quota.bonusNextReset)
+  );
+};
+
+export const getEffectiveKiroQuotaState = (quota: KiroQuotaState) => {
+  const activeBonus = hasActiveKiroBonus(quota);
+  const effectiveBonusUsage = activeBonus ? quota.bonusUsage : null;
+  const effectiveBonusLimit = activeBonus ? quota.bonusLimit : null;
+  const effectiveBonusRemaining =
+    activeBonus && typeof quota.bonusLimit === 'number' && typeof quota.bonusUsage === 'number'
+      ? Math.max(0, quota.bonusLimit - quota.bonusUsage)
+      : null;
+
+  const baseUsage = quota.baseUsage;
+  const baseLimit = quota.baseLimit;
+  const currentUsage =
+    (typeof baseUsage === 'number' ? baseUsage : 0) +
+    (typeof effectiveBonusUsage === 'number' ? effectiveBonusUsage : 0);
+  const usageLimit =
+    (typeof baseLimit === 'number' ? baseLimit : 0) +
+    (typeof effectiveBonusLimit === 'number' ? effectiveBonusLimit : 0);
+  const remainingCredits =
+    usageLimit > 0
+      ? Math.max(
+          0,
+          (typeof quota.baseRemaining === 'number' ? quota.baseRemaining : 0) +
+            (typeof effectiveBonusRemaining === 'number' ? effectiveBonusRemaining : 0)
+        )
+      : null;
+
+  return {
+    ...quota,
+    bonusStatus: activeBonus ? quota.bonusStatus : undefined,
+    bonusUsage: effectiveBonusUsage,
+    bonusLimit: effectiveBonusLimit,
+    bonusRemaining: effectiveBonusRemaining,
+    bonusNextReset: activeBonus ? quota.bonusNextReset : undefined,
+    currentUsage: usageLimit > 0 ? currentUsage : baseUsage,
+    usageLimit: usageLimit > 0 ? usageLimit : baseLimit,
+    remainingCredits,
+  };
+};
+
 const normalizeKiroTimestamp = (...values: unknown[]): number | null => {
   for (const value of values) {
     const normalized = normalizeNumberValue(value);
@@ -1356,7 +1413,7 @@ const fetchKiroQuota = async (
   const nextReset = toIsoFromKiroTimestamp(normalizeKiroTimestamp(payload.nextDateReset));
   const bonusNextReset = toIsoFromKiroTimestamp(bonusNextResetTimestamp);
   const bonusStatusUpper = normalizeStringValue(bonusStatus)?.toUpperCase() ?? '';
-  const bonusExpiredByStatus = ['EXPIRED', 'INACTIVE', 'ENDED', 'TERMINATED'].includes(bonusStatusUpper);
+  const bonusExpiredByStatus = KIRO_INACTIVE_BONUS_STATUSES.has(bonusStatusUpper);
   const bonusExpiredByTime =
     bonusNextResetTimestamp !== null && bonusNextResetTimestamp <= Date.now();
   const hasActiveBonus = bonusLimit > 0 && !bonusExpiredByStatus && !bonusExpiredByTime;
@@ -1393,20 +1450,21 @@ const renderKiroItems = (
 ): ReactNode => {
   const { styles: styleMap, QuotaProgressBar } = helpers;
   const { createElement: h, Fragment } = React;
+  const effectiveQuota = getEffectiveKiroQuotaState(quota);
   const nodes: ReactNode[] = [];
 
-  if (quota.subscriptionType) {
+  if (effectiveQuota.subscriptionType) {
     nodes.push(
       h(
         'div',
         { key: 'subscription', className: styleMap.codexPlan },
         h('span', { className: styleMap.codexPlanLabel }, t('kiro_quota.subscription_label')),
-        h('span', { className: styleMap.codexPlanValue }, quota.subscriptionType)
+        h('span', { className: styleMap.codexPlanValue }, effectiveQuota.subscriptionType)
       )
     );
   }
 
-  const usageLimit = quota.usageLimit;
+  const usageLimit = effectiveQuota.usageLimit;
   if (usageLimit === null || usageLimit === 0) {
     nodes.push(
       h('div', { key: 'empty', className: styleMap.quotaMessage }, t('kiro_quota.empty_data'))
@@ -1414,15 +1472,15 @@ const renderKiroItems = (
     return h(Fragment, null, ...nodes);
   }
 
-  const resetLabel = formatQuotaResetTime(quota.nextReset);
-  const bonusResetLabel = formatQuotaResetTime(quota.bonusNextReset);
+  const resetLabel = formatQuotaResetTime(effectiveQuota.nextReset);
+  const bonusResetLabel = formatQuotaResetTime(effectiveQuota.bonusNextReset);
   const buildRemainingPercent = (remaining: number | null, limit: number | null) => {
     if (remaining === null || limit === null || limit <= 0) return 0;
     return Math.round((remaining / limit) * 100);
   };
 
-  const baseRemainingPercent = buildRemainingPercent(quota.baseRemaining, quota.baseLimit);
-  if (quota.baseLimit !== null && quota.baseLimit > 0) {
+  const baseRemainingPercent = buildRemainingPercent(effectiveQuota.baseRemaining, effectiveQuota.baseLimit);
+  if (effectiveQuota.baseLimit !== null && effectiveQuota.baseLimit > 0) {
     nodes.push(
       h(
         'div',
@@ -1435,11 +1493,11 @@ const renderKiroItems = (
             'div',
             { className: styleMap.quotaMeta },
             h('span', { className: styleMap.quotaPercent }, `${baseRemainingPercent}%`),
-            quota.baseRemaining !== null
+            effectiveQuota.baseRemaining !== null
               ? h(
                   'span',
                   { className: styleMap.quotaAmount },
-                  t('kiro_quota.remaining_credits', { count: Math.round(quota.baseRemaining) })
+                  t('kiro_quota.remaining_credits', { count: Math.round(effectiveQuota.baseRemaining) })
                 )
               : null,
             h('span', { className: styleMap.quotaReset }, resetLabel)
@@ -1454,8 +1512,8 @@ const renderKiroItems = (
     );
   }
 
-  const bonusRemainingPercent = buildRemainingPercent(quota.bonusRemaining, quota.bonusLimit);
-  if (quota.bonusLimit !== null && quota.bonusLimit > 0) {
+  const bonusRemainingPercent = buildRemainingPercent(effectiveQuota.bonusRemaining, effectiveQuota.bonusLimit);
+  if (effectiveQuota.bonusLimit !== null && effectiveQuota.bonusLimit > 0) {
     nodes.push(
       h(
         'div',
@@ -1468,11 +1526,11 @@ const renderKiroItems = (
             'div',
             { className: styleMap.quotaMeta },
             h('span', { className: styleMap.quotaPercent }, `${bonusRemainingPercent}%`),
-            quota.bonusRemaining !== null
+            effectiveQuota.bonusRemaining !== null
               ? h(
                   'span',
                   { className: styleMap.quotaAmount },
-                  t('kiro_quota.remaining_credits', { count: Math.round(quota.bonusRemaining) })
+                  t('kiro_quota.remaining_credits', { count: Math.round(effectiveQuota.bonusRemaining) })
                 )
               : null,
             h('span', { className: styleMap.quotaReset }, bonusResetLabel)
@@ -1488,8 +1546,8 @@ const renderKiroItems = (
   }
 
   const totalRemainingPercent =
-    quota.currentUsage !== null && usageLimit > 0
-      ? Math.max(0, 100 - Math.round((quota.currentUsage / usageLimit) * 100))
+    effectiveQuota.currentUsage !== null && usageLimit > 0
+      ? Math.max(0, 100 - Math.round((effectiveQuota.currentUsage / usageLimit) * 100))
       : 0;
 
   nodes.push(
@@ -1504,11 +1562,11 @@ const renderKiroItems = (
           'div',
           { className: styleMap.quotaMeta },
           h('span', { className: styleMap.quotaPercent }, `${totalRemainingPercent}%`),
-          quota.remainingCredits !== null
+          effectiveQuota.remainingCredits !== null
             ? h(
                 'span',
                 { className: styleMap.quotaAmount },
-                t('kiro_quota.remaining_credits', { count: Math.round(quota.remainingCredits) })
+                t('kiro_quota.remaining_credits', { count: Math.round(effectiveQuota.remainingCredits) })
               )
             : null
         )

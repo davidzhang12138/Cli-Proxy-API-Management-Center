@@ -24,7 +24,7 @@ import { normalizeAuthIndex, normalizeUsageSourceId, type UsageDetail } from '@/
 import { QuotaCard } from './QuotaCard';
 import type { QuotaStatusState, QuotaUsageModelSummary } from './QuotaCard';
 import { useQuotaLoader } from './useQuotaLoader';
-import type { QuotaConfig } from './quotaConfigs';
+import { getEffectiveKiroQuotaState, type QuotaConfig } from './quotaConfigs';
 import { useGridColumns } from './useGridColumns';
 import { IconRefreshCw } from '@/components/ui/icons';
 import styles from '@/pages/QuotaPage.module.scss';
@@ -82,6 +82,9 @@ const clampQuotaRatio = (value: number | null | undefined): number | null => {
   }
   return Math.min(1, Math.max(0, Number(value)));
 };
+
+const getCodexAvailabilityWindows = (state: CodexQuotaState) =>
+  (state.windows ?? []).filter((window) => !window.id.startsWith('code-review-'));
 
 const buildEmptyUsageSummary = (ready: boolean): FileUsageSummary => ({
   totalTokens: ready ? 0 : null,
@@ -182,7 +185,7 @@ const getQuotaRemainingRatio = (
     }
     case 'codex': {
       const state = quotaState as CodexQuotaState;
-      const ratios = state.windows
+      const ratios = getCodexAvailabilityWindows(state)
         .map((window) =>
           window.usedPercent === null ? null : clampQuotaRatio(1 - window.usedPercent / 100)
         )
@@ -203,7 +206,7 @@ const getQuotaRemainingRatio = (
       return null;
     }
     case 'kiro': {
-      const state = quotaState as KiroQuotaState;
+      const state = getEffectiveKiroQuotaState(quotaState as KiroQuotaState);
       if (typeof state.remainingCredits === 'number' && typeof state.usageLimit === 'number') {
         if (state.usageLimit <= 0) {
           return state.remainingCredits > 0 ? 1 : 0;
