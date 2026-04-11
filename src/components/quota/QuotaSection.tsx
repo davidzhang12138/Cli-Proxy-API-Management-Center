@@ -372,7 +372,6 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           if (tokenDiff !== 0) return tokenDiff;
           return left.model.localeCompare(right.model, undefined, { sensitivity: 'base' });
         });
-        summary.models = summary.models.slice(0, 3);
       }
 
       bucket.set(key, summary);

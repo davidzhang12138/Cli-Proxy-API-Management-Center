@@ -1415,6 +1415,8 @@
     "usage_since": "数据起始：{{time}}",
     "usage_no_data": "暂无使用数据",
     "top_models": "模型用量",
+    "top_models_click_hint": "点击卡片查看 {{count}} 个模型的用量",
+    "top_models_modal_title": "{{name}} 的模型用量",
     "quota_filter_label": "配额筛选",
     "quota_filter_all": "全部",
     "quota_filter_has": "有配额",

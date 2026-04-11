@@ -514,12 +514,14 @@
 
 .quotaRefreshButton:global(.btn.btn-sm) {
   border-radius: 999px;
-  padding-inline: 12px;
+  min-height: 30px;
+  padding-inline: 10px;
+  font-size: 12px;
 
   > span {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     white-space: nowrap;
   }
 

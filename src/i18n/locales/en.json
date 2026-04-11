@@ -1415,6 +1415,8 @@
     "usage_since": "Data since {{time}}",
     "usage_no_data": "No usage data yet",
     "top_models": "Top Models",
+    "top_models_click_hint": "Click the card to view usage for {{count}} models",
+    "top_models_modal_title": "Model usage for {{name}}",
     "quota_filter_label": "Quota Filter",
     "quota_filter_all": "All",
     "quota_filter_has": "Has Quota",

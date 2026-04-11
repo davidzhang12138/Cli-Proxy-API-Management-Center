@@ -2,12 +2,14 @@
  * Generic quota card component.
  */
 
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ReactElement, ReactNode } from 'react';
+import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import { TYPE_COLORS } from '@/utils/quota';
 import { formatCompactNumber } from '@/utils/usage';
+import { Modal } from '@/components/ui/Modal';
 import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -111,6 +113,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
   renderQuotaItems
 }: QuotaCardProps<TState>) {
   const { t, i18n } = useTranslation();
+  const [modelsModalOpen, setModelsModalOpen] = useState(false);
 
   const displayType = item.type || item.provider || defaultType;
   const typeColorSet = TYPE_COLORS[displayType] || TYPE_COLORS.unknown;
@@ -141,6 +144,19 @@ export function QuotaCard<TState extends QuotaStatusState>({
     { key: 'cached', label: t('usage_stats.cached_tokens'), value: cachedTokens },
     { key: 'reasoning', label: t('usage_stats.reasoning_tokens'), value: reasoningTokens }
   ];
+  const hasUsageModels = topModels.length > 0;
+
+  const openModelsModal = () => {
+    if (!hasUsageModels) return;
+    setModelsModalOpen(true);
+  };
+
+  const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!hasUsageModels) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    setModelsModalOpen(true);
+  };
 
   const getTypeLabel = (type: string): string => {
     const key = `auth_files.filter_${type}`;
@@ -151,7 +167,15 @@ export function QuotaCard<TState extends QuotaStatusState>({
   };
 
   return (
-    <div className={`${styles.fileCard} ${cardClassName}`}>
+    <>
+    <div
+      className={`${styles.fileCard} ${cardClassName} ${hasUsageModels ? styles.fileCardClickable : ''}`}
+      onClick={openModelsModal}
+      onKeyDown={handleCardKeyDown}
+      role={hasUsageModels ? 'button' : undefined}
+      tabIndex={hasUsageModels ? 0 : undefined}
+      aria-label={hasUsageModels ? t('quota_management.top_models_modal_title', { name: item.name }) : undefined}
+    >
       <div className={styles.cardHeader}>
         <span
           className={styles.typeBadge}
@@ -194,26 +218,17 @@ export function QuotaCard<TState extends QuotaStatusState>({
           ))}
         </div>
 
-        {topModels.length > 0 && (
-          <div className={styles.cardUsageModels}>
+        {hasUsageModels && (
+          <div className={styles.cardUsageHint}>
             <span className={styles.cardUsageModelsLabel}>{t('quota_management.top_models')}</span>
-            <div className={styles.cardUsageModelList}>
-              {topModels.map((model) => (
-                <span
-                  key={model.model}
-                  className={styles.cardUsageModelChip}
-                  title={`${model.model}: ${model.totalTokens.toLocaleString()} Tokens`}
-                >
-                  {model.model}
-                  <strong>{formatCompactNumber(model.totalTokens)}</strong>
-                </span>
-              ))}
-            </div>
+            <span className={styles.cardUsageHintText}>
+              {t('quota_management.top_models_click_hint', { count: topModels.length })}
+            </span>
           </div>
         )}
       </div>
 
-      <div className={styles.quotaSection}>
+      <div className={styles.quotaSection} onClick={(event) => event.stopPropagation()}>
         {quotaStatus === 'loading' ? (
           <div className={styles.quotaMessage}>{t(`${i18nPrefix}.loading`)}</div>
         ) : quotaStatus === 'idle' ? (
@@ -242,6 +257,36 @@ export function QuotaCard<TState extends QuotaStatusState>({
         )}
       </div>
     </div>
+
+    <Modal
+      open={modelsModalOpen}
+      onClose={() => setModelsModalOpen(false)}
+      title={t('quota_management.top_models_modal_title', { name: item.name })}
+      width={720}
+    >
+      <div className={styles.quotaUsageModalBody}>
+        <div className={styles.quotaUsageModalSummary}>
+          <span className={styles.cardUsageModelsLabel}>{t('quota_management.used_tokens')}</span>
+          <strong>{usedTokens === null ? '--' : `${formatCompactNumber(usedTokens)} Tokens`}</strong>
+        </div>
+        <div className={styles.quotaUsageModalList}>
+          {topModels.map((model) => (
+            <div key={model.model} className={styles.quotaUsageModalItem}>
+              <span className={styles.quotaUsageModalModel} title={model.model}>
+                {model.model}
+              </span>
+              <span
+                className={styles.quotaUsageModalValue}
+                title={`${model.totalTokens.toLocaleString()} Tokens`}
+              >
+                {formatCompactNumber(model.totalTokens)} Tokens
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Modal>
+    </>
   );
 }
 

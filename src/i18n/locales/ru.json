@@ -1412,6 +1412,8 @@
     "usage_since": "Данные с {{time}}",
     "usage_no_data": "Данных об использовании пока нет",
     "top_models": "Топ моделей",
+    "top_models_click_hint": "Нажмите на карточку, чтобы посмотреть использование {{count}} моделей",
+    "top_models_modal_title": "Использование моделей для {{name}}",
     "quota_filter_label": "Фильтр квоты",
     "quota_filter_all": "Все",
     "quota_filter_has": "Есть квота",
