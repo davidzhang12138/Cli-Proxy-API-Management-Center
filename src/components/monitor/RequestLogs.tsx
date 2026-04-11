@@ -329,6 +329,8 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
                 {
                   ...detail,
                   auth_index: Number(detail.auth_index) || 0,
+                  latency_ms:
+                    typeof detail.latency_ms === 'number' ? detail.latency_ms : undefined,
                   __modelName: modelName,
                 },
                 modelPrices

@@ -97,6 +97,8 @@ export function HourlyCostChart({ data, loading, isDark }: HourlyCostChartProps)
                 {
                   ...detail,
                   auth_index: Number(detail.auth_index) || 0,
+                  latency_ms:
+                    typeof detail.latency_ms === 'number' ? detail.latency_ms : undefined,
                   __modelName: modelName,
                 },
                 modelPrices

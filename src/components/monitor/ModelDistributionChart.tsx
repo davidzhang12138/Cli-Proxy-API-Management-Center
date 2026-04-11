@@ -56,6 +56,8 @@ export function ModelDistributionChart({ data, loading, isDark, timeRange }: Mod
             {
               ...detail,
               auth_index: Number(detail.auth_index) || 0,
+              latency_ms:
+                typeof detail.latency_ms === 'number' ? detail.latency_ms : undefined,
               __modelName: modelName,
             },
             modelPrices
