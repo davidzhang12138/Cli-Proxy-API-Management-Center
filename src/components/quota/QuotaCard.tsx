@@ -145,14 +145,20 @@ export function QuotaCard<TState extends QuotaStatusState>({
     { key: 'reasoning', label: t('usage_stats.reasoning_tokens'), value: reasoningTokens }
   ];
   const hasUsageModels = topModels.length > 0;
+  const hasUsageData =
+    usedTokens !== null ||
+    usageStartedAt !== null ||
+    inputTokens !== null ||
+    outputTokens !== null ||
+    cachedTokens !== null ||
+    reasoningTokens !== null ||
+    hasUsageModels;
 
   const openModelsModal = () => {
-    if (!hasUsageModels) return;
     setModelsModalOpen(true);
   };
 
   const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!hasUsageModels) return;
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
     setModelsModalOpen(true);
@@ -169,12 +175,12 @@ export function QuotaCard<TState extends QuotaStatusState>({
   return (
     <>
     <div
-      className={`${styles.fileCard} ${cardClassName} ${hasUsageModels ? styles.fileCardClickable : ''}`}
+      className={`${styles.fileCard} ${cardClassName} ${styles.fileCardClickable}`}
       onClick={openModelsModal}
       onKeyDown={handleCardKeyDown}
-      role={hasUsageModels ? 'button' : undefined}
-      tabIndex={hasUsageModels ? 0 : undefined}
-      aria-label={hasUsageModels ? t('quota_management.top_models_modal_title', { name: item.name }) : undefined}
+      role="button"
+      tabIndex={0}
+      aria-label={t('quota_management.top_models_modal_title', { name: item.name })}
     >
       <div className={styles.cardHeader}>
         <span
@@ -190,42 +196,13 @@ export function QuotaCard<TState extends QuotaStatusState>({
         <span className={styles.fileName}>{item.name}</span>
       </div>
 
-      <div className={styles.cardUsageRow}>
-        <div className={styles.cardUsageMeta}>
-          <span className={styles.cardUsageLabel}>{t('quota_management.used_tokens')}</span>
-          <span className={styles.cardUsageSubtext} title={usageStartedAt ?? undefined}>
-            {usageMetaText}
-          </span>
-        </div>
-        <span
-          className={styles.cardUsageValue}
-          title={usedTokens === null ? '--' : usedTokens.toLocaleString()}
-        >
-          {usedTokens === null ? '--' : `${formatCompactNumber(usedTokens)} Tokens`}
+      <div className={styles.cardUsageHint}>
+        <span className={styles.cardUsageModelsLabel}>{t('quota_management.top_models')}</span>
+        <span className={styles.cardUsageHintText}>
+          {hasUsageModels
+            ? t('quota_management.top_models_click_hint', { count: topModels.length })
+            : t('quota_management.usage_details_click_hint')}
         </span>
-
-        <div className={styles.cardUsageBreakdown}>
-          {usageBreakdownItems.map((item) => (
-            <div key={item.key} className={styles.cardUsageStat}>
-              <span className={styles.cardUsageStatLabel}>{item.label}</span>
-              <span
-                className={styles.cardUsageStatValue}
-                title={item.value === null ? undefined : item.value.toLocaleString()}
-              >
-                {item.value === null ? '--' : formatCompactNumber(item.value)}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {hasUsageModels && (
-          <div className={styles.cardUsageHint}>
-            <span className={styles.cardUsageModelsLabel}>{t('quota_management.top_models')}</span>
-            <span className={styles.cardUsageHintText}>
-              {t('quota_management.top_models_click_hint', { count: topModels.length })}
-            </span>
-          </div>
-        )}
       </div>
 
       <div className={styles.quotaSection} onClick={(event) => event.stopPropagation()}>
@@ -269,21 +246,44 @@ export function QuotaCard<TState extends QuotaStatusState>({
           <span className={styles.cardUsageModelsLabel}>{t('quota_management.used_tokens')}</span>
           <strong>{usedTokens === null ? '--' : `${formatCompactNumber(usedTokens)} Tokens`}</strong>
         </div>
-        <div className={styles.quotaUsageModalList}>
-          {topModels.map((model) => (
-            <div key={model.model} className={styles.quotaUsageModalItem}>
-              <span className={styles.quotaUsageModalModel} title={model.model}>
-                {model.model}
-              </span>
+        <div className={styles.cardUsageMeta}>
+          <span className={styles.cardUsageLabel}>{t('quota_management.used_tokens')}</span>
+          <span className={styles.cardUsageSubtext} title={usageStartedAt ?? undefined}>
+            {usageMetaText}
+          </span>
+        </div>
+        <div className={styles.cardUsageBreakdown}>
+          {usageBreakdownItems.map((item) => (
+            <div key={item.key} className={styles.cardUsageStat}>
+              <span className={styles.cardUsageStatLabel}>{item.label}</span>
               <span
-                className={styles.quotaUsageModalValue}
-                title={`${model.totalTokens.toLocaleString()} Tokens`}
+                className={styles.cardUsageStatValue}
+                title={item.value === null ? undefined : item.value.toLocaleString()}
               >
-                {formatCompactNumber(model.totalTokens)} Tokens
+                {item.value === null ? '--' : formatCompactNumber(item.value)}
               </span>
             </div>
           ))}
         </div>
+        {hasUsageModels ? (
+          <div className={styles.quotaUsageModalList}>
+            {topModels.map((model) => (
+              <div key={model.model} className={styles.quotaUsageModalItem}>
+                <span className={styles.quotaUsageModalModel} title={model.model}>
+                  {model.model}
+                </span>
+                <span
+                  className={styles.quotaUsageModalValue}
+                  title={`${model.totalTokens.toLocaleString()} Tokens`}
+                >
+                  {formatCompactNumber(model.totalTokens)} Tokens
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : !hasUsageData ? (
+          <div className={styles.quotaMessage}>{t('quota_management.usage_no_data')}</div>
+        ) : null}
       </div>
     </Modal>
     </>
