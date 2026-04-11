@@ -1,6 +1,7 @@
 import { useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { Button } from '@/components/ui/Button';
 import {
   ANTIGRAVITY_CONFIG,
   CLAUDE_CONFIG,
@@ -9,6 +10,7 @@ import {
   KIRO_CONFIG,
   KIMI_CONFIG
 } from '@/components/quota';
+import { IconRefreshCw } from '@/components/ui/icons';
 import { useNotificationStore, useQuotaStore } from '@/stores';
 import type { AuthFileItem } from '@/types';
 import { getStatusFromError } from '@/utils/quota';
@@ -113,6 +115,22 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
 
   return (
     <div className={styles.quotaSection}>
+      <div className={styles.quotaSectionHeader}>
+        <span className={styles.quotaSectionTitle}>{t('auth_files.quota_refresh_single')}</span>
+        <Button
+          variant="secondary"
+          size="sm"
+          className={styles.quotaRefreshButton}
+          onClick={() => void refreshQuotaForFile()}
+          disabled={!canRefreshQuota}
+          loading={quotaStatus === 'loading'}
+          title={t(`${config.i18nPrefix}.refresh_button`)}
+          aria-label={t(`${config.i18nPrefix}.refresh_button`)}
+        >
+          {quotaStatus !== 'loading' && <IconRefreshCw size={14} />}
+          {t(`${config.i18nPrefix}.refresh_button`)}
+        </Button>
+      </div>
       {quotaStatus === 'loading' ? (
         <div className={styles.quotaMessage}>{t(`${config.i18nPrefix}.loading`)}</div>
       ) : quotaStatus === 'idle' ? (

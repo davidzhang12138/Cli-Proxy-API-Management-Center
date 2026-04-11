@@ -666,7 +666,7 @@
 // 虚拟滚动表格固定列宽
 .virtualTable {
   table-layout: fixed;
-  min-width: 1720px;
+  min-width: 1780px;
 
   th, td {
     overflow: hidden;
@@ -677,7 +677,7 @@
   // Auth 认证来源
   th:nth-child(1), td:nth-child(1) { width: 80px; }
   // API
-  th:nth-child(2), td:nth-child(2) { width: 100px; }
+  th:nth-child(2), td:nth-child(2) { width: 160px; }
   // 请求类型
   th:nth-child(3), td:nth-child(3) { width: 65px; }
   // 模型
