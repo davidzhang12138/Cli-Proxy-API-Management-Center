@@ -670,7 +670,8 @@
     "plan_plus": "Plus",
     "plan_team": "Team",
     "plan_free": "Free",
-    "plan_pro": "Pro"
+    "plan_pro": "Pro 20x",
+    "plan_prolite": "Pro 5x"
   },
   "gemini_cli_quota": {
     "title": "Квота Gemini CLI",
@@ -1307,7 +1308,9 @@
           "switch_project": "Переключить проект",
           "switch_project_desc": "Автоматически переходить на другой проект при превышении квоты",
           "switch_preview_model": "Переключить на preview-модель",
-          "switch_preview_model_desc": "Переключаться на preview-версию модели при превышении квоты"
+          "switch_preview_model_desc": "Переключаться на preview-версию модели при превышении квоты",
+          "antigravity_credits": "Повтор Antigravity Credits",
+          "antigravity_credits_desc": "При ответе Antigravity quota_exhausted 429 повторять запрос один раз с enabledCreditTypes=[\"GOOGLE_ONE_AI\"]"
         },
         "streaming": {
           "title": "Настройки стриминга",

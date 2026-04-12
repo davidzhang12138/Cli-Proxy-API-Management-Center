@@ -675,7 +675,8 @@
     "plan_plus": "Plus",
     "plan_team": "Team",
     "plan_free": "Free",
-    "plan_pro": "Pro"
+    "plan_pro": "Pro 20x",
+    "plan_prolite": "Pro 5x"
   },
   "gemini_cli_quota": {
     "title": "Gemini CLI Quota",
@@ -1310,7 +1311,9 @@
           "switch_project": "Switch Project",
           "switch_project_desc": "Automatically switch to another project when quota is exceeded",
           "switch_preview_model": "Switch to Preview Model",
-          "switch_preview_model_desc": "Switch to preview model version when quota is exceeded"
+          "switch_preview_model_desc": "Switch to preview model version when quota is exceeded",
+          "antigravity_credits": "Antigravity Credits Retry",
+          "antigravity_credits_desc": "Retry once with enabledCreditTypes=[\"GOOGLE_ONE_AI\"] when Antigravity returns quota_exhausted 429"
         },
         "streaming": {
           "title": "Streaming Configuration",
