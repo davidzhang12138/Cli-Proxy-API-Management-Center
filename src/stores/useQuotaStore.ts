@@ -15,6 +15,9 @@ import type {
 import { STORAGE_KEY_QUOTA } from '@/utils/constants';
 
 type QuotaUpdater<T> = T | ((prev: T) => T);
+type TimedQuotaState = { status?: string; _cachedAt?: number; _cacheExpiresAt?: number };
+
+const QUOTA_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface QuotaStoreState {
   antigravityQuota: Record<string, AntigravityQuotaState>;
@@ -49,10 +52,138 @@ const resolveUpdater = <T,>(updater: QuotaUpdater<T>, prev: T): T => {
   return updater;
 };
 
-const sanitizeQuotaMap = <T extends { status?: string }>(quotaMap: Record<string, T>) =>
+const toFutureTimestamp = (value?: string) => {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return null;
+  }
+  return timestamp > Date.now() ? timestamp : null;
+};
+
+const parseDisplayResetLabel = (value?: string) => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === '-') return null;
+
+  const match = trimmed.match(/^(\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+
+  const [, monthText, dayText, hourText, minuteText] = match;
+  const now = new Date();
+  const candidate = new Date(
+    now.getFullYear(),
+    Number(monthText) - 1,
+    Number(dayText),
+    Number(hourText),
+    Number(minuteText),
+    0,
+    0
+  );
+  if (Number.isNaN(candidate.getTime())) {
+    return null;
+  }
+  if (candidate.getTime() <= now.getTime()) {
+    candidate.setFullYear(candidate.getFullYear() + 1);
+  }
+  return candidate.getTime();
+};
+
+const pickEarliestFutureTimestamp = (values: Array<number | null>) => {
+  const timestamps = values.filter((value): value is number => value !== null);
+  return timestamps.length ? Math.min(...timestamps) : null;
+};
+
+const resolveQuotaCacheExpiryAt = (value: TimedQuotaState, now: number) => {
+  if ('groups' in value && Array.isArray(value.groups)) {
+    return (
+      pickEarliestFutureTimestamp(value.groups.map((group) => toFutureTimestamp(group.resetTime))) ??
+      now + QUOTA_CACHE_TTL_MS
+    );
+  }
+
+  if ('buckets' in value && Array.isArray(value.buckets)) {
+    return (
+      pickEarliestFutureTimestamp(value.buckets.map((bucket) => toFutureTimestamp(bucket.resetTime))) ??
+      now + QUOTA_CACHE_TTL_MS
+    );
+  }
+
+  if ('windows' in value && Array.isArray(value.windows)) {
+    return (
+      pickEarliestFutureTimestamp(
+        value.windows.map((window) => toFutureTimestamp(window.resetTime) ?? parseDisplayResetLabel(window.resetLabel))
+      ) ??
+      now + QUOTA_CACHE_TTL_MS
+    );
+  }
+
+  if ('nextReset' in value || 'bonusNextReset' in value) {
+    const nextResetValue =
+      'nextReset' in value && typeof value.nextReset === 'string' ? value.nextReset : undefined;
+    const bonusNextResetValue =
+      'bonusNextReset' in value && typeof value.bonusNextReset === 'string'
+        ? value.bonusNextReset
+        : undefined;
+
+    return (
+      pickEarliestFutureTimestamp([
+        toFutureTimestamp(nextResetValue),
+        toFutureTimestamp(bonusNextResetValue)
+      ]) ??
+      now + QUOTA_CACHE_TTL_MS
+    );
+  }
+
+  return now + QUOTA_CACHE_TTL_MS;
+};
+
+const isFreshQuotaState = (value: TimedQuotaState | undefined, now: number) => {
+  if (!value || value.status === 'loading') return false;
+  if (typeof value._cacheExpiresAt === 'number' && Number.isFinite(value._cacheExpiresAt)) {
+    return value._cacheExpiresAt > now;
+  }
+  if (typeof value._cachedAt === 'number' && Number.isFinite(value._cachedAt)) {
+    return now - value._cachedAt <= QUOTA_CACHE_TTL_MS;
+  }
+  return false;
+};
+
+const sanitizeQuotaMap = <T extends TimedQuotaState>(quotaMap: Record<string, T>) =>
   Object.fromEntries(
-    Object.entries(quotaMap).filter(([, value]) => value && value.status !== 'loading')
+    Object.entries(quotaMap).filter(([, value]) => isFreshQuotaState(value, Date.now()))
   ) as Record<string, T>;
+
+const stampQuotaMap = <T extends TimedQuotaState>(
+  nextMap: Record<string, T>,
+  prevMap: Record<string, T>
+) => {
+  const now = Date.now();
+
+  return Object.fromEntries(
+    Object.entries(nextMap).flatMap(([key, value]) => {
+      if (!value) {
+        return [];
+      }
+
+      if (value.status === 'loading') {
+        return [[key, value]];
+      }
+
+      const prevValue = prevMap[key];
+      const cachedAt =
+        prevValue === value && isFreshQuotaState(prevValue, now)
+          ? prevValue._cachedAt
+          : now;
+      const cacheExpiresAt =
+        prevValue === value && isFreshQuotaState(prevValue, now)
+          ? prevValue._cacheExpiresAt
+          : resolveQuotaCacheExpiryAt(value, now);
+
+      return [[key, { ...value, _cachedAt: cachedAt, _cacheExpiresAt: cacheExpiresAt }]];
+    })
+  ) as Record<string, T>;
+};
 
 const sanitizePersistedQuotaState = (
   state: PersistedQuotaStoreState | Partial<PersistedQuotaStoreState>
@@ -76,27 +207,33 @@ export const useQuotaStore = create<QuotaStoreState>()(
       kimiQuota: {},
       setAntigravityQuota: (updater) =>
         set((state) => ({
-          antigravityQuota: resolveUpdater(updater, state.antigravityQuota)
+          antigravityQuota: stampQuotaMap(
+            resolveUpdater(updater, state.antigravityQuota),
+            state.antigravityQuota
+          )
         })),
       setClaudeQuota: (updater) =>
         set((state) => ({
-          claudeQuota: resolveUpdater(updater, state.claudeQuota)
+          claudeQuota: stampQuotaMap(resolveUpdater(updater, state.claudeQuota), state.claudeQuota)
         })),
       setCodexQuota: (updater) =>
         set((state) => ({
-          codexQuota: resolveUpdater(updater, state.codexQuota)
+          codexQuota: stampQuotaMap(resolveUpdater(updater, state.codexQuota), state.codexQuota)
         })),
       setGeminiCliQuota: (updater) =>
         set((state) => ({
-          geminiCliQuota: resolveUpdater(updater, state.geminiCliQuota)
+          geminiCliQuota: stampQuotaMap(
+            resolveUpdater(updater, state.geminiCliQuota),
+            state.geminiCliQuota
+          )
         })),
       setKiroQuota: (updater) =>
         set((state) => ({
-          kiroQuota: resolveUpdater(updater, state.kiroQuota)
+          kiroQuota: stampQuotaMap(resolveUpdater(updater, state.kiroQuota), state.kiroQuota)
         })),
       setKimiQuota: (updater) =>
         set((state) => ({
-          kimiQuota: resolveUpdater(updater, state.kimiQuota)
+          kimiQuota: stampQuotaMap(resolveUpdater(updater, state.kimiQuota), state.kimiQuota)
         })),
       clearQuotaCache: () =>
         set({

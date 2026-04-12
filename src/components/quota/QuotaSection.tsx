@@ -12,6 +12,7 @@ import type {
   AntigravityQuotaState,
   AuthFileItem,
   ClaudeQuotaState,
+  CodexQuotaWindow,
   CodexQuotaState,
   GeminiCliQuotaState,
   KimiQuotaState,
@@ -91,6 +92,62 @@ const toResetTimestamp = (value?: string): number | null => {
   if (!value) return null;
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+const toDisplayResetTimestamp = (value?: string): number | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === '-') return null;
+
+  const directTimestamp = Date.parse(trimmed);
+  if (Number.isFinite(directTimestamp)) {
+    return directTimestamp;
+  }
+
+  const match = trimmed.match(/^(\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+
+  const [, monthText, dayText, hourText, minuteText] = match;
+  const now = new Date();
+  const candidate = new Date(
+    now.getFullYear(),
+    Number(monthText) - 1,
+    Number(dayText),
+    Number(hourText),
+    Number(minuteText),
+    0,
+    0
+  );
+  if (Number.isNaN(candidate.getTime())) return null;
+
+  if (candidate.getTime() < now.getTime() - 180 * 24 * 60 * 60 * 1000) {
+    candidate.setFullYear(candidate.getFullYear() + 1);
+  }
+
+  return candidate.getTime();
+};
+
+const matchesCodexWindowModel = (
+  window: CodexQuotaWindow,
+  normalizedSelectedModel: string
+): boolean => {
+  if (!normalizedSelectedModel) return true;
+
+  const rawCandidates = [
+    window.id,
+    window.label,
+    typeof window.labelParams?.name === 'string' ? window.labelParams.name : ''
+  ];
+  const candidates = rawCandidates
+    .map((value) => normalizeModelKey(String(value)))
+    .filter(Boolean);
+
+  return candidates.some(
+    (candidate) =>
+      candidate === normalizedSelectedModel ||
+      candidate.includes(normalizedSelectedModel) ||
+      normalizedSelectedModel.includes(candidate)
+  );
 };
 
 const isAntigravityQuotaState = (
@@ -303,12 +360,28 @@ const getQuotaResetTimestampForModel = (
     }
     case 'claude': {
       const state = quotaState as ClaudeQuotaState;
-      return pickEarliest(state.windows.map((window) => toResetTimestamp(window.resetTime)));
+      return pickEarliest(
+        state.windows.map((window) => toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel))
+      );
     }
     case 'codex': {
       const state = quotaState as CodexQuotaState;
+      const availabilityWindows = getCodexAvailabilityWindows(state);
+      const weeklyWindows = availabilityWindows.filter(
+        (window) => window.id === 'weekly' || window.id.endsWith('-weekly')
+      );
+      const matchedWeeklyWindows = normalizedSelectedModel
+        ? weeklyWindows.filter((window) => matchesCodexWindowModel(window, normalizedSelectedModel))
+        : weeklyWindows;
+      const sourceWindows =
+        matchedWeeklyWindows.length > 0
+          ? matchedWeeklyWindows
+          : weeklyWindows.length > 0
+            ? weeklyWindows
+            : availabilityWindows;
+
       return pickEarliest(
-        getCodexAvailabilityWindows(state).map((window) => toResetTimestamp(window.resetTime))
+        sourceWindows.map((window) => toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel))
       );
     }
     case 'gemini-cli': {
