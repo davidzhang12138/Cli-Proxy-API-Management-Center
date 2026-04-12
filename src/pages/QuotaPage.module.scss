@@ -899,8 +899,17 @@
 .cardHeader {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: $spacing-sm;
   min-height: 28px;
+}
+
+.cardHeaderMain {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
 }
 
 .typeBadge {
@@ -918,6 +927,48 @@
   color: var(--text-primary);
   word-break: break-all;
   line-height: 1.4;
+  min-width: 0;
+  flex: 1;
+}
+
+.cardRefreshButton {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--bg-hover) 72%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+    color: var(--text-primary);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.cardRefreshIconSpinning {
+  animation: quotaCardRefreshSpin 0.9s linear infinite;
+}
+
+@keyframes quotaCardRefreshSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .cardUsageRow {

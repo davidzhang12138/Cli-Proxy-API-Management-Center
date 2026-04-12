@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
+import { IconRefreshCw } from '@/components/ui/icons';
 import { TYPE_COLORS } from '@/utils/quota';
 import { formatCompactNumber } from '@/utils/usage';
 import { Modal } from '@/components/ui/Modal';
@@ -139,7 +140,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
     : usedTokens === 0
       ? t('quota_management.usage_no_data')
       : t('system_info.not_loaded');
-  const idleMessageKey = onRefresh ? `${i18nPrefix}.idle` : (cardIdleMessageKey ?? `${i18nPrefix}.idle`);
+  const idleMessageKey = cardIdleMessageKey ?? `${i18nPrefix}.idle`;
   const usageBreakdownItems = [
     { key: 'input', label: t('usage_stats.input_tokens'), value: inputTokens },
     { key: 'output', label: t('usage_stats.output_tokens'), value: outputTokens },
@@ -185,17 +186,38 @@ export function QuotaCard<TState extends QuotaStatusState>({
       aria-label={t('quota_management.top_models_modal_title', { name: item.name })}
     >
       <div className={styles.cardHeader}>
-        <span
-          className={styles.typeBadge}
-          style={{
-            backgroundColor: typeColor.bg,
-            color: typeColor.text,
-            ...(typeColor.border ? { border: typeColor.border } : {})
-          }}
-        >
-          {getTypeLabel(displayType)}
-        </span>
-        <span className={styles.fileName}>{item.name}</span>
+        <div className={styles.cardHeaderMain}>
+          <span
+            className={styles.typeBadge}
+            style={{
+              backgroundColor: typeColor.bg,
+              color: typeColor.text,
+              ...(typeColor.border ? { border: typeColor.border } : {})
+            }}
+          >
+            {getTypeLabel(displayType)}
+          </span>
+          <span className={styles.fileName}>{item.name}</span>
+        </div>
+        {onRefresh && (
+          <button
+            type="button"
+            className={styles.cardRefreshButton}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRefresh();
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+            disabled={!canRefresh || quotaStatus === 'loading'}
+            title={t('auth_files.quota_refresh_hint')}
+            aria-label={t('auth_files.quota_refresh_single')}
+          >
+            <IconRefreshCw
+              size={15}
+              className={quotaStatus === 'loading' ? styles.cardRefreshIconSpinning : undefined}
+            />
+          </button>
+        )}
       </div>
 
       <div className={styles.cardUsageHint}>
@@ -211,18 +233,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
         {quotaStatus === 'loading' ? (
           <div className={styles.quotaMessage}>{t(`${i18nPrefix}.loading`)}</div>
         ) : quotaStatus === 'idle' ? (
-          onRefresh ? (
-            <button
-              type="button"
-              className={`${styles.quotaMessage} ${styles.quotaMessageAction}`}
-              onClick={onRefresh}
-              disabled={!canRefresh}
-            >
-              {t(idleMessageKey)}
-            </button>
-          ) : (
-            <div className={styles.quotaMessage}>{t(idleMessageKey)}</div>
-          )
+          <div className={styles.quotaMessage}>{t(idleMessageKey)}</div>
         ) : quotaStatus === 'error' ? (
           <div className={styles.quotaError}>
             {t(`${i18nPrefix}.load_failed`, {

@@ -1421,7 +1421,7 @@
     "page_jump_placeholder": "1-{{total}} 页",
     "page_jump_confirm": "跳转",
     "antigravity_more_quota": "更多 Antigravity 配额",
-    "card_idle_hint": "点击卡片内的刷新额度按钮获取最新额度。",
+    "card_idle_hint": "点击右上角刷新按钮获取最新额度。",
     "used_tokens": "已用 Tokens",
     "usage_since": "数据起始：{{time}}",
     "usage_no_data": "暂无使用数据",
@@ -1441,6 +1441,7 @@
     "sort_default": "默认",
     "sort_quota_desc": "配额从高到低",
     "sort_quota_asc": "配额从低到高",
+    "sort_model_reset_asc": "按所选模型重置时间",
     "filtered_empty_title": "当前筛选下暂无账号",
     "filtered_empty_desc": "调整配额筛选、模型筛选或排序后再查看。"
   },

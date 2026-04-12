@@ -260,6 +260,14 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
   ) => {
     if (!window) return;
     const resetLabel = formatCodexResetLabel(window);
+    const resetAt = normalizeNumberValue(window.reset_at ?? window.resetAt);
+    const resetAfter = normalizeNumberValue(window.reset_after_seconds ?? window.resetAfterSeconds);
+    const resetTime =
+      resetAt !== null && resetAt > 0
+        ? new Date(resetAt * 1000).toISOString()
+        : resetAfter !== null && resetAfter > 0
+          ? new Date((Math.floor(Date.now() / 1000) + resetAfter) * 1000).toISOString()
+          : undefined;
     const usedPercentRaw = normalizeNumberValue(window.used_percent ?? window.usedPercent);
     const isLimitReached = Boolean(limitReached) || allowed === false;
     const usedPercent = usedPercentRaw ?? (isLimitReached && resetLabel !== '-' ? 100 : null);
@@ -270,6 +278,7 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
       labelParams,
       usedPercent,
       resetLabel,
+      resetTime,
     });
   };
 
@@ -939,6 +948,7 @@ const buildClaudeQuotaWindows = (
       labelKey,
       usedPercent,
       resetLabel,
+      resetTime: typedWindow.resets_at,
     });
   }
 

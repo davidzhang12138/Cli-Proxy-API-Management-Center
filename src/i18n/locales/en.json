@@ -1421,7 +1421,7 @@
     "page_jump_placeholder": "1-{{total}}",
     "page_jump_confirm": "Go",
     "antigravity_more_quota": "More Antigravity quota",
-    "card_idle_hint": "Use the refresh action inside the card to fetch the latest quota data.",
+    "card_idle_hint": "Use the refresh button in the top-right corner to fetch the latest quota data.",
     "used_tokens": "Used Tokens",
     "usage_since": "Data since {{time}}",
     "usage_no_data": "No usage data yet",
@@ -1441,6 +1441,7 @@
     "sort_default": "Default",
     "sort_quota_desc": "Quota High to Low",
     "sort_quota_asc": "Quota Low to High",
+    "sort_model_reset_asc": "Selected model reset time",
     "filtered_empty_title": "No credentials match the current filters",
     "filtered_empty_desc": "Adjust the quota filter, model filter, or sort mode to continue."
   },
