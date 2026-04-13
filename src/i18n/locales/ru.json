@@ -1426,6 +1426,7 @@
     "usage_details_click_hint": "Нажмите на карточку, чтобы посмотреть детали использования",
     "top_models_click_hint": "Нажмите на карточку, чтобы посмотреть использование {{count}} моделей",
     "top_models_modal_title": "Использование моделей для {{name}}",
+    "top_models_usage_value": "{{tokens}} · Доля квоты {{share}} · Стоимость {{cost}}",
     "quota_filter_label": "Фильтр квоты",
     "quota_filter_all": "Все",
     "quota_filter_has": "Есть квота",

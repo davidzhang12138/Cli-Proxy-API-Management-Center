@@ -1429,6 +1429,7 @@
     "usage_details_click_hint": "Click the card to view usage details",
     "top_models_click_hint": "Click the card to view usage for {{count}} models",
     "top_models_modal_title": "Model usage for {{name}}",
+    "top_models_usage_value": "{{tokens}} · Quota Share {{share}} · Cost {{cost}}",
     "quota_filter_label": "Quota Filter",
     "quota_filter_all": "All",
     "quota_filter_has": "Has Quota",

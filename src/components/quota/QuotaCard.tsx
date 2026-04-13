@@ -64,6 +64,7 @@ export interface QuotaUsageModelSummary {
   model: string;
   totalTokens: number;
   totalCost: number;
+  quotaUsageRatio?: number | null;
 }
 
 const USAGE_DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
@@ -80,6 +81,12 @@ const formatUsageCost = (value: number): string => {
   if (value >= 100) return `$${value.toFixed(2)}`;
   if (value >= 1) return `$${value.toFixed(3)}`;
   return `$${value.toFixed(4)}`;
+};
+
+const formatUsageShare = (value: number | null): string => {
+  if (value === null || !Number.isFinite(value)) return '--';
+  if (value <= 0) return '0.0%';
+  return `${value.toFixed(1)}%`;
 };
 
 interface QuotaCardProps<TState extends QuotaStatusState> {
@@ -156,6 +163,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
     { key: 'reasoning', label: t('usage_stats.reasoning_tokens'), value: reasoningTokens }
   ];
   const hasUsageModels = topModels.length > 0;
+  const totalUsageCost = topModels.reduce((sum, model) => sum + model.totalCost, 0);
   const hasUsageData =
     usedTokens !== null ||
     usageStartedAt !== null ||
@@ -263,9 +271,15 @@ export function QuotaCard<TState extends QuotaStatusState>({
       width={720}
     >
       <div className={styles.quotaUsageModalBody}>
-        <div className={styles.quotaUsageModalSummary}>
-          <span className={styles.cardUsageModelsLabel}>{t('quota_management.used_tokens')}</span>
-          <strong>{usedTokens === null ? '--' : `${formatCompactNumber(usedTokens)} Tokens`}</strong>
+        <div className={styles.quotaUsageModalSummaryGrid}>
+          <div className={styles.quotaUsageModalSummary}>
+            <span className={styles.cardUsageModelsLabel}>{t('quota_management.used_tokens')}</span>
+            <strong>{usedTokens === null ? '--' : `${formatCompactNumber(usedTokens)} Tokens`}</strong>
+          </div>
+          <div className={styles.quotaUsageModalSummary}>
+            <span className={styles.cardUsageModelsLabel}>{t('usage_stats.total_cost')}</span>
+            <strong>{formatUsageCost(totalUsageCost)}</strong>
+          </div>
         </div>
         <div className={styles.cardUsageMeta}>
           <span className={styles.cardUsageLabel}>{t('quota_management.used_tokens')}</span>
@@ -288,19 +302,37 @@ export function QuotaCard<TState extends QuotaStatusState>({
         </div>
         {hasUsageModels ? (
           <div className={styles.quotaUsageModalList}>
-            {topModels.map((model) => (
-              <div key={model.model} className={styles.quotaUsageModalItem}>
-                <span className={styles.quotaUsageModalModel} title={model.model}>
-                  {model.model}
-                </span>
-                <span
-                  className={styles.quotaUsageModalValue}
-                  title={`${model.totalTokens.toLocaleString()} Tokens · ${formatUsageCost(model.totalCost)}`}
-                >
-                  {formatCompactNumber(model.totalTokens)} Tokens · {formatUsageCost(model.totalCost)}
-                </span>
-              </div>
-            ))}
+            {topModels.map((model) => {
+              const usageLine = t('quota_management.top_models_usage_value', {
+                tokens: `${formatCompactNumber(model.totalTokens)} Tokens`,
+                share: formatUsageShare(
+                  model.quotaUsageRatio === null || model.quotaUsageRatio === undefined
+                    ? null
+                    : model.quotaUsageRatio * 100
+                ),
+                cost: formatUsageCost(model.totalCost)
+              });
+              const usageLineTitle = t('quota_management.top_models_usage_value', {
+                tokens: `${model.totalTokens.toLocaleString()} Tokens`,
+                share: formatUsageShare(
+                  model.quotaUsageRatio === null || model.quotaUsageRatio === undefined
+                    ? null
+                    : model.quotaUsageRatio * 100
+                ),
+                cost: formatUsageCost(model.totalCost)
+              });
+
+              return (
+                <div key={model.model} className={styles.quotaUsageModalItem}>
+                  <span className={styles.quotaUsageModalModel} title={model.model}>
+                    {model.model}
+                  </span>
+                  <span className={styles.quotaUsageModalValue} title={usageLineTitle}>
+                    {usageLine}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         ) : !hasUsageData && !detailsContent ? (
           <div className={styles.quotaMessage}>{t('quota_management.usage_no_data')}</div>

@@ -12,6 +12,7 @@ import type {
   AntigravityQuotaState,
   AuthFileItem,
   ClaudeQuotaState,
+  ClaudeQuotaWindow,
   CodexQuotaWindow,
   CodexQuotaState,
   GeminiCliQuotaState,
@@ -414,6 +415,106 @@ const getQuotaResetTimestampForModel = (
     default:
       return null;
   }
+};
+
+const matchesClaudeWindowModel = (
+  window: ClaudeQuotaWindow,
+  normalizedSelectedModel: string
+): boolean => {
+  if (!normalizedSelectedModel) return true;
+
+  const candidates = [window.id, window.label]
+    .map((value) => normalizeModelKey(String(value)))
+    .filter(Boolean);
+
+  return candidates.some(
+    (candidate) =>
+      candidate === normalizedSelectedModel ||
+      candidate.includes(normalizedSelectedModel) ||
+      normalizedSelectedModel.includes(candidate)
+  );
+};
+
+const getQuotaUsedRatioForUsageModel = (
+  quotaType: QuotaConfig<QuotaStatusState, unknown>['type'],
+  quotaState: QuotaStatusState | undefined,
+  modelName: string,
+  fileTotalTokens: number | null,
+  modelTotalTokens: number
+): number | null => {
+  if (!quotaState || quotaState.status !== 'success') {
+    return null;
+  }
+
+  const normalizedModel = normalizeModelKey(modelName);
+  const toUsedRatio = (remainingRatio: number | null) =>
+    remainingRatio === null ? null : clampQuotaRatio(1 - remainingRatio);
+
+  switch (quotaType) {
+    case 'antigravity':
+    case 'gemini-cli': {
+      return toUsedRatio(getQuotaRemainingRatioForModel(quotaType, quotaState, normalizedModel));
+    }
+    case 'claude': {
+      const state = quotaState as ClaudeQuotaState;
+      const matchedWindows = state.windows.filter((window) =>
+        matchesClaudeWindowModel(window, normalizedModel)
+      );
+      const usedRatios = matchedWindows
+        .map((window) =>
+          window.usedPercent === null ? null : clampQuotaRatio(window.usedPercent / 100)
+        )
+        .filter((ratio): ratio is number => ratio !== null);
+      if (usedRatios.length) {
+        return Math.max(...usedRatios);
+      }
+      break;
+    }
+    case 'codex': {
+      const state = quotaState as CodexQuotaState;
+      const availabilityWindows = getCodexAvailabilityWindows(state);
+      const weeklyWindows = availabilityWindows.filter(
+        (window) => window.id === 'weekly' || window.id.endsWith('-weekly')
+      );
+      const matchedWeeklyWindows = weeklyWindows.filter((window) =>
+        matchesCodexWindowModel(window, normalizedModel)
+      );
+      const matchedAvailabilityWindows = availabilityWindows.filter((window) =>
+        matchesCodexWindowModel(window, normalizedModel)
+      );
+      const sourceWindows =
+        matchedWeeklyWindows.length > 0
+          ? matchedWeeklyWindows
+          : matchedAvailabilityWindows.length > 0
+            ? matchedAvailabilityWindows
+            : [];
+      const usedRatios = sourceWindows
+        .map((window) =>
+          window.usedPercent === null ? null : clampQuotaRatio(window.usedPercent / 100)
+        )
+        .filter((ratio): ratio is number => ratio !== null);
+      if (usedRatios.length) {
+        return Math.max(...usedRatios);
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  const remainingRatio = getQuotaRemainingRatio(quotaType, quotaState);
+  const overallUsedRatio =
+    remainingRatio === null ? null : clampQuotaRatio(1 - remainingRatio);
+  if (
+    overallUsedRatio === null ||
+    fileTotalTokens === null ||
+    fileTotalTokens <= 0 ||
+    modelTotalTokens <= 0
+  ) {
+    return null;
+  }
+
+  return clampQuotaRatio((modelTotalTokens / fileTotalTokens) * overallUsedRatio);
 };
 
 const useQuotaPagination = <T,>(items: T[], defaultPageSize = 6): QuotaPaginationState<T> => {
@@ -1010,8 +1111,19 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           <div ref={gridRef} className={config.gridClassName}>
             {pageItems.map((item) => {
               const usageSummary = usageSummaryByFileName.get(item.name) ?? buildEmptyUsageSummary(usageStatsReady);
+              const quotaState = quota[item.name];
+              const enrichedTopModels = usageSummary.models.map((model) => ({
+                ...model,
+                quotaUsageRatio: getQuotaUsedRatioForUsageModel(
+                  config.type,
+                  quotaState,
+                  model.model,
+                  usageSummary.totalTokens,
+                  model.totalTokens
+                )
+              }));
               const antigravityGroups =
-                config.type === 'antigravity' ? getAntigravityGroups(quota[item.name]) : [];
+                config.type === 'antigravity' ? getAntigravityGroups(quotaState) : [];
               const detailsContent =
                 config.type === 'antigravity' &&
                 antigravityGroups.some((group) => !ANTIGRAVITY_VISIBLE_GROUP_IDS.has(group.id)) ? (
@@ -1040,14 +1152,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                 <QuotaCard
                   key={item.name}
                   item={item}
-                  quota={quota[item.name]}
+                  quota={quotaState}
                   usedTokens={usageSummary.totalTokens}
                   usageStartedAtMs={usageSummary.startedAtMs}
                   inputTokens={usageSummary.inputTokens}
                   outputTokens={usageSummary.outputTokens}
                   cachedTokens={usageSummary.cachedTokens}
                   reasoningTokens={usageSummary.reasoningTokens}
-                  topModels={usageSummary.models}
+                  topModels={enrichedTopModels}
                   resolvedTheme={resolvedTheme}
                   i18nPrefix={config.i18nPrefix}
                   cardIdleMessageKey={config.cardIdleMessageKey}
