@@ -20,7 +20,13 @@ import type {
   ResolvedTheme
 } from '@/types';
 import { getStatusFromError } from '@/utils/quota';
-import { normalizeAuthIndex, normalizeUsageSourceId, type UsageDetail } from '@/utils/usage';
+import {
+  calculateCost,
+  loadModelPrices,
+  normalizeAuthIndex,
+  normalizeUsageSourceId,
+  type UsageDetail
+} from '@/utils/usage';
 import { QuotaCard } from './QuotaCard';
 import type { QuotaStatusState, QuotaUsageModelSummary } from './QuotaCard';
 import { useQuotaLoader } from './useQuotaLoader';
@@ -33,7 +39,12 @@ type QuotaUpdater<T> = T | ((prev: T) => T);
 type QuotaSetter<T> = (updater: QuotaUpdater<T>) => void;
 type ViewMode = 'paged' | 'all';
 type QuotaAvailabilityFilter = 'all' | 'has' | 'none';
-type QuotaSortMode = 'default' | 'quota_desc' | 'quota_asc' | 'model_reset_asc';
+type QuotaSortMode =
+  | 'default'
+  | 'quota_desc'
+  | 'quota_asc'
+  | 'model_reset_asc'
+  | 'model_reset_desc';
 
 const DEFAULT_ITEMS_PER_PAGE = 6;
 const PAGE_SIZE_OPTIONS = [6, 12, 24];
@@ -506,6 +517,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const [refreshSnapshots, setRefreshSnapshots] = useState<Record<string, TState>>({});
 
   const providerFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [files, config]);
+  const modelPrices = useMemo(() => loadModelPrices(), []);
 
   const usageSummaryByFileName = useMemo(() => {
     const normalizedSelectedModel =
@@ -529,6 +541,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       const totalTokens = inputTokens + outputTokens + cachedTokens + reasoningTokens;
       const timestampMs = toUsageTimestampMs(detail);
       const modelName = String(detail.__modelName ?? '').trim();
+      const totalCost = calculateCost(detail, modelPrices);
 
       summary.totalTokens = (summary.totalTokens ?? 0) + totalTokens;
       summary.inputTokens = (summary.inputTokens ?? 0) + inputTokens;
@@ -548,8 +561,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         );
         if (existing) {
           existing.totalTokens += totalTokens;
+          existing.totalCost += totalCost;
         } else {
-          summary.models.push({ model: modelName, totalTokens });
+          summary.models.push({ model: modelName, totalTokens, totalCost });
         }
         summary.models.sort((left, right) => {
           const tokenDiff = right.totalTokens - left.totalTokens;
@@ -606,7 +620,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     });
 
     return summaryByFile;
-  }, [providerFiles, selectedModel, usageDetails, usageStatsReady]);
+  }, [modelPrices, providerFiles, selectedModel, usageDetails, usageStatsReady]);
 
   const preserveQuotaSnapshot = useCallback(
     (targets: AuthFileItem[]) => {
@@ -695,7 +709,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
         const leftState = getQuotaStateForList(left.name);
         const rightState = getQuotaStateForList(right.name);
-        if (sortMode === 'model_reset_asc') {
+        if (sortMode === 'model_reset_asc' || sortMode === 'model_reset_desc') {
           const leftReset = getQuotaResetTimestampForModel(
             config.type,
             leftState,
@@ -713,7 +727,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           if (leftReset === null) return 1;
           if (rightReset === null) return -1;
           if (leftReset !== rightReset) {
-            return leftReset - rightReset;
+            return sortMode === 'model_reset_asc'
+              ? leftReset - rightReset
+              : rightReset - leftReset;
           }
           return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
         }

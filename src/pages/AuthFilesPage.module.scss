@@ -512,22 +512,43 @@
   letter-spacing: 0.01em;
 }
 
-.quotaRefreshButton:global(.btn.btn-sm) {
-  border-radius: 999px;
-  min-height: 30px;
-  padding-inline: 10px;
-  font-size: 12px;
+.cardRefreshButton {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 
-  > span {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    white-space: nowrap;
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--bg-hover) 72%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+    color: var(--text-primary);
   }
 
-  @include mobile {
-    width: 100%;
-    justify-content: center;
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.cardRefreshIconSpinning {
+  animation: authFileQuotaRefreshSpin 0.9s linear infinite;
+}
+
+@keyframes authFileQuotaRefreshSpin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
   }
 }
 

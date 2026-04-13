@@ -1,7 +1,6 @@
 import { useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Button } from '@/components/ui/Button';
 import {
   ANTIGRAVITY_CONFIG,
   CLAUDE_CONFIG,
@@ -117,31 +116,24 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     <div className={styles.quotaSection}>
       <div className={styles.quotaSectionHeader}>
         <span className={styles.quotaSectionTitle}>{t('auth_files.quota_refresh_single')}</span>
-        <Button
-          variant="secondary"
-          size="sm"
-          className={styles.quotaRefreshButton}
+        <button
+          type="button"
+          className={styles.cardRefreshButton}
           onClick={() => void refreshQuotaForFile()}
-          disabled={!canRefreshQuota}
-          loading={quotaStatus === 'loading'}
-          title={t(`${config.i18nPrefix}.refresh_button`)}
-          aria-label={t(`${config.i18nPrefix}.refresh_button`)}
+          disabled={!canRefreshQuota || quotaStatus === 'loading'}
+          title={t('auth_files.quota_refresh_hint')}
+          aria-label={t('auth_files.quota_refresh_single')}
         >
-          {quotaStatus !== 'loading' && <IconRefreshCw size={14} />}
-          {t(`${config.i18nPrefix}.refresh_button`)}
-        </Button>
+          <IconRefreshCw
+            size={15}
+            className={quotaStatus === 'loading' ? styles.cardRefreshIconSpinning : undefined}
+          />
+        </button>
       </div>
       {quotaStatus === 'loading' ? (
         <div className={styles.quotaMessage}>{t(`${config.i18nPrefix}.loading`)}</div>
       ) : quotaStatus === 'idle' ? (
-        <button
-          type="button"
-          className={`${styles.quotaMessage} ${styles.quotaMessageAction}`}
-          onClick={() => void refreshQuotaForFile()}
-          disabled={!canRefreshQuota}
-        >
-          {t(`${config.i18nPrefix}.idle`)}
-        </button>
+        <div className={styles.quotaMessage}>{t(`${config.i18nPrefix}.idle`)}</div>
       ) : quotaStatus === 'error' ? (
         <div className={styles.quotaError}>
           {t(`${config.i18nPrefix}.load_failed`, {

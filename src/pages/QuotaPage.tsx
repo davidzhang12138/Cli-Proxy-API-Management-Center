@@ -27,7 +27,12 @@ import type { AuthFileItem } from '@/types';
 import styles from './QuotaPage.module.scss';
 
 type QuotaAvailabilityFilter = 'all' | 'has' | 'none';
-type QuotaSortMode = 'default' | 'quota_desc' | 'quota_asc' | 'model_reset_asc';
+type QuotaSortMode =
+  | 'default'
+  | 'quota_desc'
+  | 'quota_asc'
+  | 'model_reset_asc'
+  | 'model_reset_desc';
 
 const QUOTA_CONFIGS = [
   CLAUDE_CONFIG,
@@ -479,6 +484,7 @@ export function QuotaPage() {
                 <option value="quota_desc">{t('quota_management.sort_quota_desc')}</option>
                 <option value="quota_asc">{t('quota_management.sort_quota_asc')}</option>
                 <option value="model_reset_asc">{t('quota_management.sort_model_reset_asc')}</option>
+                <option value="model_reset_desc">{t('quota_management.sort_model_reset_desc')}</option>
               </select>
             </div>
 

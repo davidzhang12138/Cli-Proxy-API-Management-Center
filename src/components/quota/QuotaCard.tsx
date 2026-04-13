@@ -63,6 +63,7 @@ export interface QuotaRenderHelpers {
 export interface QuotaUsageModelSummary {
   model: string;
   totalTokens: number;
+  totalCost: number;
 }
 
 const USAGE_DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
@@ -72,6 +73,13 @@ const USAGE_DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
   hour: '2-digit',
   minute: '2-digit',
   hour12: false
+};
+
+const formatUsageCost = (value: number): string => {
+  if (!Number.isFinite(value) || value <= 0) return '$0.00';
+  if (value >= 100) return `$${value.toFixed(2)}`;
+  if (value >= 1) return `$${value.toFixed(3)}`;
+  return `$${value.toFixed(4)}`;
 };
 
 interface QuotaCardProps<TState extends QuotaStatusState> {
@@ -287,9 +295,9 @@ export function QuotaCard<TState extends QuotaStatusState>({
                 </span>
                 <span
                   className={styles.quotaUsageModalValue}
-                  title={`${model.totalTokens.toLocaleString()} Tokens`}
+                  title={`${model.totalTokens.toLocaleString()} Tokens · ${formatUsageCost(model.totalCost)}`}
                 >
-                  {formatCompactNumber(model.totalTokens)} Tokens
+                  {formatCompactNumber(model.totalTokens)} Tokens · {formatUsageCost(model.totalCost)}
                 </span>
               </div>
             ))}

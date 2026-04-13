@@ -1441,7 +1441,8 @@
     "sort_default": "Default",
     "sort_quota_desc": "Quota High to Low",
     "sort_quota_asc": "Quota Low to High",
-    "sort_model_reset_asc": "Selected model reset time",
+    "sort_model_reset_asc": "Selected model reset time asc",
+    "sort_model_reset_desc": "Selected model reset time desc",
     "filtered_empty_title": "No credentials match the current filters",
     "filtered_empty_desc": "Adjust the quota filter, model filter, or sort mode to continue."
   },
