@@ -94,28 +94,44 @@ const pickEarliestFutureTimestamp = (values: Array<number | null>) => {
   return timestamps.length ? Math.min(...timestamps) : null;
 };
 
-const resolveQuotaCacheExpiryAt = (value: TimedQuotaState, now: number) => {
+const pickPreferredWindowExpiryAt = (
+  windows: Array<{ id?: string; resetTime?: string; resetLabel?: string }>
+) => {
+  const entries = windows
+    .map((window) => ({
+      id: typeof window.id === 'string' ? window.id : '',
+      timestamp:
+        toFutureTimestamp(window.resetTime) ?? parseDisplayResetLabel(window.resetLabel)
+    }))
+    .filter((entry): entry is { id: string; timestamp: number } => entry.timestamp !== null);
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const longCycleEntries = entries.filter(
+    (entry) =>
+      entry.id === 'weekly' ||
+      entry.id.endsWith('-weekly') ||
+      entry.id.startsWith('seven-day')
+  );
+
+  return pickEarliestFutureTimestamp(
+    (longCycleEntries.length > 0 ? longCycleEntries : entries).map((entry) => entry.timestamp)
+  );
+};
+
+const resolveQuotaResetExpiryAt = (value: TimedQuotaState) => {
   if ('groups' in value && Array.isArray(value.groups)) {
-    return (
-      pickEarliestFutureTimestamp(value.groups.map((group) => toFutureTimestamp(group.resetTime))) ??
-      now + QUOTA_CACHE_TTL_MS
-    );
+    return pickEarliestFutureTimestamp(value.groups.map((group) => toFutureTimestamp(group.resetTime)));
   }
 
   if ('buckets' in value && Array.isArray(value.buckets)) {
-    return (
-      pickEarliestFutureTimestamp(value.buckets.map((bucket) => toFutureTimestamp(bucket.resetTime))) ??
-      now + QUOTA_CACHE_TTL_MS
-    );
+    return pickEarliestFutureTimestamp(value.buckets.map((bucket) => toFutureTimestamp(bucket.resetTime)));
   }
 
   if ('windows' in value && Array.isArray(value.windows)) {
-    return (
-      pickEarliestFutureTimestamp(
-        value.windows.map((window) => toFutureTimestamp(window.resetTime) ?? parseDisplayResetLabel(window.resetLabel))
-      ) ??
-      now + QUOTA_CACHE_TTL_MS
-    );
+    return pickPreferredWindowExpiryAt(value.windows);
   }
 
   if ('nextReset' in value || 'bonusNextReset' in value) {
@@ -126,33 +142,57 @@ const resolveQuotaCacheExpiryAt = (value: TimedQuotaState, now: number) => {
         ? value.bonusNextReset
         : undefined;
 
-    return (
-      pickEarliestFutureTimestamp([
-        toFutureTimestamp(nextResetValue),
-        toFutureTimestamp(bonusNextResetValue)
-      ]) ??
-      now + QUOTA_CACHE_TTL_MS
-    );
+    return pickEarliestFutureTimestamp([
+      toFutureTimestamp(nextResetValue),
+      toFutureTimestamp(bonusNextResetValue)
+    ]);
   }
 
-  return now + QUOTA_CACHE_TTL_MS;
+  return null;
+};
+
+const resolveQuotaCacheExpiryAt = (value: TimedQuotaState, cachedAt: number) => {
+  const resetExpiryAt = resolveQuotaResetExpiryAt(value);
+  const minimumRetentionExpiryAt = cachedAt + QUOTA_CACHE_TTL_MS;
+  return resetExpiryAt === null
+    ? minimumRetentionExpiryAt
+    : Math.max(resetExpiryAt, minimumRetentionExpiryAt);
 };
 
 const isFreshQuotaState = (value: TimedQuotaState | undefined, now: number) => {
   if (!value || value.status === 'loading') return false;
-  if (typeof value._cacheExpiresAt === 'number' && Number.isFinite(value._cacheExpiresAt)) {
-    return value._cacheExpiresAt > now;
-  }
-  if (typeof value._cachedAt === 'number' && Number.isFinite(value._cachedAt)) {
-    return now - value._cachedAt <= QUOTA_CACHE_TTL_MS;
-  }
-  return false;
+  const cachedAt =
+    typeof value._cachedAt === 'number' && Number.isFinite(value._cachedAt) ? value._cachedAt : now;
+  return resolveQuotaCacheExpiryAt(value, cachedAt) > now;
 };
 
-const sanitizeQuotaMap = <T extends TimedQuotaState>(quotaMap: Record<string, T>) =>
-  Object.fromEntries(
-    Object.entries(quotaMap).filter(([, value]) => isFreshQuotaState(value, Date.now()))
+const sanitizeQuotaMap = <T extends TimedQuotaState>(quotaMap: Record<string, T>) => {
+  const now = Date.now();
+
+  return Object.fromEntries(
+    Object.entries(quotaMap).flatMap(([key, value]) => {
+      if (!isFreshQuotaState(value, now)) {
+        return [];
+      }
+
+      const cachedAt =
+        typeof value._cachedAt === 'number' && Number.isFinite(value._cachedAt)
+          ? value._cachedAt
+          : now;
+
+      return [
+        [
+          key,
+          {
+            ...value,
+            _cachedAt: cachedAt,
+            _cacheExpiresAt: resolveQuotaCacheExpiryAt(value, cachedAt)
+          }
+        ]
+      ];
+    })
   ) as Record<string, T>;
+};
 
 const stampQuotaMap = <T extends TimedQuotaState>(
   nextMap: Record<string, T>,
@@ -175,12 +215,11 @@ const stampQuotaMap = <T extends TimedQuotaState>(
         prevValue === value && isFreshQuotaState(prevValue, now)
           ? prevValue._cachedAt
           : now;
-      const cacheExpiresAt =
-        prevValue === value && isFreshQuotaState(prevValue, now)
-          ? prevValue._cacheExpiresAt
-          : resolveQuotaCacheExpiryAt(value, now);
+      const normalizedCachedAt =
+        typeof cachedAt === 'number' && Number.isFinite(cachedAt) ? cachedAt : now;
+      const cacheExpiresAt = resolveQuotaCacheExpiryAt(value, normalizedCachedAt);
 
-      return [[key, { ...value, _cachedAt: cachedAt, _cacheExpiresAt: cacheExpiresAt }]];
+      return [[key, { ...value, _cachedAt: normalizedCachedAt, _cacheExpiresAt: cacheExpiresAt }]];
     })
   ) as Record<string, T>;
 };
