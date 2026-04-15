@@ -45,7 +45,9 @@ type QuotaSortMode =
   | 'quota_desc'
   | 'quota_asc'
   | 'model_reset_asc'
-  | 'model_reset_desc';
+  | 'model_reset_desc'
+  | 'model_recent_usage_asc'
+  | 'model_recent_usage_desc';
 
 const DEFAULT_ITEMS_PER_PAGE = 6;
 const PAGE_SIZE_OPTIONS = [6, 12, 24];
@@ -60,6 +62,7 @@ interface FileUsageSummary {
   cachedTokens: number | null;
   reasoningTokens: number | null;
   startedAtMs: number | null;
+  latestUsedAtMs: number | null;
   models: QuotaUsageModelSummary[];
 }
 
@@ -208,8 +211,24 @@ const buildEmptyUsageSummary = (ready: boolean): FileUsageSummary => ({
   cachedTokens: ready ? 0 : null,
   reasoningTokens: ready ? 0 : null,
   startedAtMs: null,
+  latestUsedAtMs: null,
   models: []
 });
+
+const getRecentUsageTimestampForModel = (
+  summary: FileUsageSummary | undefined,
+  normalizedSelectedModel: string
+): number | null => {
+  if (!summary) return null;
+  if (!normalizedSelectedModel) {
+    return summary.latestUsedAtMs;
+  }
+
+  const matchedModel = summary.models.find(
+    (model) => normalizeModelKey(model.model) === normalizedSelectedModel
+  );
+  return matchedModel?.latestUsedAtMs ?? null;
+};
 
 const quotaStateMatchesModel = (
   quotaType: QuotaConfig<QuotaStatusState, unknown>['type'],
@@ -587,6 +606,7 @@ interface QuotaSectionProps<TState extends QuotaStatusState, TData> {
   availabilityFilter: QuotaAvailabilityFilter;
   selectedModel: string;
   sortMode: QuotaSortMode;
+  searchQuery: string;
   fileModelsByName: Record<string, string[]>;
 }
 
@@ -600,6 +620,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   availabilityFilter,
   selectedModel,
   sortMode,
+  searchQuery,
   fileModelsByName
 }: QuotaSectionProps<TState, TData>) {
   const { t } = useTranslation();
@@ -655,16 +676,33 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           : summary.startedAtMs === null
             ? timestampMs
             : Math.min(summary.startedAtMs, timestampMs);
+      summary.latestUsedAtMs =
+        timestampMs === null
+          ? summary.latestUsedAtMs
+          : summary.latestUsedAtMs === null
+            ? timestampMs
+            : Math.max(summary.latestUsedAtMs, timestampMs);
 
-      if (modelName && totalTokens > 0) {
+      if (modelName) {
         const existing = summary.models.find(
           (model) => normalizeModelKey(model.model) === normalizeModelKey(modelName)
         );
         if (existing) {
           existing.totalTokens += totalTokens;
           existing.totalCost += totalCost;
+          existing.latestUsedAtMs =
+            timestampMs === null
+              ? existing.latestUsedAtMs ?? null
+              : existing.latestUsedAtMs === null || existing.latestUsedAtMs === undefined
+                ? timestampMs
+                : Math.max(existing.latestUsedAtMs, timestampMs);
         } else {
-          summary.models.push({ model: modelName, totalTokens, totalCost });
+          summary.models.push({
+            model: modelName,
+            totalTokens,
+            totalCost,
+            latestUsedAtMs: timestampMs
+          });
         }
         summary.models.sort((left, right) => {
           const tokenDiff = right.totalTokens - left.totalTokens;
@@ -763,6 +801,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const visibleFiles = useMemo(() => {
     const normalizedSelectedModel =
       selectedModel && selectedModel !== 'all' ? normalizeModelKey(selectedModel) : '';
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
     return [...providerFiles]
       .filter((file) => {
@@ -784,24 +823,48 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         }
 
         if (!normalizedSelectedModel) {
-          return true;
-        }
-
-        const quotaModelMatch = quotaStateMatchesModel(
-          config.type,
-          quotaState,
-          normalizedSelectedModel
-        );
-        if (quotaModelMatch !== null) {
-          return quotaModelMatch;
+          if (!normalizedSearchQuery) {
+            return true;
+          }
+        } else {
+          const quotaModelMatch = quotaStateMatchesModel(
+            config.type,
+            quotaState,
+            normalizedSelectedModel
+          );
+          if (quotaModelMatch !== null && !quotaModelMatch) {
+            return false;
+          }
         }
 
         const supportedModels = fileModelsByName[file.name] ?? [];
         const usageModels = usageSummaryByFileName.get(file.name)?.models ?? [];
-        return (
-          supportedModels.some((model) => normalizeModelKey(model) === normalizedSelectedModel) ||
-          usageModels.some((model) => normalizeModelKey(model.model) === normalizedSelectedModel)
-        );
+
+        if (normalizedSelectedModel) {
+          const hasSelectedModel =
+            supportedModels.some((model) => normalizeModelKey(model) === normalizedSelectedModel) ||
+            usageModels.some((model) => normalizeModelKey(model.model) === normalizedSelectedModel);
+          if (!hasSelectedModel) {
+            return false;
+          }
+        }
+
+        if (!normalizedSearchQuery) {
+          return true;
+        }
+
+        const searchFields = [
+          file.name,
+          file.type,
+          file.provider,
+          String(file['auth_index'] ?? file.authIndex ?? ''),
+          ...supportedModels,
+          ...usageModels.map((model) => model.model)
+        ]
+          .map((value) => String(value ?? '').trim().toLowerCase())
+          .filter(Boolean);
+
+        return searchFields.some((field) => field.includes(normalizedSearchQuery));
       })
       .sort((left, right) => {
         if (sortMode === 'default') {
@@ -810,6 +873,8 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
         const leftState = getQuotaStateForList(left.name);
         const rightState = getQuotaStateForList(right.name);
+        const leftUsageSummary = usageSummaryByFileName.get(left.name);
+        const rightUsageSummary = usageSummaryByFileName.get(right.name);
         if (sortMode === 'model_reset_asc' || sortMode === 'model_reset_desc') {
           const leftReset = getQuotaResetTimestampForModel(
             config.type,
@@ -831,6 +896,29 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             return sortMode === 'model_reset_asc'
               ? leftReset - rightReset
               : rightReset - leftReset;
+          }
+          return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+        }
+
+        if (sortMode === 'model_recent_usage_asc' || sortMode === 'model_recent_usage_desc') {
+          const leftRecentUsage = getRecentUsageTimestampForModel(
+            leftUsageSummary,
+            normalizedSelectedModel
+          );
+          const rightRecentUsage = getRecentUsageTimestampForModel(
+            rightUsageSummary,
+            normalizedSelectedModel
+          );
+
+          if (leftRecentUsage === null && rightRecentUsage === null) {
+            return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+          }
+          if (leftRecentUsage === null) return 1;
+          if (rightRecentUsage === null) return -1;
+          if (leftRecentUsage !== rightRecentUsage) {
+            return sortMode === 'model_recent_usage_asc'
+              ? leftRecentUsage - rightRecentUsage
+              : rightRecentUsage - leftRecentUsage;
           }
           return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
         }
@@ -864,6 +952,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     fileModelsByName,
     getQuotaStateForList,
     providerFiles,
+    searchQuery,
     selectedModel,
     sortMode,
     usageSummaryByFileName

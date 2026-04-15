@@ -65,6 +65,7 @@ export interface QuotaUsageModelSummary {
   totalTokens: number;
   totalCost: number;
   quotaUsageRatio?: number | null;
+  latestUsedAtMs?: number | null;
 }
 
 const USAGE_DATE_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {

@@ -2,7 +2,15 @@
  * Quota management page.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconFilterAll } from '@/components/ui/icons';
 import {
@@ -32,7 +40,9 @@ type QuotaSortMode =
   | 'quota_desc'
   | 'quota_asc'
   | 'model_reset_asc'
-  | 'model_reset_desc';
+  | 'model_reset_desc'
+  | 'model_recent_usage_asc'
+  | 'model_recent_usage_desc';
 
 const QUOTA_CONFIGS = [
   CLAUDE_CONFIG,
@@ -141,10 +151,12 @@ export function QuotaPage() {
   const [availabilityFilter, setAvailabilityFilter] = useState<QuotaAvailabilityFilter>('all');
   const [selectedModel, setSelectedModel] = useState('all');
   const [sortMode, setSortMode] = useState<QuotaSortMode>('default');
+  const [searchQuery, setSearchQuery] = useState('');
   const [activeQuotaFilter, setActiveQuotaFilter] = useState<ActiveQuotaFilter>('all');
   const [fileModelsByName, setFileModelsByName] = useState<Record<string, string[]>>({});
   const [modelCatalogLoading, setModelCatalogLoading] = useState(false);
   const [modelReloadKey, setModelReloadKey] = useState(0);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const fileModelsRef = useRef<Record<string, string[]>>({});
 
@@ -347,6 +359,7 @@ export function QuotaPage() {
     availabilityFilter,
     selectedModel,
     sortMode,
+    searchQuery: deferredSearchQuery,
     fileModelsByName
   };
 
@@ -439,6 +452,19 @@ export function QuotaPage() {
         <div className={styles.filterControlsPanel}>
           <div className={styles.filterToolbar}>
             <div className={styles.filterControl}>
+              <label htmlFor="quota-search-query">{t('quota_management.search_label')}</label>
+              <input
+                id="quota-search-query"
+                type="search"
+                className={styles.searchInput}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={t('quota_management.search_placeholder')}
+                spellCheck={false}
+              />
+            </div>
+
+            <div className={styles.filterControl}>
               <label htmlFor="quota-availability-filter">{t('quota_management.quota_filter_label')}</label>
               <select
                 id="quota-availability-filter"
@@ -485,6 +511,8 @@ export function QuotaPage() {
                 <option value="quota_asc">{t('quota_management.sort_quota_asc')}</option>
                 <option value="model_reset_asc">{t('quota_management.sort_model_reset_asc')}</option>
                 <option value="model_reset_desc">{t('quota_management.sort_model_reset_desc')}</option>
+                <option value="model_recent_usage_asc">{t('quota_management.sort_model_recent_usage_asc')}</option>
+                <option value="model_recent_usage_desc">{t('quota_management.sort_model_recent_usage_desc')}</option>
               </select>
             </div>
 

@@ -187,6 +187,31 @@
   }
 }
 
+.searchInput {
+  height: 40px;
+  width: 100%;
+  padding: 0 12px;
+  border-radius: $radius-md;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  transition:
+    border-color $transition-fast,
+    box-shadow $transition-fast,
+    background-color $transition-fast;
+
+  &::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--primary-color) 55%, var(--border-color));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 14%, transparent);
+  }
+}
+
 .filterStatus {
   margin-left: auto;
   padding: 8px 12px;
