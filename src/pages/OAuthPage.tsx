@@ -656,7 +656,6 @@ export function OAuthPage() {
             )}
           </div>
         </Card>
-
       </div>
     </div>
   );
