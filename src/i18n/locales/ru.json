@@ -1403,6 +1403,7 @@
     "quota_filter_all": "Все",
     "quota_filter_has": "Есть квота",
     "quota_filter_none": "Без квоты",
+    "quota_filter_uncached": "Не кешировано",
     "model_filter_label": "Фильтр модели",
     "model_filter_all": "Все модели",
     "model_filter_loading": "Загрузка списка моделей...",

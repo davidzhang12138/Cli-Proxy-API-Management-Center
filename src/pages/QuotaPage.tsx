@@ -34,7 +34,7 @@ import {
 import type { AuthFileItem } from '@/types';
 import styles from './QuotaPage.module.scss';
 
-type QuotaAvailabilityFilter = 'all' | 'has' | 'none';
+type QuotaAvailabilityFilter = 'all' | 'has' | 'none' | 'uncached';
 type QuotaSortMode =
   | 'default'
   | 'quota_desc'
@@ -477,6 +477,7 @@ export function QuotaPage() {
                 <option value="all">{t('quota_management.quota_filter_all')}</option>
                 <option value="has">{t('quota_management.quota_filter_has')}</option>
                 <option value="none">{t('quota_management.quota_filter_none')}</option>
+                <option value="uncached">{t('quota_management.quota_filter_uncached')}</option>
               </select>
             </div>
 

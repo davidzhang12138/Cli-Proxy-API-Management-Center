@@ -1406,6 +1406,7 @@
     "quota_filter_all": "All",
     "quota_filter_has": "Has Quota",
     "quota_filter_none": "No Quota",
+    "quota_filter_uncached": "Uncached",
     "model_filter_label": "Model Filter",
     "model_filter_all": "All Models",
     "model_filter_loading": "Loading credential models...",

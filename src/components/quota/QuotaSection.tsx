@@ -39,7 +39,7 @@ import styles from '@/pages/QuotaPage.module.scss';
 type QuotaUpdater<T> = T | ((prev: T) => T);
 type QuotaSetter<T> = (updater: QuotaUpdater<T>) => void;
 type ViewMode = 'paged' | 'all';
-type QuotaAvailabilityFilter = 'all' | 'has' | 'none';
+type QuotaAvailabilityFilter = 'all' | 'has' | 'none' | 'uncached';
 type QuotaSortMode =
   | 'default'
   | 'quota_desc'
@@ -816,7 +816,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             ? true
             : availabilityFilter === 'has'
               ? ratio !== null && ratio > 0
-              : ratio !== null && ratio <= 0;
+              : availabilityFilter === 'none'
+                ? ratio !== null && ratio <= 0
+                : ratio === null;
 
         if (!matchesQuota) {
           return false;
