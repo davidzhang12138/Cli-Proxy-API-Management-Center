@@ -41,9 +41,10 @@ export const STORAGE_KEY_AUTH_FILES_PAGE_SIZE = 'cli-proxy-auth-files-page-size'
 export const STORAGE_KEY_QUOTA = 'cli-proxy-quota-cache';
 
 // 语言配置
-export const LANGUAGE_ORDER = defineLanguageOrder(['zh-CN', 'en', 'ru'] as const);
+export const LANGUAGE_ORDER = defineLanguageOrder(['zh-CN', 'zh-TW', 'en', 'ru'] as const);
 export const LANGUAGE_LABEL_KEYS: Record<Language, string> = {
   'zh-CN': 'language.chinese',
+  'zh-TW': 'language.chinese_tw',
   en: 'language.english',
   ru: 'language.russian'
 };
