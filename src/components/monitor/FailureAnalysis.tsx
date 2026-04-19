@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { useDisableModel } from '@/hooks';
 import { normalizeUsageSourceId } from '@/utils/usage';
-import { resolveSourceDisplay } from '@/utils/sourceResolver';
-import type { SourceInfo, CredentialInfo } from '@/types/sourceInfo';
+import { resolveSourceDisplay, type SourceInfoMap } from '@/utils/sourceResolver';
+import type { CredentialInfo } from '@/types/sourceInfo';
 import { TimeRangeSelector, formatTimeRangeCaption, type TimeRange } from './TimeRangeSelector';
 import { DisableModelModal } from './DisableModelModal';
 import {
@@ -22,7 +22,7 @@ interface FailureAnalysisProps {
   loading: boolean;
   providerMap: Record<string, string>;
   providerModels: Record<string, Set<string>>;
-  sourceInfoMap: Map<string, SourceInfo>;
+  sourceInfoMap: SourceInfoMap;
   authFileMap?: Map<string, CredentialInfo>;
 }
 

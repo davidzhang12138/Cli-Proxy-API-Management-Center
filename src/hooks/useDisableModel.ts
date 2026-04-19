@@ -12,12 +12,12 @@ import {
   createDisableState,
   type DisableState,
 } from '@/utils/monitor';
-import type { SourceInfo } from '@/types/sourceInfo';
+import type { SourceInfoMap } from '@/utils/sourceResolver';
 import type { OpenAIProviderConfig } from '@/types';
 
 export interface UseDisableModelOptions {
   providerMap: Record<string, string>;
-  sourceInfoMap?: Map<string, SourceInfo>;
+  sourceInfoMap?: SourceInfoMap;
   providerModels?: Record<string, Set<string>>;
 }
 
