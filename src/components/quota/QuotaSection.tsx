@@ -142,6 +142,68 @@ const toDisplayResetTimestamp = (value?: string): number | null => {
   return candidate.getTime();
 };
 
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+const pickLatestTimestamp = (values: Array<number | null>) => {
+  const timestamps = values.filter((value): value is number => value !== null);
+  return timestamps.length ? Math.max(...timestamps) : null;
+};
+
+const resolveWindowStartTimestamp = (resetTimestamp: number | null, durationMs: number | null) => {
+  if (resetTimestamp === null || durationMs === null || durationMs <= 0) {
+    return null;
+  }
+  return resetTimestamp - durationMs;
+};
+
+const getClaudeWindowDurationMs = (windowId: string): number | null => {
+  if (windowId === 'five-hour') return 5 * HOUR_MS;
+  if (windowId.startsWith('seven-day')) return 7 * DAY_MS;
+  return null;
+};
+
+const getCodexWindowDurationMs = (windowId: string): number | null => {
+  if (
+    windowId === 'five-hour' ||
+    windowId.endsWith('-five-hour') ||
+    windowId.includes('-five-hour-')
+  ) {
+    return 5 * HOUR_MS;
+  }
+  if (
+    windowId === 'weekly' ||
+    windowId.endsWith('-weekly') ||
+    windowId.includes('-weekly-')
+  ) {
+    return 7 * DAY_MS;
+  }
+  return null;
+};
+
+const inferAntigravityWindowDurationMs = (resetTimestamp: number | null): number | null => {
+  if (resetTimestamp === null) {
+    return null;
+  }
+  const remainingMs = resetTimestamp - Date.now();
+  if (remainingMs <= 0) {
+    return null;
+  }
+  return remainingMs > 5 * HOUR_MS ? 7 * DAY_MS : 5 * HOUR_MS;
+};
+
+const subtractOneCalendarMonth = (timestamp: number | null): number | null => {
+  if (timestamp === null) {
+    return null;
+  }
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  date.setMonth(date.getMonth() - 1);
+  return date.getTime();
+};
+
 const matchesCodexWindowModel = (
   window: CodexQuotaWindow,
   normalizedSelectedModel: string
@@ -436,6 +498,61 @@ const getQuotaResetTimestampForModel = (
   }
 };
 
+const getQuotaUsageWindowStartTimestamp = (
+  quotaType: QuotaConfig<QuotaStatusState, unknown>['type'],
+  quotaState: QuotaStatusState | undefined
+): number | null => {
+  if (!quotaState || quotaState.status !== 'success') {
+    return null;
+  }
+
+  switch (quotaType) {
+    case 'antigravity': {
+      const state = quotaState as AntigravityQuotaState;
+      return pickLatestTimestamp(
+        state.groups.map((group) => {
+          const resetTimestamp = toResetTimestamp(group.resetTime);
+          return resolveWindowStartTimestamp(
+            resetTimestamp,
+            inferAntigravityWindowDurationMs(resetTimestamp)
+          );
+        })
+      );
+    }
+    case 'claude': {
+      const state = quotaState as ClaudeQuotaState;
+      return pickLatestTimestamp(
+        state.windows.map((window) =>
+          resolveWindowStartTimestamp(
+            toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel),
+            getClaudeWindowDurationMs(window.id)
+          )
+        )
+      );
+    }
+    case 'codex': {
+      const state = quotaState as CodexQuotaState;
+      return pickLatestTimestamp(
+        getCodexAvailabilityWindows(state).map((window) =>
+          resolveWindowStartTimestamp(
+            toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel),
+            getCodexWindowDurationMs(window.id)
+          )
+        )
+      );
+    }
+    case 'kiro': {
+      const state = getEffectiveKiroQuotaState(quotaState as KiroQuotaState);
+      return pickLatestTimestamp([
+        subtractOneCalendarMonth(toResetTimestamp(state.nextReset)),
+        subtractOneCalendarMonth(toResetTimestamp(state.bonusNextReset))
+      ]);
+    }
+    default:
+      return null;
+  }
+};
+
 const matchesClaudeWindowModel = (
   window: ClaudeQuotaWindow,
   normalizedSelectedModel: string
@@ -641,18 +758,21 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const providerFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [files, config]);
   const modelPrices = useMemo(() => loadModelPrices(), []);
 
+  const getQuotaStateForList = useCallback(
+    (fileName: string): QuotaStatusState | undefined => {
+      const currentState = quota[fileName] as QuotaStatusState | undefined;
+      if (currentState?.status === 'loading' && refreshSnapshots[fileName]) {
+        return refreshSnapshots[fileName] as QuotaStatusState;
+      }
+      return currentState;
+    },
+    [quota, refreshSnapshots]
+  );
+
   const usageSummaryByFileName = useMemo(() => {
     const normalizedSelectedModel =
       selectedModel && selectedModel !== 'all' ? normalizeModelKey(selectedModel) : '';
-    const usageByAuthIndex = new Map<string, FileUsageSummary>();
-    const usageBySource = new Map<string, FileUsageSummary>();
-
-    const accumulateDetail = (
-      bucket: Map<string, FileUsageSummary>,
-      key: string,
-      detail: UsageDetail
-    ) => {
-      const summary = bucket.get(key) ?? buildEmptyUsageSummary(true);
+    const accumulateDetail = (summary: FileUsageSummary, detail: UsageDetail, timestampMs: number | null) => {
       const inputTokens = toNonNegativeNumber(detail.tokens.input_tokens);
       const outputTokens = toNonNegativeNumber(detail.tokens.output_tokens);
       const cachedTokens = Math.max(
@@ -661,7 +781,6 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       );
       const reasoningTokens = toNonNegativeNumber(detail.tokens.reasoning_tokens);
       const totalTokens = inputTokens + outputTokens + cachedTokens + reasoningTokens;
-      const timestampMs = toUsageTimestampMs(detail);
       const modelName = String(detail.__modelName ?? '').trim();
       const totalCost = calculateCost(detail, modelPrices);
 
@@ -683,7 +802,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             ? timestampMs
             : Math.max(summary.latestUsedAtMs, timestampMs);
 
-      if (modelName) {
+      if (modelName && totalTokens > 0) {
         const existing = summary.models.find(
           (model) => normalizeModelKey(model.model) === normalizeModelKey(modelName)
         );
@@ -710,56 +829,63 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           return left.model.localeCompare(right.model, undefined, { sensitivity: 'base' });
         });
       }
-
-      bucket.set(key, summary);
     };
-
-    usageDetails.forEach((detail) => {
-      if (
-        normalizedSelectedModel &&
-        normalizeModelKey(String(detail.__modelName ?? '')) !== normalizedSelectedModel
-      ) {
-        return;
-      }
-
-      const authIndexKey = normalizeAuthIndex(detail.auth_index);
-      if (authIndexKey) {
-        accumulateDetail(usageByAuthIndex, authIndexKey, detail);
-      }
-
-      const sourceId = normalizeUsageSourceId(detail.source);
-      if (sourceId) {
-        accumulateDetail(usageBySource, sourceId, detail);
-      }
-    });
 
     const summaryByFile = new Map<string, FileUsageSummary>();
     providerFiles.forEach((file) => {
       const rawAuthIndex = file['auth_index'] ?? file.authIndex;
       const authIndexKey = normalizeAuthIndex(rawAuthIndex);
-      if (authIndexKey && usageByAuthIndex.has(authIndexKey)) {
-        summaryByFile.set(file.name, usageByAuthIndex.get(authIndexKey) ?? buildEmptyUsageSummary(usageStatsReady));
-        return;
-      }
-
       const fileNameId = file.name ? normalizeUsageSourceId(file.name) : '';
-      if (fileNameId && usageBySource.has(fileNameId)) {
-        summaryByFile.set(file.name, usageBySource.get(fileNameId) ?? buildEmptyUsageSummary(usageStatsReady));
-        return;
-      }
-
       const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
       const nameWithoutExtId = nameWithoutExt ? normalizeUsageSourceId(nameWithoutExt) : '';
-      if (nameWithoutExtId && usageBySource.has(nameWithoutExtId)) {
-        summaryByFile.set(file.name, usageBySource.get(nameWithoutExtId) ?? buildEmptyUsageSummary(usageStatsReady));
-        return;
-      }
+      const candidateSourceIds = new Set(
+        [fileNameId, nameWithoutExtId].filter((value): value is string => Boolean(value))
+      );
+      const cutoffTimestamp = getQuotaUsageWindowStartTimestamp(
+        config.type,
+        getQuotaStateForList(file.name)
+      );
+      const summary = buildEmptyUsageSummary(usageStatsReady);
 
-      summaryByFile.set(file.name, buildEmptyUsageSummary(usageStatsReady));
+      usageDetails.forEach((detail) => {
+        if (
+          normalizedSelectedModel &&
+          normalizeModelKey(String(detail.__modelName ?? '')) !== normalizedSelectedModel
+        ) {
+          return;
+        }
+
+        const detailAuthIndex = normalizeAuthIndex(detail.auth_index);
+        const detailSourceId = normalizeUsageSourceId(detail.source);
+        const matchesFile =
+          (authIndexKey && detailAuthIndex === authIndexKey) ||
+          (detailSourceId && candidateSourceIds.has(detailSourceId));
+
+        if (!matchesFile) {
+          return;
+        }
+
+        const timestampMs = toUsageTimestampMs(detail);
+        if (cutoffTimestamp !== null && (timestampMs === null || timestampMs < cutoffTimestamp)) {
+          return;
+        }
+
+        accumulateDetail(summary, detail, timestampMs);
+      });
+
+      summaryByFile.set(file.name, summary);
     });
 
     return summaryByFile;
-  }, [modelPrices, providerFiles, selectedModel, usageDetails, usageStatsReady]);
+  }, [
+    config.type,
+    getQuotaStateForList,
+    modelPrices,
+    providerFiles,
+    selectedModel,
+    usageDetails,
+    usageStatsReady
+  ]);
 
   const preserveQuotaSnapshot = useCallback(
     (targets: AuthFileItem[]) => {
@@ -786,17 +912,6 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       return nextState;
     });
   }, []);
-
-  const getQuotaStateForList = useCallback(
-    (fileName: string): QuotaStatusState | undefined => {
-      const currentState = quota[fileName] as QuotaStatusState | undefined;
-      if (currentState?.status === 'loading' && refreshSnapshots[fileName]) {
-        return refreshSnapshots[fileName] as QuotaStatusState;
-      }
-      return currentState;
-    },
-    [quota, refreshSnapshots]
-  );
 
   const visibleFiles = useMemo(() => {
     const normalizedSelectedModel =
