@@ -757,6 +757,28 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
   const providerFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [files, config]);
   const modelPrices = useMemo(() => loadModelPrices(), []);
+  const usageDetailsIndex = useMemo(() => {
+    const byAuthIndex = new Map<string, UsageDetail[]>();
+    const bySource = new Map<string, UsageDetail[]>();
+
+    usageDetails.forEach((detail) => {
+      const authIndexKey = normalizeAuthIndex(detail.auth_index);
+      if (authIndexKey) {
+        const authEntries = byAuthIndex.get(authIndexKey) ?? [];
+        authEntries.push(detail);
+        byAuthIndex.set(authIndexKey, authEntries);
+      }
+
+      const sourceId = normalizeUsageSourceId(detail.source);
+      if (sourceId) {
+        const sourceEntries = bySource.get(sourceId) ?? [];
+        sourceEntries.push(detail);
+        bySource.set(sourceId, sourceEntries);
+      }
+    });
+
+    return { byAuthIndex, bySource };
+  }, [usageDetails]);
 
   const getQuotaStateForList = useCallback(
     (fileName: string): QuotaStatusState | undefined => {
@@ -846,22 +868,25 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         getQuotaStateForList(file.name)
       );
       const summary = buildEmptyUsageSummary(usageStatsReady);
+      const matchedDetails = new Set<UsageDetail>();
 
-      usageDetails.forEach((detail) => {
+      if (authIndexKey) {
+        usageDetailsIndex.byAuthIndex.get(authIndexKey)?.forEach((detail) => {
+          matchedDetails.add(detail);
+        });
+      }
+
+      candidateSourceIds.forEach((sourceId) => {
+        usageDetailsIndex.bySource.get(sourceId)?.forEach((detail) => {
+          matchedDetails.add(detail);
+        });
+      });
+
+      matchedDetails.forEach((detail) => {
         if (
           normalizedSelectedModel &&
           normalizeModelKey(String(detail.__modelName ?? '')) !== normalizedSelectedModel
         ) {
-          return;
-        }
-
-        const detailAuthIndex = normalizeAuthIndex(detail.auth_index);
-        const detailSourceId = normalizeUsageSourceId(detail.source);
-        const matchesFile =
-          (authIndexKey && detailAuthIndex === authIndexKey) ||
-          (detailSourceId && candidateSourceIds.has(detailSourceId));
-
-        if (!matchesFile) {
           return;
         }
 
@@ -883,7 +908,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     modelPrices,
     providerFiles,
     selectedModel,
-    usageDetails,
+    usageDetailsIndex,
     usageStatsReady
   ]);
 

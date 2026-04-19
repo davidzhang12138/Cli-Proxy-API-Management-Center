@@ -3,6 +3,7 @@
  */
 
 import {
+  startTransition,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -199,6 +200,11 @@ export function QuotaPage() {
 
   const modelOptions = useMemo(() => {
     const models = new Map<string, string>();
+    const scopedAuthIndexKeys = new Set(
+      scopedQuotaFiles
+        .map((file) => String(file['auth_index'] ?? file.authIndex ?? '').trim())
+        .filter(Boolean)
+    );
 
     scopedQuotaFiles.forEach((file) => {
       const entries = fileModelsByName[file.name] ?? [];
@@ -211,11 +217,7 @@ export function QuotaPage() {
 
     usageDetails.forEach((detail) => {
       const authIndexKey = String(detail.auth_index ?? '').trim();
-      const matchesAuthFile = scopedQuotaFiles.some((file) => {
-        const fileAuthIndex = String(file['auth_index'] ?? file.authIndex ?? '').trim();
-        return fileAuthIndex && fileAuthIndex === authIndexKey;
-      });
-      if (!matchesAuthFile) {
+      if (!authIndexKey || !scopedAuthIndexKeys.has(authIndexKey)) {
         return;
       }
       const modelName = String(detail.__modelName ?? '').trim();
@@ -420,7 +422,11 @@ export function QuotaPage() {
                   type="button"
                   className={`${styles.filterTag} ${isActive ? styles.filterTagActive : ''}`}
                   style={buttonStyle}
-                  onClick={() => setActiveQuotaFilter(type)}
+                  onClick={() => {
+                    startTransition(() => {
+                      setActiveQuotaFilter(type);
+                    });
+                  }}
                 >
                   <span className={styles.filterTagLabel}>
                     {type === 'all' ? (
