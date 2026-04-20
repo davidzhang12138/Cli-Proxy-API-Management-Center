@@ -17,7 +17,7 @@ import { STORAGE_KEY_QUOTA } from '@/utils/constants';
 type QuotaUpdater<T> = T | ((prev: T) => T);
 type TimedQuotaState = { status?: string; _cachedAt?: number; _cacheExpiresAt?: number };
 
-const QUOTA_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const QUOTA_CACHE_FALLBACK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface QuotaStoreState {
   antigravityQuota: Record<string, AntigravityQuotaState>;
@@ -153,10 +153,8 @@ const resolveQuotaResetExpiryAt = (value: TimedQuotaState) => {
 
 const resolveQuotaCacheExpiryAt = (value: TimedQuotaState, cachedAt: number) => {
   const resetExpiryAt = resolveQuotaResetExpiryAt(value);
-  const minimumRetentionExpiryAt = cachedAt + QUOTA_CACHE_TTL_MS;
-  return resetExpiryAt === null
-    ? minimumRetentionExpiryAt
-    : Math.max(resetExpiryAt, minimumRetentionExpiryAt);
+  const fallbackExpiryAt = cachedAt + QUOTA_CACHE_FALLBACK_TTL_MS;
+  return resetExpiryAt ?? fallbackExpiryAt;
 };
 
 const isFreshQuotaState = (value: TimedQuotaState | undefined, now: number) => {
