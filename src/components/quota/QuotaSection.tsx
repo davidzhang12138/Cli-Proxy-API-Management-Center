@@ -145,9 +145,9 @@ const toDisplayResetTimestamp = (value?: string): number | null => {
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
-const pickLatestTimestamp = (values: Array<number | null>) => {
+const pickEarliestTimestamp = (values: Array<number | null>) => {
   const timestamps = values.filter((value): value is number => value !== null);
-  return timestamps.length ? Math.max(...timestamps) : null;
+  return timestamps.length ? Math.min(...timestamps) : null;
 };
 
 const resolveWindowStartTimestamp = (resetTimestamp: number | null, durationMs: number | null) => {
@@ -509,7 +509,7 @@ const getQuotaUsageWindowStartTimestamp = (
   switch (quotaType) {
     case 'antigravity': {
       const state = quotaState as AntigravityQuotaState;
-      return pickLatestTimestamp(
+      return pickEarliestTimestamp(
         state.groups.map((group) => {
           const resetTimestamp = toResetTimestamp(group.resetTime);
           return resolveWindowStartTimestamp(
@@ -521,7 +521,7 @@ const getQuotaUsageWindowStartTimestamp = (
     }
     case 'claude': {
       const state = quotaState as ClaudeQuotaState;
-      return pickLatestTimestamp(
+      return pickEarliestTimestamp(
         state.windows.map((window) =>
           resolveWindowStartTimestamp(
             toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel),
@@ -532,7 +532,7 @@ const getQuotaUsageWindowStartTimestamp = (
     }
     case 'codex': {
       const state = quotaState as CodexQuotaState;
-      return pickLatestTimestamp(
+      return pickEarliestTimestamp(
         getCodexAvailabilityWindows(state).map((window) =>
           resolveWindowStartTimestamp(
             toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel),
@@ -543,7 +543,7 @@ const getQuotaUsageWindowStartTimestamp = (
     }
     case 'kiro': {
       const state = getEffectiveKiroQuotaState(quotaState as KiroQuotaState);
-      return pickLatestTimestamp([
+      return pickEarliestTimestamp([
         subtractOneCalendarMonth(toResetTimestamp(state.nextReset)),
         subtractOneCalendarMonth(toResetTimestamp(state.bonusNextReset))
       ]);
