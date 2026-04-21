@@ -746,6 +746,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const setQuota = useQuotaStore((state) => state[config.storeSetter]) as QuotaSetter<
     Record<string, TState>
   >;
+  const purgeStaleEntries = useQuotaStore((state) => state.purgeStaleEntries);
   const { quota, loadQuota } = useQuotaLoader(config);
 
   const [, gridRef] = useGridColumns(380);
@@ -756,6 +757,13 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const [refreshSnapshots, setRefreshSnapshots] = useState<Record<string, TState>>({});
 
   const providerFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [files, config]);
+
+  useEffect(() => {
+    purgeStaleEntries();
+    const timer = setInterval(purgeStaleEntries, 60_000);
+    return () => clearInterval(timer);
+  }, [purgeStaleEntries]);
+
   const modelPrices = useMemo(() => loadModelPrices(), []);
   const usageDetailsIndex = useMemo(() => {
     const byAuthIndex = new Map<string, UsageDetail[]>();

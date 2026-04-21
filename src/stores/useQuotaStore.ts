@@ -33,6 +33,7 @@ interface QuotaStoreState {
   setKiroQuota: (updater: QuotaUpdater<Record<string, KiroQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   clearQuotaCache: () => void;
+  purgeStaleEntries: () => void;
 }
 
 type PersistedQuotaStoreState = Pick<
@@ -159,6 +160,9 @@ const resolveQuotaCacheExpiryAt = (value: TimedQuotaState, cachedAt: number) => 
 
 const isFreshQuotaState = (value: TimedQuotaState | undefined, now: number) => {
   if (!value || value.status === 'loading') return false;
+  if (typeof value._cacheExpiresAt === 'number' && Number.isFinite(value._cacheExpiresAt)) {
+    return value._cacheExpiresAt > now;
+  }
   const cachedAt =
     typeof value._cachedAt === 'number' && Number.isFinite(value._cachedAt) ? value._cachedAt : now;
   return resolveQuotaCacheExpiryAt(value, cachedAt) > now;
@@ -178,13 +182,18 @@ const sanitizeQuotaMap = <T extends TimedQuotaState>(quotaMap: Record<string, T>
           ? value._cachedAt
           : now;
 
+      const cacheExpiresAt =
+        typeof value._cacheExpiresAt === 'number' && Number.isFinite(value._cacheExpiresAt)
+          ? value._cacheExpiresAt
+          : resolveQuotaCacheExpiryAt(value, cachedAt);
+
       return [
         [
           key,
           {
             ...value,
             _cachedAt: cachedAt,
-            _cacheExpiresAt: resolveQuotaCacheExpiryAt(value, cachedAt)
+            _cacheExpiresAt: cacheExpiresAt
           }
         ]
       ];
@@ -280,6 +289,18 @@ export const useQuotaStore = create<QuotaStoreState>()(
           geminiCliQuota: {},
           kiroQuota: {},
           kimiQuota: {}
+        }),
+      purgeStaleEntries: () =>
+        set((state) => {
+          const sanitized = sanitizePersistedQuotaState({
+            antigravityQuota: state.antigravityQuota,
+            claudeQuota: state.claudeQuota,
+            codexQuota: state.codexQuota,
+            geminiCliQuota: state.geminiCliQuota,
+            kiroQuota: state.kiroQuota,
+            kimiQuota: state.kimiQuota,
+          });
+          return sanitized;
         })
     }),
     {
