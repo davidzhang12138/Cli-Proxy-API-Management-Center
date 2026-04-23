@@ -1410,6 +1410,7 @@
     "quota_filter_has": "有配额",
     "quota_filter_none": "无配额",
     "quota_filter_uncached": "未缓存",
+    "quota_filter_expired": "已过期",
     "model_filter_label": "模型筛选",
     "model_filter_all": "全部模型",
     "model_filter_loading": "正在加载账号模型列表…",

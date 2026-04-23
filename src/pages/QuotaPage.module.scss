@@ -675,6 +675,11 @@
   color: var(--text-tertiary);
 }
 
+.quotaResetExpired {
+  color: var(--warning-color);
+  font-style: italic;
+}
+
 .quotaAmount {
   color: var(--text-secondary);
 }

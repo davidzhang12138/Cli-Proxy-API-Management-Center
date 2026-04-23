@@ -20,7 +20,7 @@ import type {
   KiroQuotaState,
   ResolvedTheme
 } from '@/types';
-import { getStatusFromError } from '@/utils/quota';
+import { formatQuotaResetTime, getStatusFromError } from '@/utils/quota';
 import {
   calculateCost,
   loadModelPrices,
@@ -39,7 +39,7 @@ import styles from '@/pages/QuotaPage.module.scss';
 type QuotaUpdater<T> = T | ((prev: T) => T);
 type QuotaSetter<T> = (updater: QuotaUpdater<T>) => void;
 type ViewMode = 'paged' | 'all';
-type QuotaAvailabilityFilter = 'all' | 'has' | 'none' | 'uncached';
+type QuotaAvailabilityFilter = 'all' | 'has' | 'none' | 'expired' | 'uncached';
 type QuotaSortMode =
   | 'default'
   | 'quota_desc'
@@ -424,6 +424,36 @@ const getQuotaRemainingRatio = (
     }
     default:
       return null;
+  }
+};
+
+const isPastResetTime = (resetTime?: string): boolean => {
+  if (!resetTime) return false;
+  const timestamp = Date.parse(resetTime);
+  return Number.isFinite(timestamp) && timestamp <= Date.now();
+};
+
+const isQuotaResetExpired = (
+  quotaType: QuotaConfig<QuotaStatusState, unknown>['type'],
+  quotaState: QuotaStatusState | undefined
+): boolean => {
+  if (!quotaState || quotaState.status !== 'success') return false;
+
+  switch (quotaType) {
+    case 'antigravity':
+      return getAntigravityGroups(quotaState).some((group) => isPastResetTime(group.resetTime));
+    case 'claude':
+      return (quotaState as ClaudeQuotaState).windows.some((w) => isPastResetTime(w.resetTime));
+    case 'codex':
+      return (quotaState as CodexQuotaState).windows.some((w) => isPastResetTime(w.resetTime));
+    case 'gemini-cli':
+      return (quotaState as GeminiCliQuotaState).buckets.some((b) => isPastResetTime(b.resetTime));
+    case 'kiro': {
+      const effective = getEffectiveKiroQuotaState(quotaState as KiroQuotaState);
+      return isPastResetTime(effective.nextReset) || isPastResetTime(effective.bonusNextReset);
+    }
+    default:
+      return false;
   }
 };
 
@@ -966,7 +996,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
               ? ratio !== null && ratio > 0
               : availabilityFilter === 'none'
                 ? ratio !== null && ratio <= 0
-                : ratio === null;
+                : availabilityFilter === 'expired'
+                  ? ratio !== null && isQuotaResetExpired(config.type, quotaState)
+                  : ratio === null;
 
         if (!matchesQuota) {
           return false;
@@ -1373,7 +1405,10 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                     <div className={styles.quotaUsageModalList}>
                       {antigravityGroups
                         .filter((group) => !ANTIGRAVITY_VISIBLE_GROUP_IDS.has(group.id))
-                        .map((group) => (
+                        .map((group) => {
+                          const resetLabel = formatQuotaResetTime(group.resetTime);
+                          const expired = isPastResetTime(group.resetTime);
+                          return (
                           <div key={group.id} className={styles.quotaUsageModalItem}>
                             <span className={styles.quotaUsageModalModel} title={group.models.join(', ')}>
                               {group.label}
@@ -1381,8 +1416,12 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                             <span className={styles.quotaUsageModalValue}>
                               {`${Math.round(Math.max(0, Math.min(1, group.remainingFraction)) * 100)}%`}
                             </span>
+                            <span className={expired ? styles.quotaResetExpired : styles.quotaReset}>
+                              {resetLabel}
+                            </span>
                           </div>
-                        ))}
+                          );
+                        })}
                     </div>
                   </div>
                 ) : null;

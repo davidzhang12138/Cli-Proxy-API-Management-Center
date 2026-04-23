@@ -707,6 +707,12 @@ const fetchGeminiCliQuota = async (
   };
 };
 
+const isResetTimeExpired = (resetTime?: string): boolean => {
+  if (!resetTime) return false;
+  const timestamp = Date.parse(resetTime);
+  return Number.isFinite(timestamp) && timestamp <= Date.now();
+};
+
 const renderAntigravityItems = (
   quota: AntigravityQuotaState,
   t: TFunction,
@@ -726,6 +732,8 @@ const renderAntigravityItems = (
     const clamped = Math.max(0, Math.min(1, group.remainingFraction));
     const percent = Math.round(clamped * 100);
     const resetLabel = formatQuotaResetTime(group.resetTime);
+    const expired = isResetTimeExpired(group.resetTime);
+    const resetClassName = expired ? styleMap.quotaResetExpired : styleMap.quotaReset;
 
     return h(
       'div',
@@ -738,7 +746,7 @@ const renderAntigravityItems = (
           'div',
           { className: styleMap.quotaMeta },
           h('span', { className: styleMap.quotaPercent }, `${percent}%`),
-          h('span', { className: styleMap.quotaReset }, resetLabel)
+          h('span', { className: resetClassName }, resetLabel)
         )
       ),
       h(QuotaProgressBar, {
@@ -808,6 +816,8 @@ const renderCodexItems = (
       const windowLabel = window.labelKey
         ? t(window.labelKey, window.labelParams as Record<string, string | number>)
         : window.label;
+      const expired = isResetTimeExpired(window.resetTime);
+      const resetClassName = expired ? styleMap.quotaResetExpired : styleMap.quotaReset;
 
       return h(
         'div',
@@ -820,7 +830,7 @@ const renderCodexItems = (
             'div',
             { className: styleMap.quotaMeta },
             h('span', { className: styleMap.quotaPercent }, percentLabel),
-            h('span', { className: styleMap.quotaReset }, window.resetLabel)
+            h('span', { className: resetClassName }, window.resetLabel)
           )
         ),
         h(QuotaProgressBar, {
@@ -900,6 +910,8 @@ const renderGeminiCliItems = (
       const title = bucket.tokenType ? `${titleBase} (${bucket.tokenType})` : titleBase;
 
       const resetLabel = formatQuotaResetTime(bucket.resetTime);
+      const expired = isResetTimeExpired(bucket.resetTime);
+      const resetClassName = expired ? styleMap.quotaResetExpired : styleMap.quotaReset;
 
       return h(
         'div',
@@ -915,7 +927,7 @@ const renderGeminiCliItems = (
             remainingAmountLabel
               ? h('span', { className: styleMap.quotaAmount }, remainingAmountLabel)
               : null,
-            h('span', { className: styleMap.quotaReset }, resetLabel)
+            h('span', { className: resetClassName }, resetLabel)
           )
         ),
         h(QuotaProgressBar, {
@@ -1107,6 +1119,8 @@ const renderClaudeItems = (
       const remaining = clampedUsed === null ? null : Math.max(0, Math.min(100, 100 - clampedUsed));
       const percentLabel = remaining === null ? '--' : `${Math.round(remaining)}%`;
       const windowLabel = window.labelKey ? t(window.labelKey) : window.label;
+      const expired = isResetTimeExpired(window.resetTime);
+      const resetClassName = expired ? styleMap.quotaResetExpired : styleMap.quotaReset;
 
       return h(
         'div',
@@ -1119,7 +1133,7 @@ const renderClaudeItems = (
             'div',
             { className: styleMap.quotaMeta },
             h('span', { className: styleMap.quotaPercent }, percentLabel),
-            h('span', { className: styleMap.quotaReset }, window.resetLabel)
+            h('span', { className: resetClassName }, window.resetLabel)
           )
         ),
         h(QuotaProgressBar, {
@@ -1497,6 +1511,10 @@ const renderKiroItems = (
 
   const resetLabel = formatQuotaResetTime(effectiveQuota.nextReset);
   const bonusResetLabel = formatQuotaResetTime(effectiveQuota.bonusNextReset);
+  const resetExpired = isResetTimeExpired(effectiveQuota.nextReset);
+  const bonusResetExpired = isResetTimeExpired(effectiveQuota.bonusNextReset);
+  const resetClassName = resetExpired ? styleMap.quotaResetExpired : styleMap.quotaReset;
+  const bonusResetClassName = bonusResetExpired ? styleMap.quotaResetExpired : styleMap.quotaReset;
   const buildRemainingPercent = (remaining: number | null, limit: number | null) => {
     if (remaining === null || limit === null || limit <= 0) return 0;
     return Math.round((remaining / limit) * 100);
@@ -1523,7 +1541,7 @@ const renderKiroItems = (
                   t('kiro_quota.remaining_credits', { count: Math.round(effectiveQuota.baseRemaining) })
                 )
               : null,
-            h('span', { className: styleMap.quotaReset }, resetLabel)
+            h('span', { className: resetClassName }, resetLabel)
           )
         ),
         h(QuotaProgressBar, {
@@ -1556,7 +1574,7 @@ const renderKiroItems = (
                   t('kiro_quota.remaining_credits', { count: Math.round(effectiveQuota.bonusRemaining) })
                 )
               : null,
-            h('span', { className: styleMap.quotaReset }, bonusResetLabel)
+            h('span', { className: bonusResetClassName }, bonusResetLabel)
           )
         ),
         h(QuotaProgressBar, {
