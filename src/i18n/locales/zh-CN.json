@@ -1713,6 +1713,7 @@
       "header_total": "总 Token",
       "header_cost": "花费",
       "header_latency": "耗时",
+      "header_speed": "速度",
       "header_time": "时间",
       "header_actions": "操作",
       "summary_title": "当前筛选总览",

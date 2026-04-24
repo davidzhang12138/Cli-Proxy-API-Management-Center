@@ -480,6 +480,23 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
     return `${secondsText} s`;
   };
 
+  const formatTokenSpeed = (outputTokens: number, latencyMs: number | null) => {
+    if (latencyMs === null || latencyMs <= 0 || outputTokens <= 0) {
+      return '-';
+    }
+
+    const tokensPerSecond = outputTokens / (latencyMs / 1000);
+    if (!Number.isFinite(tokensPerSecond) || tokensPerSecond <= 0) {
+      return '-';
+    }
+
+    const fractionDigits = tokensPerSecond >= 100 ? 0 : tokensPerSecond >= 10 ? 1 : 2;
+    return `${tokensPerSecond.toLocaleString('zh-CN', {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    })} token/s`;
+  };
+
   // 获取预计算的统计数据
   const getStats = (entry: LogEntry): PrecomputedStats => {
     return precomputedStats.get(entry.id) || {
@@ -539,6 +556,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
         </td>
         <td>{formatNumber(stats.totalCount)}</td>
         <td>{formatLatencySeconds(entry.latencyMs)}</td>
+        <td>{formatTokenSpeed(entry.outputTokens, entry.latencyMs)}</td>
         <td>{formatNumber(entry.inputTokens)}</td>
         <td>{formatNumber(entry.cachedTokens)}</td>
         <td>{formatNumber(entry.outputTokens)}</td>
@@ -683,6 +701,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
                       <th>{t('monitor.logs.header_rate')}</th>
                       <th>{t('monitor.logs.header_count')}</th>
                       <th>{t('monitor.logs.header_latency')}</th>
+                      <th>{t('monitor.logs.header_speed')}</th>
                       <th>{t('monitor.logs.header_input')}</th>
                       <th>{t('monitor.logs.header_cached')}</th>
                       <th>{t('monitor.logs.header_output')}</th>

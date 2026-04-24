@@ -1710,6 +1710,7 @@
       "header_total": "Total Tokens",
       "header_cost": "Cost",
       "header_latency": "Duration",
+      "header_speed": "Скорость",
       "header_time": "Time",
       "header_actions": "Actions",
       "summary_title": "Filtered Overview",
