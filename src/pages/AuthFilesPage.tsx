@@ -88,6 +88,7 @@ export function AuthFilesPage() {
 
   const [filter, setFilter] = useState<'all' | string>('all');
   const [problemOnly, setProblemOnly] = useState(false);
+  const [disabledOnly, setDisabledOnly] = useState(false);
   const [compactMode, setCompactMode] = useState(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -201,6 +202,9 @@ export function AuthFilesPage() {
       if (typeof persisted.problemOnly === 'boolean') {
         setProblemOnly(persisted.problemOnly);
       }
+      if (typeof persisted.disabledOnly === 'boolean') {
+        setDisabledOnly(persisted.disabledOnly);
+      }
       if (
         typeof persistedCompactMode !== 'boolean' &&
         typeof persisted.compactMode === 'boolean'
@@ -243,6 +247,7 @@ export function AuthFilesPage() {
     writeAuthFilesUiState({
       filter,
       problemOnly,
+      disabledOnly,
       compactMode,
       search,
       page,
@@ -254,6 +259,7 @@ export function AuthFilesPage() {
     writePersistedAuthFilesCompactMode(compactMode);
   }, [
     compactMode,
+    disabledOnly,
     filter,
     page,
     pageSize,
@@ -355,9 +361,14 @@ export function AuthFilesPage() {
     return Array.from(types);
   }, [files]);
 
-  const filesMatchingProblemFilter = useMemo(
-    () => (problemOnly ? files.filter(hasAuthFileStatusMessage) : files),
-    [files, problemOnly]
+  const filesMatchingStatusFilters = useMemo(
+    () =>
+      files.filter((file) => {
+        if (problemOnly && !hasAuthFileStatusMessage(file)) return false;
+        if (disabledOnly && file.disabled !== true) return false;
+        return true;
+      }),
+    [disabledOnly, files, problemOnly]
   );
 
   const sortOptions = useMemo(
@@ -370,14 +381,14 @@ export function AuthFilesPage() {
   );
 
   const typeCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: filesMatchingProblemFilter.length };
-    filesMatchingProblemFilter.forEach((file) => {
+    const counts: Record<string, number> = { all: filesMatchingStatusFilters.length };
+    filesMatchingStatusFilters.forEach((file) => {
       const type = String(file.type ?? file.provider ?? '').trim();
       if (!type) return;
       counts[type] = (counts[type] || 0) + 1;
     });
     return counts;
-  }, [filesMatchingProblemFilter]);
+  }, [filesMatchingStatusFilters]);
 
   const normalizedSearch = search.trim();
   const wildcardSearch = useMemo(() => buildWildcardSearch(normalizedSearch), [normalizedSearch]);
@@ -385,7 +396,7 @@ export function AuthFilesPage() {
   const filtered = useMemo(() => {
     const normalizedTerm = normalizedSearch.toLowerCase();
 
-    return filesMatchingProblemFilter.filter((item) => {
+    return filesMatchingStatusFilters.filter((item) => {
       const itemType = String(item.type ?? item.provider ?? '').trim();
       const matchType = filter === 'all' || itemType === filter;
       const matchSearch =
@@ -398,7 +409,7 @@ export function AuthFilesPage() {
         });
       return matchType && matchSearch;
     });
-  }, [filesMatchingProblemFilter, filter, normalizedSearch, wildcardSearch]);
+  }, [filesMatchingStatusFilters, filter, normalizedSearch, wildcardSearch]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -637,13 +648,19 @@ export function AuthFilesPage() {
     </div>
   );
 
-  const deleteAllButtonLabel = problemOnly
-    ? filter === 'all'
-      ? t('auth_files.delete_problem_button')
-      : t('auth_files.delete_problem_button_with_type', { type: getTypeLabel(t, filter) })
-    : filter === 'all'
+  const deleteAllButtonLabel = (() => {
+    if (disabledOnly) {
+      return t('auth_files.delete_filtered_result_button');
+    }
+    if (problemOnly) {
+      return filter === 'all'
+        ? t('auth_files.delete_problem_button')
+        : t('auth_files.delete_problem_button_with_type', { type: getTypeLabel(t, filter) });
+    }
+    return filter === 'all'
       ? t('auth_files.delete_all_button')
       : `${t('common.delete')} ${getTypeLabel(t, filter)}`;
+  })();
 
   return (
     <div className={styles.container}>
@@ -674,8 +691,10 @@ export function AuthFilesPage() {
                 handleDeleteAll({
                   filter,
                   problemOnly,
+                  disabledOnly,
                   onResetFilterToAll: () => setFilter('all'),
                   onResetProblemOnly: () => setProblemOnly(false),
+                  onResetDisabledOnly: () => setDisabledOnly(false),
                 })
               }
               disabled={disableControls || loading || deletingAll}
@@ -756,6 +775,21 @@ export function AuthFilesPage() {
                         label={
                           <span className={styles.filterToggleLabel}>
                             {t('auth_files.problem_filter_only')}
+                          </span>
+                        }
+                      />
+                    </div>
+                    <div className={styles.filterToggleCard}>
+                      <ToggleSwitch
+                        checked={disabledOnly}
+                        onChange={(value) => {
+                          setDisabledOnly(value);
+                          setPage(1);
+                        }}
+                        ariaLabel={t('auth_files.disabled_filter_only')}
+                        label={
+                          <span className={styles.filterToggleLabel}>
+                            {t('auth_files.disabled_filter_only')}
                           </span>
                         }
                       />
