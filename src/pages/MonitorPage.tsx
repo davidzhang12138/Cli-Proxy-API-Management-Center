@@ -303,9 +303,11 @@ export function MonitorPage() {
     loadData();
   };
 
+  const initialLoading = loading && !usageData;
+
   return (
     <div className={styles.container}>
-      {loading && !usageData && (
+      {initialLoading && (
         <div className={styles.loadingOverlay} aria-busy="true">
           <div className={styles.loadingOverlayContent}>
             <LoadingSpinner size={28} className={styles.loadingOverlaySpinner} />
@@ -314,81 +316,85 @@ export function MonitorPage() {
         </div>
       )}
 
-      {/* 页面标题 */}
-      <div className={styles.header}>
-        <h1 className={styles.pageTitle}>{t('monitor.title')}</h1>
-        <div className={styles.headerActions}>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={loadData}
-            disabled={loading}
-          >
-            {loading ? t('common.loading') : t('common.refresh')}
-          </Button>
-        </div>
-      </div>
-
-      {/* 错误提示 */}
-      {error && <div className={styles.errorBox}>{error}</div>}
-
-      {/* 时间范围和 API 过滤 */}
-      <div className={styles.filters}>
-        <div className={styles.filterGroup}>
-          <span className={styles.filterLabel}>{t('monitor.time_range')}</span>
-          <div className={styles.timeButtons}>
-            {([1, 7, 14, 30] as TimeRange[]).map((range) => (
-              <button
-                key={range}
-                className={`${styles.timeButton} ${timeRange === range ? styles.active : ''}`}
-                onClick={() => handleTimeRangeChange(range)}
+      {!initialLoading && (
+        <>
+          {/* 页面标题 */}
+          <div className={styles.header}>
+            <h1 className={styles.pageTitle}>{t('monitor.title')}</h1>
+            <div className={styles.headerActions}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={loadData}
+                disabled={loading}
               >
-                {range === 1 ? t('monitor.today') : t('monitor.last_n_days', { n: range })}
-              </button>
-            ))}
+                {loading ? t('common.loading') : t('common.refresh')}
+              </Button>
+            </div>
           </div>
-        </div>
-        <div className={styles.filterGroup}>
-          <span className={styles.filterLabel}>{t('monitor.api_filter')}</span>
-          <input
-            type="text"
-            className={styles.filterInput}
-            placeholder={t('monitor.api_filter_placeholder')}
-            value={apiFilter}
-            onChange={(e) => setApiFilter(e.target.value)}
-          />
-          <Button variant="secondary" size="sm" onClick={handleApiFilterApply}>
-            {t('monitor.apply')}
-          </Button>
-        </div>
-      </div>
 
-      {/* KPI 卡片 */}
-      <KpiCards data={filteredData} loading={loading} />
+          {/* 错误提示 */}
+          {error && <div className={styles.errorBox}>{error}</div>}
 
-      {/* 图表区域 */}
-      <div className={styles.chartsGrid}>
-        <ModelDistributionChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} />
-        <DailyTrendChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} />
-      </div>
+          {/* 时间范围和 API 过滤 */}
+          <div className={styles.filters}>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>{t('monitor.time_range')}</span>
+              <div className={styles.timeButtons}>
+                {([1, 7, 14, 30] as TimeRange[]).map((range) => (
+                  <button
+                    key={range}
+                    className={`${styles.timeButton} ${timeRange === range ? styles.active : ''}`}
+                    onClick={() => handleTimeRangeChange(range)}
+                  >
+                    {range === 1 ? t('monitor.today') : t('monitor.last_n_days', { n: range })}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>{t('monitor.api_filter')}</span>
+              <input
+                type="text"
+                className={styles.filterInput}
+                placeholder={t('monitor.api_filter_placeholder')}
+                value={apiFilter}
+                onChange={(e) => setApiFilter(e.target.value)}
+              />
+              <Button variant="secondary" size="sm" onClick={handleApiFilterApply}>
+                {t('monitor.apply')}
+              </Button>
+            </div>
+          </div>
 
-      {/* 小时级图表 */}
-      <DeferredSection label={t('monitor.hourly_cost.title')} minHeight={420}>
-        <HourlyCostChart data={apiFilteredData} loading={loading} isDark={isDark} />
-      </DeferredSection>
+          {/* KPI 卡片 */}
+          <KpiCards data={filteredData} loading={loading} />
 
-      {/* 请求日志 */}
-      <DeferredSection label={t('monitor.logs.title')} minHeight={520}>
-        <RequestLogs
-          data={filteredData}
-          loading={loading}
-          providerMap={providerMap}
-          providerTypeMap={providerTypeMap}
-          sourceInfoMap={sourceInfoMap}
-          authFileMap={authFileMap}
-          apiFilter={apiFilter}
-        />
-      </DeferredSection>
+          {/* 图表区域 */}
+          <div className={styles.chartsGrid}>
+            <ModelDistributionChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} />
+            <DailyTrendChart data={filteredData} loading={loading} isDark={isDark} timeRange={timeRange} />
+          </div>
+
+          {/* 小时级图表 */}
+          <DeferredSection label={t('monitor.hourly_cost.title')} minHeight={420}>
+            <HourlyCostChart data={apiFilteredData} loading={loading} isDark={isDark} />
+          </DeferredSection>
+
+          {/* 请求日志 */}
+          <DeferredSection label={t('monitor.logs.title')} minHeight={520}>
+            <RequestLogs
+              data={filteredData}
+              loading={loading}
+              providerMap={providerMap}
+              providerTypeMap={providerTypeMap}
+              sourceInfoMap={sourceInfoMap}
+              authFileMap={authFileMap}
+              apiFilter={apiFilter}
+            />
+          </DeferredSection>
+        </>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@
 .container {
   width: 100%;
   min-height: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -740,7 +741,16 @@
     color: var(--text-tertiary);
     background-color: var(--bg-secondary);
     white-space: nowrap;
-    z-index: 1;
+    z-index: 10;
+
+    &.sortableHeader {
+      user-select: none;
+      transition: color 0.15s ease;
+
+      &:hover {
+        color: var(--text-primary);
+      }
+    }
   }
 
   td {
@@ -796,6 +806,26 @@
     th:first-child {
       z-index: 3;
     }
+  }
+}
+
+.sortHeaderButton {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: $radius-sm;
   }
 }
 

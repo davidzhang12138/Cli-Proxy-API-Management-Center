@@ -112,6 +112,8 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
   const [filterSource, setFilterSource] = useState('');
   const [filterStatus, setFilterStatus] = useState<'' | 'success' | 'failed'>('');
   const [filterProviderType, setFilterProviderType] = useState('');
+  const [logSortKey, setLogSortKey] = useState<'rate' | 'count' | 'latency' | 'speed' | 'cost' | null>(null);
+  const [logSortDir, setLogSortDir] = useState<'asc' | 'desc'>('desc');
   const [autoRefresh, setAutoRefresh] = useState(10);
   const [countdown, setCountdown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -120,15 +122,6 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
   // 虚拟滚动容器 ref
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  // 固定表头容器 ref
-  const headerRef = useRef<HTMLDivElement>(null);
-
-  // 同步表头和内容的水平滚动
-  const handleScroll = useCallback(() => {
-    if (tableContainerRef.current && headerRef.current) {
-      headerRef.current.scrollLeft = tableContainerRef.current.scrollLeft;
-    }
-  }, []);
 
   // 时间范围状态
   const [timeRange, setTimeRange] = useState<TimeRange>(1);
@@ -436,6 +429,64 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
     });
   }, [logEntries, filterApi, filterModel, filterSource, filterStatus, filterProviderType]);
 
+  const handleLogSort = useCallback((key: 'rate' | 'count' | 'latency' | 'speed' | 'cost') => {
+    setLogSortKey((prev) => {
+      if (prev === key) {
+        setLogSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return key;
+      }
+      setLogSortDir('desc');
+      return key;
+    });
+  }, []);
+
+  const logSortArrow = (key: string) =>
+    logSortKey === key ? (logSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+
+  const getEntrySpeed = (entry: LogEntry) => {
+    if (entry.latencyMs === null || entry.latencyMs <= 0 || entry.outputTokens <= 0) return -1;
+    return entry.outputTokens / (entry.latencyMs / 1000);
+  };
+
+  const sortedEntries = useMemo(() => {
+    if (!logSortKey) return filteredEntries;
+    const dir = logSortDir === 'asc' ? 1 : -1;
+    const list = [...filteredEntries];
+    list.sort((a, b) => {
+      let va: number;
+      let vb: number;
+      switch (logSortKey) {
+        case 'rate':
+          va = parseFloat(precomputedStats.get(a.id)?.successRate ?? '0');
+          vb = parseFloat(precomputedStats.get(b.id)?.successRate ?? '0');
+          break;
+        case 'count':
+          va = precomputedStats.get(a.id)?.totalCount ?? 0;
+          vb = precomputedStats.get(b.id)?.totalCount ?? 0;
+          break;
+        case 'latency':
+          va = a.latencyMs ?? -1;
+          vb = b.latencyMs ?? -1;
+          break;
+        case 'speed':
+          va = getEntrySpeed(a);
+          vb = getEntrySpeed(b);
+          break;
+        case 'cost':
+          va = a.cost ?? -1;
+          vb = b.cost ?? -1;
+          break;
+        default:
+          return 0;
+      }
+      if (va < 0 && vb < 0) return 0;
+      if (va < 0) return 1;
+      if (vb < 0) return -1;
+      return dir * (va - vb);
+    });
+    return list;
+  }, [filteredEntries, logSortKey, logSortDir, precomputedStats]);
+
   const logSummary = useMemo(() => {
     return filteredEntries.reduce(
       (summary, entry) => {
@@ -456,10 +507,10 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
   // 虚拟滚动配置
   const rowVirtualizer = useVirtualizer({
-    count: filteredEntries.length,
+    count: sortedEntries.length,
     getScrollElement: () => tableContainerRef.current,
     estimateSize: () => ROW_HEIGHT,
-    overscan: 10, // 预渲染上下各 10 行
+    overscan: 10,
   });
 
   // 格式化数字
@@ -686,8 +737,17 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
             <div className={styles.emptyState}>{t('monitor.no_data')}</div>
           ) : (
             <>
-              {/* 固定表头 */}
-              <div ref={headerRef} className={styles.stickyHeader}>
+              {/* 虚拟滚动容器（表头 + 表体共享水平滚动） */}
+              <div
+                ref={tableContainerRef}
+                className={styles.virtualScrollContainer}
+                style={{
+                  height: 'calc(100vh - 420px)',
+                  minHeight: '360px',
+                  overflow: 'auto',
+                }}
+              >
+                {/* 固定表头 */}
                 <table className={`${styles.table} ${styles.virtualTable}`}>
                   <thead>
                     <tr>
@@ -698,33 +758,42 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
                       <th>{t('monitor.logs.header_source')}</th>
                       <th>{t('monitor.logs.header_status')}</th>
                       <th>{t('monitor.logs.header_recent')}</th>
-                      <th>{t('monitor.logs.header_rate')}</th>
-                      <th>{t('monitor.logs.header_count')}</th>
-                      <th>{t('monitor.logs.header_latency')}</th>
-                      <th>{t('monitor.logs.header_speed')}</th>
+                      <th className={styles.sortableHeader}>
+                        <button type="button" className={styles.sortHeaderButton} onClick={() => handleLogSort('rate')}>
+                          {t('monitor.logs.header_rate')}{logSortArrow('rate')}
+                        </button>
+                      </th>
+                      <th className={styles.sortableHeader}>
+                        <button type="button" className={styles.sortHeaderButton} onClick={() => handleLogSort('count')}>
+                          {t('monitor.logs.header_count')}{logSortArrow('count')}
+                        </button>
+                      </th>
+                      <th className={styles.sortableHeader}>
+                        <button type="button" className={styles.sortHeaderButton} onClick={() => handleLogSort('latency')}>
+                          {t('monitor.logs.header_latency')}{logSortArrow('latency')}
+                        </button>
+                      </th>
+                      <th className={styles.sortableHeader}>
+                        <button type="button" className={styles.sortHeaderButton} onClick={() => handleLogSort('speed')}>
+                          {t('monitor.logs.header_speed')}{logSortArrow('speed')}
+                        </button>
+                      </th>
                       <th>{t('monitor.logs.header_input')}</th>
                       <th>{t('monitor.logs.header_cached')}</th>
                       <th>{t('monitor.logs.header_output')}</th>
                       <th>{t('monitor.logs.header_total')}</th>
-                      <th>{t('monitor.logs.header_cost')}</th>
+                      <th className={styles.sortableHeader}>
+                        <button type="button" className={styles.sortHeaderButton} onClick={() => handleLogSort('cost')}>
+                          {t('monitor.logs.header_cost')}{logSortArrow('cost')}
+                        </button>
+                      </th>
                       <th>{t('monitor.logs.header_time')}</th>
                       <th>{t('monitor.logs.header_actions')}</th>
                     </tr>
                   </thead>
                 </table>
-              </div>
 
-              {/* 虚拟滚动容器 */}
-              <div
-                ref={tableContainerRef}
-                className={styles.virtualScrollContainer}
-                style={{
-                  height: 'calc(100vh - 420px)',
-                  minHeight: '360px',
-                  overflow: 'auto',
-                }}
-                onScroll={handleScroll}
-              >
+                {/* 虚拟滚动内容 */}
                 <div
                   style={{
                     height: `${rowVirtualizer.getTotalSize()}px`,
@@ -735,7 +804,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
                   <table className={`${styles.table} ${styles.virtualTable}`}>
                     <tbody>
                       {rowVirtualizer.getVirtualItems().map((virtualRow: { index: number; size: number; start: number }) => {
-                        const entry = filteredEntries[virtualRow.index];
+                        const entry = sortedEntries[virtualRow.index];
                         return (
                           <tr
                             key={entry.id}

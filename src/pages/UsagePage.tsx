@@ -254,10 +254,11 @@ export function UsagePage() {
     [filteredUsage, modelPrices]
   );
   const hasPrices = Object.keys(modelPrices).length > 0;
+  const initialLoading = loading && !usage;
 
   return (
     <div className={styles.container}>
-      {loading && !usage && (
+      {initialLoading && (
         <div className={styles.loadingOverlay} aria-busy="true">
           <div className={styles.loadingOverlayContent}>
             <LoadingSpinner size={28} className={styles.loadingOverlaySpinner} />
@@ -266,7 +267,9 @@ export function UsagePage() {
         </div>
       )}
 
-      <div className={styles.header}>
+      {!initialLoading && (
+        <>
+          <div className={styles.header}>
         <h1 className={styles.pageTitle}>{t('usage_stats.title')}</h1>
         <div className={styles.headerActions}>
           <div className={styles.timeRangeGroup}>
@@ -425,6 +428,8 @@ export function UsagePage() {
         modelPrices={modelPrices}
         onPricesChange={setModelPrices}
       />
+        </>
+      )}
     </div>
   );
 }
