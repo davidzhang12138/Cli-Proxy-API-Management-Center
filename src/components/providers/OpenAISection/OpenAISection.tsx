@@ -96,6 +96,7 @@ export function OpenAISection({
     width: 0,
     visible: false,
   });
+  const [expandedKeys, setExpandedKeys] = useState<Set<number>>(new Set());
   const sectionRef = useRef<HTMLDivElement>(null);
   const topToolbarAnchorRef = useRef<HTMLDivElement>(null);
   const topDropdownRef = useRef<HTMLDivElement>(null);
@@ -565,41 +566,64 @@ export function OpenAISection({
           )}
           {apiKeyEntries.length > 0 && (
             <div className={styles.apiKeyEntriesSection}>
-              <div className={styles.apiKeyEntriesLabel}>
-                {t('ai_providers.openai_keys_count')}: {apiKeyEntries.length}
-              </div>
-              <div className={styles.apiKeyEntryList}>
-                {apiKeyEntries.map((entry, entryIndex) => {
-                  const entryStats = getStatsForIdentity(
-                    { authIndex: entry.authIndex, apiKey: entry.apiKey },
-                    keyStats
-                  );
-                  return (
-                    <div
-                      key={getApiKeyEntryRenderKey(entry, entryIndex)}
-                      className={styles.apiKeyEntryCard}
-                    >
-                      <span className={styles.apiKeyEntryIndex}>{entryIndex + 1}</span>
-                      <span className={styles.apiKeyEntryKey}>{maskApiKey(entry.apiKey)}</span>
-                      {entry.proxyUrl && (
-                        <span className={styles.apiKeyEntryProxy}>{entry.proxyUrl}</span>
-                      )}
-                      <div className={styles.apiKeyEntryStats}>
-                        <span
-                          className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatSuccess}`}
-                        >
-                          <IconCheck size={12} /> {entryStats.success}
-                        </span>
-                        <span
-                          className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatFailure}`}
-                        >
-                          <IconX size={12} /> {entryStats.failure}
-                        </span>
+              <button
+                type="button"
+                className={styles.apiKeyEntriesToggle}
+                onClick={() =>
+                  setExpandedKeys((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(originalIndex)) {
+                      next.delete(originalIndex);
+                    } else {
+                      next.add(originalIndex);
+                    }
+                    return next;
+                  })
+                }
+              >
+                <span className={styles.apiKeyEntriesLabel}>
+                  {t('ai_providers.openai_keys_count')}: {apiKeyEntries.length}
+                </span>
+                {expandedKeys.has(originalIndex) ? (
+                  <IconChevronUp size={14} />
+                ) : (
+                  <IconChevronDown size={14} />
+                )}
+              </button>
+              {expandedKeys.has(originalIndex) && (
+                <div className={styles.apiKeyEntryList}>
+                  {apiKeyEntries.map((entry, entryIndex) => {
+                    const entryStats = getStatsForIdentity(
+                      { authIndex: entry.authIndex, apiKey: entry.apiKey },
+                      keyStats
+                    );
+                    return (
+                      <div
+                        key={getApiKeyEntryRenderKey(entry, entryIndex)}
+                        className={styles.apiKeyEntryCard}
+                      >
+                        <span className={styles.apiKeyEntryIndex}>{entryIndex + 1}</span>
+                        <span className={styles.apiKeyEntryKey}>{maskApiKey(entry.apiKey)}</span>
+                        {entry.proxyUrl && (
+                          <span className={styles.apiKeyEntryProxy}>{entry.proxyUrl}</span>
+                        )}
+                        <div className={styles.apiKeyEntryStats}>
+                          <span
+                            className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatSuccess}`}
+                          >
+                            <IconCheck size={12} /> {entryStats.success}
+                          </span>
+                          <span
+                            className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatFailure}`}
+                          >
+                            <IconX size={12} /> {entryStats.failure}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
           <div className={styles.fieldRow} style={{ marginTop: '8px' }}>

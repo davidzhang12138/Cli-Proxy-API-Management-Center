@@ -587,13 +587,36 @@ $openai-toolbar-control-height: 36px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
-  margin-bottom: 6px;
+}
+
+.apiKeyEntriesToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+  margin-bottom: 0;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: var(--primary-color);
+  }
+
+  svg {
+    display: block;
+    flex-shrink: 0;
+  }
 }
 
 .apiKeyEntryList {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-top: 6px;
 }
 
 .apiKeyEntryCard {
@@ -1177,6 +1200,50 @@ $openai-toolbar-control-height: 36px;
   display: flex;
   flex-direction: column;
   gap: $spacing-sm;
+}
+
+.keyPagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding-top: $spacing-xs;
+}
+
+.keyPageButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-sm;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background $transition-fast,
+    color $transition-fast,
+    border-color $transition-fast;
+
+  &:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+}
+
+.keyPageButtonActive {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+
+  &:hover {
+    background: var(--primary-color);
+    color: white;
+  }
 }
 
 .keyEntriesToolbar {

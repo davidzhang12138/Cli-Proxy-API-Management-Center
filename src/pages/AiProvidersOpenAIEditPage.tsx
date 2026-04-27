@@ -126,6 +126,8 @@ export function AiProvidersOpenAIEditPage() {
 
   const swipeRef = useEdgeSwipeBack({ onBack: handleBack });
   const [isTestingKeys, setIsTestingKeys] = useState(false);
+  const KEYS_PER_PAGE = 10;
+  const [keyPage, setKeyPage] = useState(0);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -369,6 +371,11 @@ export function AiProvidersOpenAIEditPage() {
 
   const renderKeyEntries = (entries: ApiKeyEntry[]) => {
     const list = entries.length ? entries : [buildApiKeyEntry()];
+    const totalPages = Math.max(1, Math.ceil(list.length / KEYS_PER_PAGE));
+    const safePage = Math.min(keyPage, totalPages - 1);
+    const pageStart = safePage * KEYS_PER_PAGE;
+    const pageEnd = Math.min(pageStart + KEYS_PER_PAGE, list.length);
+    const pageItems = list.slice(pageStart, pageEnd);
 
     const updateEntry = (idx: number, field: keyof ApiKeyEntry, value: string) => {
       const next = list.map((entry, i) => (i === idx ? { ...entry, [field]: value } : entry));
@@ -388,6 +395,10 @@ export function AiProvidersOpenAIEditPage() {
       resetDraftKeyTestStatuses(nextLength);
       setTestStatus('idle');
       setTestMessage('');
+      const newTotalPages = Math.max(1, Math.ceil(nextLength / KEYS_PER_PAGE));
+      if (safePage >= newTotalPages) {
+        setKeyPage(newTotalPages - 1);
+      }
     };
 
     const addEntry = () => {
@@ -395,6 +406,8 @@ export function AiProvidersOpenAIEditPage() {
       resetDraftKeyTestStatuses(list.length + 1);
       setTestStatus('idle');
       setTestMessage('');
+      const newTotalPages = Math.ceil((list.length + 1) / KEYS_PER_PAGE);
+      setKeyPage(newTotalPages - 1);
     };
 
     return (
@@ -424,7 +437,8 @@ export function AiProvidersOpenAIEditPage() {
           </div>
 
           {/* 数据行 */}
-          {list.map((entry, index) => {
+          {pageItems.map((entry, pageIndex) => {
+            const index = pageStart + pageIndex;
             const keyStatus = keyTestStatuses[index]?.status ?? 'idle';
             const canTestKey = Boolean(entry.apiKey?.trim()) && hasConfiguredModels;
 
@@ -489,6 +503,38 @@ export function AiProvidersOpenAIEditPage() {
             );
           })}
         </div>
+
+        {/* 分页控件 */}
+        {totalPages > 1 && (
+          <div className={styles.keyPagination}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setKeyPage((p) => Math.max(0, p - 1))}
+              disabled={safePage === 0}
+            >
+              ‹
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                type="button"
+                className={`${styles.keyPageButton} ${i === safePage ? styles.keyPageButtonActive : ''}`}
+                onClick={() => setKeyPage(i)}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setKeyPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={safePage === totalPages - 1}
+            >
+              ›
+            </Button>
+          </div>
+        )}
       </div>
     );
   };
