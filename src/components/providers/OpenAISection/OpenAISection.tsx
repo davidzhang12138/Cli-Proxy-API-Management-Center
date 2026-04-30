@@ -539,7 +539,7 @@ export function OpenAISection({
       <div
         key={`openai-provider-${originalIndex}`}
         className={styles.openaiProviderCard}
-        style={actionsDisabled || providerDisabled ? { opacity: 0.6 } : undefined}
+        style={actionsDisabled ? { opacity: 0.6 } : undefined}
       >
         <div className={styles.openaiProviderMeta}>
           <div className={styles.openaiProviderTitle}>{provider.name}</div>
