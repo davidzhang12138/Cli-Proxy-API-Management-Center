@@ -33,7 +33,7 @@ import type { QuotaStatusState, QuotaUsageModelSummary } from './QuotaCard';
 import { useQuotaLoader } from './useQuotaLoader';
 import { getEffectiveKiroQuotaState, type QuotaConfig } from './quotaConfigs';
 import { useGridColumns } from './useGridColumns';
-import { IconRefreshCw } from '@/components/ui/icons';
+import { IconRefreshCw, IconX } from '@/components/ui/icons';
 import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaUpdater<T> = T | ((prev: T) => T);
@@ -64,6 +64,19 @@ interface FileUsageSummary {
   startedAtMs: number | null;
   latestUsedAtMs: number | null;
   models: QuotaUsageModelSummary[];
+}
+
+interface QuotaRefreshFailure {
+  name: string;
+  error: string;
+  errorStatus?: number;
+}
+
+interface QuotaRefreshResult {
+  total: number;
+  successCount: number;
+  errorCount: number;
+  errors: QuotaRefreshFailure[];
 }
 
 interface QuotaPaginationState<T> {
@@ -785,6 +798,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const [pageSizePreference, setPageSizePreference] = useState(DEFAULT_ITEMS_PER_PAGE);
   const [pageJumpValue, setPageJumpValue] = useState('');
   const [refreshSnapshots, setRefreshSnapshots] = useState<Record<string, TState>>({});
+  const [refreshResult, setRefreshResult] = useState<QuotaRefreshResult | null>(null);
 
   const providerFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [files, config]);
 
@@ -1186,6 +1200,18 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     total: number;
   } | null>(null);
 
+  const formatFailedNames = useCallback(
+    (errors: QuotaRefreshFailure[]) => {
+      const visibleNames = errors.slice(0, 3).map((item) => item.name).join(', ');
+      if (errors.length <= 3) return visibleNames;
+      return t('quota_management.refresh_failed_names_more', {
+        names: visibleNames,
+        count: errors.length - 3
+      });
+    },
+    [t]
+  );
+
   const primeQuotaRefreshState = useCallback(
     (targets: AuthFileItem[]) => {
       if (targets.length === 0) return;
@@ -1204,9 +1230,11 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     async () => {
       const targets = pageItems;
       if (targets.length === 0) {
+        setRefreshResult(null);
         showNotification(t('notification.data_refreshed'), 'success');
         return;
       }
+      setRefreshResult(null);
       preserveQuotaSnapshot(targets);
       primeQuotaRefreshState(targets);
       setRefreshProgress({ completedCount: 0, total: targets.length });
@@ -1221,7 +1249,27 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           showNotification(t('notification.data_refreshed'), 'success');
           return;
         }
-        showNotification(t('notification.refresh_failed'), 'error');
+        if (summary) {
+          setRefreshResult(summary);
+          showNotification(
+            summary.successCount > 0
+              ? t('quota_management.refresh_result_partial', {
+                  success: summary.successCount,
+                  failed: summary.errorCount,
+                  total: summary.total,
+                  names: formatFailedNames(summary.errors)
+                })
+              : t('quota_management.refresh_result_failed', {
+                  failed: summary.errorCount,
+                  total: summary.total,
+                  names: formatFailedNames(summary.errors)
+                }),
+            summary.successCount > 0 ? 'warning' : 'error',
+            8000
+          );
+        } else {
+          showNotification(t('notification.refresh_failed'), 'error');
+        }
       } finally {
         clearQuotaSnapshot(targets);
         setRefreshProgress(null);
@@ -1229,6 +1277,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     },
     [
       clearQuotaSnapshot,
+      formatFailedNames,
       loadQuota,
       pageItems,
       preserveQuotaSnapshot,
@@ -1379,6 +1428,50 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         />
       ) : (
         <>
+          {refreshResult && refreshResult.errorCount > 0 && (
+            <div className={styles.refreshFailurePanel} role="alert">
+              <div className={styles.refreshFailureHeader}>
+                <div>
+                  <strong>
+                    {t('quota_management.refresh_failed_details_title', {
+                      count: refreshResult.errorCount
+                    })}
+                  </strong>
+                  <span>
+                    {t('quota_management.refresh_failed_details_summary', {
+                      success: refreshResult.successCount,
+                      total: refreshResult.total
+                    })}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className={styles.refreshFailureClose}
+                  onClick={() => setRefreshResult(null)}
+                  aria-label={t('common.close')}
+                >
+                  <IconX size={16} />
+                </button>
+              </div>
+              <div className={styles.refreshFailureList}>
+                {refreshResult.errors.map((item) => (
+                  <div key={item.name} className={styles.refreshFailureItem}>
+                    <span className={styles.refreshFailureName} title={item.name}>
+                      {item.name}
+                    </span>
+                    <span className={styles.refreshFailureReason}>
+                      {item.errorStatus
+                        ? t('quota_management.refresh_failed_reason_with_status', {
+                            status: item.errorStatus,
+                            message: item.error
+                          })
+                        : item.error}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div ref={gridRef} className={config.gridClassName}>
             {pageItems.map((item) => {
               const usageSummary = usageSummaryByFileName.get(item.name) ?? buildEmptyUsageSummary(usageStatsReady);

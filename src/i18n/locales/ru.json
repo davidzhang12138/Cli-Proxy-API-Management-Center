@@ -1447,6 +1447,12 @@
     "sort_model_reset_desc": "Сброс выбранной модели по убыванию",
     "sort_model_recent_usage_asc": "Последнее использование выбранной модели по возрастанию",
     "sort_model_recent_usage_desc": "Последнее использование выбранной модели по убыванию",
+    "refresh_result_partial": "Обновление завершено: успешно {{success}}, ошибок {{failed}}. Не удалось обновить: {{names}}",
+    "refresh_result_failed": "Обновление не удалось: ошибок {{failed}} / {{total}}. Не удалось обновить: {{names}}",
+    "refresh_failed_names_more": "{{names}} и ещё {{count}}",
+    "refresh_failed_details_title": "Не удалось обновить учётные данные: {{count}}",
+    "refresh_failed_details_summary": "Успешно {{success}} / {{total}}. Ошибки перечислены ниже.",
+    "refresh_failed_reason_with_status": "HTTP {{status}}: {{message}}",
     "filtered_empty_title": "Нет учётных данных по текущим фильтрам",
     "filtered_empty_desc": "Измените фильтр квоты, модели или режим сортировки."
   },

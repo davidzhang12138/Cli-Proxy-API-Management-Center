@@ -528,6 +528,106 @@
   }
 }
 
+.refreshFailurePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: $spacing-md;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger-color) 34%, var(--border-color));
+  background: color-mix(in srgb, var(--danger-color) 8%, var(--bg-secondary));
+}
+
+.refreshFailureHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-sm;
+
+  > div {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  strong {
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+}
+
+.refreshFailureClose {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition:
+    background-color $transition-fast,
+    color $transition-fast;
+
+  &:hover {
+    background: color-mix(in srgb, var(--danger-color) 12%, transparent);
+    color: var(--danger-color);
+  }
+}
+
+.refreshFailureList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.refreshFailureItem {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.36fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-primary) 76%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+
+  @include mobile {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+.refreshFailureName {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+  @include text-ellipsis;
+}
+
+.refreshFailureReason {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 :global([data-theme='dark']) .viewModeToggle {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }

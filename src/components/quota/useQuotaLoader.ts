@@ -27,6 +27,11 @@ interface LoadQuotaSummary {
   total: number;
   successCount: number;
   errorCount: number;
+  errors: Array<{
+    name: string;
+    error: string;
+    errorStatus?: number;
+  }>;
 }
 
 interface LoadQuotaProgress {
@@ -60,7 +65,7 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
 
       try {
         if (targets.length === 0) {
-          return { total: 0, successCount: 0, errorCount: 0 };
+          return { total: 0, successCount: 0, errorCount: 0, errors: [] };
         }
 
         setQuota((prev) => {
@@ -118,7 +123,21 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
         return {
           total: results.length,
           successCount,
-          errorCount
+          errorCount,
+          errors: results
+            .filter(
+              (
+                result
+              ): result is LoadQuotaResult<TData> & {
+                status: 'error';
+                error: string;
+              } => result.status === 'error'
+            )
+            .map((result) => ({
+              name: result.name,
+              error: result.error || t('common.unknown_error'),
+              errorStatus: result.errorStatus
+            }))
         };
       } finally {
         if (requestId === requestIdRef.current) {
