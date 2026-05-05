@@ -80,7 +80,7 @@ import {
   isKiroFile,
   isRuntimeOnlyAuthFile,
 } from '@/utils/quota';
-import { normalizeAuthIndex } from '@/utils/usage';
+import { normalizeAuthIndex } from '@/utils/authIndex';
 import type { QuotaRenderHelpers } from './QuotaCard';
 import styles from '@/pages/QuotaPage.module.scss';
 

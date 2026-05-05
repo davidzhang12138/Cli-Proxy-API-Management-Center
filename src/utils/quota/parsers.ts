@@ -10,7 +10,7 @@ import type {
   KimiUsagePayload,
   KiroQuotaPayload,
 } from '@/types';
-import { normalizeAuthIndex } from '@/utils/usage';
+import { normalizeAuthIndex } from '@/utils/authIndex';
 
 const GEMINI_CLI_MODEL_SUFFIX = '_vertex';
 export { normalizeAuthIndex };
