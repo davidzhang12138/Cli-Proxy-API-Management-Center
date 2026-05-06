@@ -6,7 +6,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -25,8 +24,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { copyToClipboard } from '@/utils/clipboard';
 import {
-  MAX_CARD_PAGE_SIZE,
-  MIN_CARD_PAGE_SIZE,
   QUOTA_PROVIDER_TYPES,
   clampCardPageSize,
   getAuthFileIcon,
@@ -66,6 +63,23 @@ const BATCH_BAR_BASE_TRANSFORM = 'translateX(-50%)';
 const BATCH_BAR_HIDDEN_TRANSFORM = 'translateX(-50%) translateY(56px)';
 const DEFAULT_REGULAR_PAGE_SIZE = 9;
 const DEFAULT_COMPACT_PAGE_SIZE = 12;
+const AUTH_FILES_PAGE_SIZE_OPTIONS = [6, 9, 12, 18, 24, 30];
+
+const buildPaginationItems = (currentPage: number, totalPages: number): Array<number | 'ellipsis'> => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, 'ellipsis', totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [1, 'ellipsis', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+
+  return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
+};
 
 const escapeWildcardSearchSegment = (value: string) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -95,7 +109,7 @@ export function AuthFilesPage() {
     regular: DEFAULT_REGULAR_PAGE_SIZE,
     compact: DEFAULT_COMPACT_PAGE_SIZE,
   });
-  const [pageSizeInput, setPageSizeInput] = useState('9');
+  const [pageJumpValue, setPageJumpValue] = useState('');
   const [viewMode, setViewMode] = useState<'diagram' | 'list'>('list');
   const [sortMode, setSortMode] = useState<AuthFilesSortMode>('default');
   const [batchActionBarVisible, setBatchActionBarVisible] = useState(false);
@@ -268,8 +282,16 @@ export function AuthFilesPage() {
   ]);
 
   useEffect(() => {
-    setPageSizeInput(String(pageSize));
-  }, [pageSize]);
+    setPageSizeByMode((current) => {
+      const nearest = AUTH_FILES_PAGE_SIZE_OPTIONS.reduce((prev, curr) =>
+        Math.abs(curr - pageSize) < Math.abs(prev - pageSize) ? curr : prev
+      );
+      if (nearest === pageSize) return current;
+      return compactMode
+        ? { ...current, compact: nearest }
+        : { ...current, regular: nearest };
+    });
+  }, [compactMode, pageSize]);
 
   const setCurrentModePageSize = useCallback(
     (next: number) => {
@@ -279,42 +301,6 @@ export function AuthFilesPage() {
     },
     [compactMode]
   );
-
-  const commitPageSizeInput = (rawValue: string) => {
-    const trimmed = rawValue.trim();
-    if (!trimmed) {
-      setPageSizeInput(String(pageSize));
-      return;
-    }
-
-    const value = Number(trimmed);
-    if (!Number.isFinite(value)) {
-      setPageSizeInput(String(pageSize));
-      return;
-    }
-
-    const next = clampCardPageSize(value);
-    setCurrentModePageSize(next);
-    setPageSizeInput(String(next));
-    setPage(1);
-  };
-
-  const handlePageSizeChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const rawValue = event.currentTarget.value;
-    setPageSizeInput(rawValue);
-
-    const trimmed = rawValue.trim();
-    if (!trimmed) return;
-
-    const parsed = Number(trimmed);
-    if (!Number.isFinite(parsed)) return;
-
-    const rounded = Math.round(parsed);
-    if (rounded < MIN_CARD_PAGE_SIZE || rounded > MAX_CARD_PAGE_SIZE) return;
-
-    setCurrentModePageSize(rounded);
-    setPage(1);
-  };
 
   const handleSortModeChange = useCallback(
     (value: string) => {
@@ -372,6 +358,7 @@ export function AuthFilesPage() {
       { value: 'default', label: t('auth_files.sort_default') },
       { value: 'az', label: t('auth_files.sort_az') },
       { value: 'priority', label: t('auth_files.sort_priority') },
+      { value: 'created', label: t('auth_files.sort_created') },
     ],
     [t]
   );
@@ -425,6 +412,12 @@ export function AuthFilesPage() {
         const pb = parsePriorityValue(b.priority ?? b['priority']) ?? 0;
         return pb - pa; // 高优先级排前面
       });
+    } else if (sortMode === 'created') {
+      copy.sort((a, b) => {
+        const ma = Number(a['modtime'] ?? a.modified ?? 0);
+        const mb = Number(b['modtime'] ?? b.modified ?? 0);
+        return mb - ma;
+      });
     }
     return copy;
   }, [filtered, sortMode]);
@@ -433,6 +426,10 @@ export function AuthFilesPage() {
   const currentPage = Math.min(page, totalPages);
   const start = (currentPage - 1) * pageSize;
   const pageItems = sorted.slice(start, start + pageSize);
+  const paginationItems = useMemo(
+    () => buildPaginationItems(currentPage, totalPages),
+    [currentPage, totalPages]
+  );
   const selectablePageItems = useMemo(
     () => pageItems.filter((file) => !isRuntimeOnlyAuthFile(file)),
     [pageItems]
@@ -729,24 +726,6 @@ export function AuthFilesPage() {
                   />
                 </div>
                 <div className={styles.filterItem}>
-                  <label>{t('auth_files.page_size_label')}</label>
-                  <input
-                    className={styles.pageSizeSelect}
-                    type="number"
-                    min={MIN_CARD_PAGE_SIZE}
-                    max={MAX_CARD_PAGE_SIZE}
-                    step={1}
-                    value={pageSizeInput}
-                    onChange={handlePageSizeChange}
-                    onBlur={(e) => commitPageSizeInput(e.currentTarget.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.currentTarget.blur();
-                      }
-                    }}
-                  />
-                </div>
-                <div className={styles.filterItem}>
                   <label>{t('auth_files.sort_label')}</label>
                   <Select
                     className={styles.sortSelect}
@@ -843,29 +822,110 @@ export function AuthFilesPage() {
 
             {!loading && sorted.length > pageSize && (
               <div className={styles.pagination}>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage <= 1}
-                >
-                  {t('auth_files.pagination_prev')}
-                </Button>
-                <div className={styles.pageInfo}>
-                  {t('auth_files.pagination_info', {
-                    current: currentPage,
-                    total: totalPages,
-                    count: sorted.length,
-                  })}
+                <div className={styles.paginationMeta}>
+                  <div className={styles.pageSizeControl}>
+                    <label>{t('auth_files.page_size_label')}</label>
+                    <select
+                      className={styles.pageSizeSelect}
+                      value={pageSize}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setCurrentModePageSize(next);
+                        setPage(1);
+                      }}
+                    >
+                      {AUTH_FILES_PAGE_SIZE_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {t('auth_files.page_size_option', { count: opt })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className={styles.pageInfo}>
+                    {t('auth_files.pagination_info', {
+                      current: currentPage,
+                      total: totalPages,
+                      count: sorted.length,
+                    })}
+                  </div>
                 </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage >= totalPages}
-                >
-                  {t('auth_files.pagination_next')}
-                </Button>
+
+                <div className={styles.paginationControls}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage <= 1}
+                  >
+                    {t('auth_files.pagination_prev')}
+                  </Button>
+                  <div className={styles.paginationNumbers}>
+                    {paginationItems.map((item, index) =>
+                      item === 'ellipsis' ? (
+                        <span
+                          key={`ellipsis-${currentPage}-${index}`}
+                          className={styles.paginationEllipsis}
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={item}
+                          type="button"
+                          className={`${styles.paginationNumberButton} ${
+                            item === currentPage ? styles.paginationNumberButtonActive : ''
+                          }`}
+                          onClick={() => setPage(item)}
+                          aria-current={item === currentPage ? 'page' : undefined}
+                        >
+                          {item}
+                        </button>
+                      )
+                    )}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    {t('auth_files.pagination_next')}
+                  </Button>
+                </div>
+
+                <div className={styles.paginationJump}>
+                  <label>{t('auth_files.page_jump_label')}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    inputMode="numeric"
+                    className={styles.paginationJumpInput}
+                    value={pageJumpValue}
+                    onChange={(e) => setPageJumpValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return;
+                      const target = Number(pageJumpValue);
+                      if (!Number.isFinite(target)) return;
+                      setPage(Math.max(1, Math.min(totalPages, target)));
+                      setPageJumpValue('');
+                    }}
+                    placeholder={t('auth_files.page_jump_placeholder', { total: totalPages })}
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const target = Number(pageJumpValue);
+                      if (!Number.isFinite(target)) return;
+                      setPage(Math.max(1, Math.min(totalPages, target)));
+                      setPageJumpValue('');
+                    }}
+                    disabled={!pageJumpValue.trim()}
+                  >
+                    {t('auth_files.page_jump_confirm')}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
