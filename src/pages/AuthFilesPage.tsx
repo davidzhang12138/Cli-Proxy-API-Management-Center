@@ -714,7 +714,7 @@ export function AuthFilesPage() {
           <div className={styles.filterContent}>
             <div className={styles.filterControlsPanel}>
               <div className={styles.filterControls}>
-                <div className={styles.filterItem}>
+                <div className={`${styles.filterItem} ${styles.filterItemSearch}`}>
                   <label>{t('auth_files.search_label')}</label>
                   <Input
                     value={search}
@@ -725,7 +725,7 @@ export function AuthFilesPage() {
                     placeholder={t('auth_files.search_placeholder')}
                   />
                 </div>
-                <div className={styles.filterItem}>
+                <div className={`${styles.filterItem} ${styles.filterItemSort}`}>
                   <label>{t('auth_files.sort_label')}</label>
                   <Select
                     className={styles.sortSelect}

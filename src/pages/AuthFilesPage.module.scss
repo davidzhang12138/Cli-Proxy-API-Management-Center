@@ -239,10 +239,10 @@
 }
 
 .filterControls {
-  display: grid;
-  grid-template-columns: minmax(240px, 1.4fr) repeat(2, minmax(120px, 0.72fr)) minmax(220px, auto);
+  display: flex;
   gap: $spacing-md;
   align-items: flex-end;
+  flex-wrap: wrap;
 
   // 修复 Input 组件在 filterItem 中的嵌套样式
   :global(.form-group) {
@@ -254,12 +254,9 @@
     box-sizing: border-box;
   }
 
-  @include tablet {
-    grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(140px, 0.8fr));
-  }
-
   @include mobile {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
@@ -279,17 +276,23 @@
   }
 }
 
+.filterItemSearch {
+  flex: 1;
+  min-width: 200px;
+}
+
+.filterItemSort {
+  min-width: 130px;
+  width: 160px;
+}
+
 .filterToggleItem {
   min-width: 0;
-
-  @include tablet {
-    grid-column: 1 / -1;
-  }
 }
 
 .filterToggleGroup {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   min-height: 40px;
 }
