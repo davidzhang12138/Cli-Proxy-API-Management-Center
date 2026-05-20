@@ -28,6 +28,7 @@ import {
   getTypeColor,
   getTypeLabel,
   isRuntimeOnlyAuthFile,
+  normalizeProviderKey,
   parsePriorityValue,
   type QuotaProviderType,
   type ResolvedTheme,
@@ -82,18 +83,18 @@ export function AuthFileCard(props: AuthFileCardProps) {
     onToggleSelect,
   } = props;
 
-  const displayType = String(file.type ?? file.provider ?? 'unknown');
   const recentBuckets = normalizeRecentRequestBuckets(file.recent_requests ?? file.recentRequests);
   const fileStats = {
     success: normalizeUsageTotal(file.success),
     failure: normalizeUsageTotal(file.failed),
   };
   const isRuntimeOnly = isRuntimeOnlyAuthFile(file);
-  const isAistudio = displayType.toLowerCase() === 'aistudio';
+  const providerKey = normalizeProviderKey(String(file.type ?? file.provider ?? 'unknown'));
+  const isAistudio = providerKey === 'aistudio';
   const showModelsButton = !isRuntimeOnly || isAistudio;
-  const typeColor = getTypeColor(displayType, resolvedTheme);
-  const typeLabel = getTypeLabel(t, displayType);
-  const providerIcon = getAuthFileIcon(displayType, resolvedTheme);
+  const typeColor = getTypeColor(providerKey, resolvedTheme);
+  const typeLabel = getTypeLabel(t, providerKey);
+  const providerIcon = getAuthFileIcon(providerKey, resolvedTheme);
 
   const quotaType =
     quotaFilterType && resolveQuotaType(file) === quotaFilterType ? quotaFilterType : null;
