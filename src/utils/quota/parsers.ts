@@ -9,6 +9,7 @@ import type {
   GeminiCliQuotaPayload,
   KimiUsagePayload,
   KiroQuotaPayload,
+  XaiBillingPayload,
 } from '@/types';
 import { normalizeAuthIndex } from '@/utils/authIndex';
 
@@ -198,7 +199,9 @@ export function parseGeminiCliQuotaPayload(payload: unknown): GeminiCliQuotaPayl
   return null;
 }
 
-export function parseGeminiCliCodeAssistPayload(payload: unknown): GeminiCliCodeAssistPayload | null {
+export function parseGeminiCliCodeAssistPayload(
+  payload: unknown
+): GeminiCliCodeAssistPayload | null {
   if (payload === undefined || payload === null) return null;
   if (typeof payload === 'string') {
     const trimmed = payload.trim();
@@ -245,6 +248,23 @@ export function parseKiroQuotaPayload(payload: unknown): KiroQuotaPayload | null
   }
   if (typeof payload === 'object') {
     return payload as KiroQuotaPayload;
+  }
+  return null;
+}
+
+export function parseXaiBillingPayload(payload: unknown): XaiBillingPayload | null {
+  if (payload === undefined || payload === null) return null;
+  if (typeof payload === 'string') {
+    const trimmed = payload.trim();
+    if (!trimmed) return null;
+    try {
+      return JSON.parse(trimmed) as XaiBillingPayload;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof payload === 'object') {
+    return payload as XaiBillingPayload;
   }
   return null;
 }

@@ -30,7 +30,8 @@ import {
   CODEX_CONFIG,
   GEMINI_CLI_CONFIG,
   KIRO_CONFIG,
-  KIMI_CONFIG
+  KIMI_CONFIG,
+  XAI_CONFIG,
 } from '@/components/quota';
 import type { AuthFileItem } from '@/types';
 import styles from './QuotaPage.module.scss';
@@ -50,6 +51,7 @@ const QUOTA_CONFIGS = [
   ANTIGRAVITY_CONFIG,
   CODEX_CONFIG,
   KIRO_CONFIG,
+  XAI_CONFIG,
   GEMINI_CLI_CONFIG,
   KIMI_CONFIG
 ] as const;
@@ -373,6 +375,8 @@ export function QuotaPage() {
         return <QuotaSection key={type} config={CODEX_CONFIG} {...commonSectionProps} />;
       case KIRO_CONFIG.type:
         return <QuotaSection key={type} config={KIRO_CONFIG} {...commonSectionProps} />;
+      case XAI_CONFIG.type:
+        return <QuotaSection key={type} config={XAI_CONFIG} {...commonSectionProps} />;
       case GEMINI_CLI_CONFIG.type:
         return <QuotaSection key={type} config={GEMINI_CLI_CONFIG} {...commonSectionProps} />;
       case KIMI_CONFIG.type:

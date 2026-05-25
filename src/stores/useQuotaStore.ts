@@ -11,6 +11,7 @@ import type {
   GeminiCliQuotaState,
   KimiQuotaState,
   KiroQuotaState,
+  XaiQuotaState,
 } from '@/types';
 import { STORAGE_KEY_QUOTA } from '@/utils/constants';
 
@@ -26,12 +27,14 @@ interface QuotaStoreState {
   geminiCliQuota: Record<string, GeminiCliQuotaState>;
   kiroQuota: Record<string, KiroQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
+  xaiQuota: Record<string, XaiQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setGeminiCliQuota: (updater: QuotaUpdater<Record<string, GeminiCliQuotaState>>) => void;
   setKiroQuota: (updater: QuotaUpdater<Record<string, KiroQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
+  setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
   clearQuotaCache: () => void;
   purgeStaleEntries: () => void;
 }
@@ -44,6 +47,7 @@ type PersistedQuotaStoreState = Pick<
   | 'geminiCliQuota'
   | 'kiroQuota'
   | 'kimiQuota'
+  | 'xaiQuota'
 >;
 
 const resolveUpdater = <T,>(updater: QuotaUpdater<T>, prev: T): T => {
@@ -92,9 +96,9 @@ const sanitizeQuotaMap = <T extends TimedQuotaState>(quotaMap: Record<string, T>
           {
             ...value,
             _cachedAt: cachedAt,
-            _cacheExpiresAt: cacheExpiresAt
-          }
-        ]
+            _cacheExpiresAt: cacheExpiresAt,
+          },
+        ],
       ];
     })
   ) as Record<string, T>;
@@ -118,9 +122,7 @@ const stampQuotaMap = <T extends TimedQuotaState>(
 
       const prevValue = prevMap[key];
       const cachedAt =
-        prevValue === value && isFreshQuotaState(prevValue, now)
-          ? prevValue._cachedAt
-          : now;
+        prevValue === value && isFreshQuotaState(prevValue, now) ? prevValue._cachedAt : now;
       const normalizedCachedAt =
         typeof cachedAt === 'number' && Number.isFinite(cachedAt) ? cachedAt : now;
       const cacheExpiresAt = resolveQuotaCacheExpiryAt(value, normalizedCachedAt);
@@ -139,6 +141,7 @@ const sanitizePersistedQuotaState = (
   geminiCliQuota: sanitizeQuotaMap(state.geminiCliQuota ?? {}),
   kiroQuota: sanitizeQuotaMap(state.kiroQuota ?? {}),
   kimiQuota: sanitizeQuotaMap(state.kimiQuota ?? {}),
+  xaiQuota: sanitizeQuotaMap(state.xaiQuota ?? {}),
 });
 
 export const useQuotaStore = create<QuotaStoreState>()(
@@ -150,35 +153,40 @@ export const useQuotaStore = create<QuotaStoreState>()(
       geminiCliQuota: {},
       kiroQuota: {},
       kimiQuota: {},
+      xaiQuota: {},
       setAntigravityQuota: (updater) =>
         set((state) => ({
           antigravityQuota: stampQuotaMap(
             resolveUpdater(updater, state.antigravityQuota),
             state.antigravityQuota
-          )
+          ),
         })),
       setClaudeQuota: (updater) =>
         set((state) => ({
-          claudeQuota: stampQuotaMap(resolveUpdater(updater, state.claudeQuota), state.claudeQuota)
+          claudeQuota: stampQuotaMap(resolveUpdater(updater, state.claudeQuota), state.claudeQuota),
         })),
       setCodexQuota: (updater) =>
         set((state) => ({
-          codexQuota: stampQuotaMap(resolveUpdater(updater, state.codexQuota), state.codexQuota)
+          codexQuota: stampQuotaMap(resolveUpdater(updater, state.codexQuota), state.codexQuota),
         })),
       setGeminiCliQuota: (updater) =>
         set((state) => ({
           geminiCliQuota: stampQuotaMap(
             resolveUpdater(updater, state.geminiCliQuota),
             state.geminiCliQuota
-          )
+          ),
         })),
       setKiroQuota: (updater) =>
         set((state) => ({
-          kiroQuota: stampQuotaMap(resolveUpdater(updater, state.kiroQuota), state.kiroQuota)
+          kiroQuota: stampQuotaMap(resolveUpdater(updater, state.kiroQuota), state.kiroQuota),
         })),
       setKimiQuota: (updater) =>
         set((state) => ({
-          kimiQuota: stampQuotaMap(resolveUpdater(updater, state.kimiQuota), state.kimiQuota)
+          kimiQuota: stampQuotaMap(resolveUpdater(updater, state.kimiQuota), state.kimiQuota),
+        })),
+      setXaiQuota: (updater) =>
+        set((state) => ({
+          xaiQuota: stampQuotaMap(resolveUpdater(updater, state.xaiQuota), state.xaiQuota),
         })),
       clearQuotaCache: () =>
         set({
@@ -187,20 +195,21 @@ export const useQuotaStore = create<QuotaStoreState>()(
           codexQuota: {},
           geminiCliQuota: {},
           kiroQuota: {},
-          kimiQuota: {}
+          kimiQuota: {},
+          xaiQuota: {},
         }),
       purgeStaleEntries: () =>
-        set((state) => {
-          const sanitized = sanitizePersistedQuotaState({
+        set((state) =>
+          sanitizePersistedQuotaState({
             antigravityQuota: state.antigravityQuota,
             claudeQuota: state.claudeQuota,
             codexQuota: state.codexQuota,
             geminiCliQuota: state.geminiCliQuota,
             kiroQuota: state.kiroQuota,
             kimiQuota: state.kimiQuota,
-          });
-          return sanitized;
-        })
+            xaiQuota: state.xaiQuota,
+          })
+        ),
     }),
     {
       name: STORAGE_KEY_QUOTA,
@@ -212,6 +221,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
           geminiCliQuota: state.geminiCliQuota,
           kiroQuota: state.kiroQuota,
           kimiQuota: state.kimiQuota,
+          xaiQuota: state.xaiQuota,
         }),
       merge: (persistedState, currentState) => ({
         ...currentState,
