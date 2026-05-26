@@ -631,7 +631,9 @@
     "quota_refresh_success": "Quota refreshed for \"{{name}}\"",
     "quota_refresh_failed": "Failed to refresh quota for \"{{name}}\": {{message}}",
     "quota_refresh_single": "Refresh quota",
-    "quota_refresh_hint": "Refresh quota only for this auth file"
+    "quota_refresh_hint": "Refresh quota only for this auth file",
+    "codex_websockets_label": "WebSockets (websockets)",
+    "codex_websockets_hint": "Enable Responses API websocket transport for this Codex credential."
   },
   "antigravity_quota": {
     "title": "Antigravity Quota",
@@ -1403,7 +1405,8 @@
     "refresh_failed_details_summary": "{{success}} / {{total}} succeeded. Failed items are listed below.",
     "refresh_failed_reason_with_status": "HTTP {{status}}: {{message}}",
     "filtered_empty_title": "No credentials match the current filters",
-    "filtered_empty_desc": "Adjust the quota filter, model filter, or sort mode to continue."
+    "filtered_empty_desc": "Adjust the quota filter, model filter, or sort mode to continue.",
+    "refresh_all_credentials": "Refresh all credentials"
   },
   "system_info": {
     "title": "Management Center Info",
@@ -1819,5 +1822,222 @@
     "input_tokens": "Input Tokens",
     "output_tokens": "Output Tokens",
     "last_updated": "Updated"
+  },
+  "nav_groups": {
+    "operate": "Operate",
+    "gateway": "Gateway",
+    "observe": "Observe",
+    "control": "Control"
+  },
+  "nav_meta": {
+    "dashboard": "Operations overview",
+    "ai_providers": "Upstream model routing",
+    "auth_files": "Auth files & credentials",
+    "oauth": "OAuth authorization",
+    "quota_management": "API keys & limits",
+    "logs": "Request tracing",
+    "config_management": "Gateway configuration",
+    "system_info": "Runtime & diagnostics"
+  },
+  "providersPage": {
+    "header": {
+      "title": "AI Providers",
+      "activeResources": "{{active}}/{{total}} active resources",
+      "providerFamilies": "{{count}} provider families",
+      "updatedAt": "Updated {{time}}",
+      "issueCount": "{{count}} issues"
+    },
+    "actions": {
+      "refresh": "Refresh",
+      "syncing": "Syncing",
+      "new": "New",
+      "edit": "Edit",
+      "view": "View",
+      "delete": "Delete",
+      "clear": "Clear",
+      "cancel": "Cancel",
+      "save": "Save",
+      "create": "Create",
+      "enable": "Enable",
+      "disable": "Disable"
+    },
+    "categories": {
+      "title": "Providers",
+      "activeCount": "{{active}}/{{total}} active",
+      "ampcodeActive": "Connected",
+      "ampcodeInactive": "Not configured"
+    },
+    "providerNames": {
+      "gemini": "Gemini",
+      "codex": "Codex",
+      "claude": "Claude",
+      "vertex": "Vertex",
+      "openaiCompatibility": "OpenAI Compatible",
+      "ampcode": "Amp CLI"
+    },
+    "table": {
+      "key": "Key",
+      "baseUrl": "Base URL",
+      "prefix": "Prefix",
+      "models": "Models/Headers",
+      "status": "Status",
+      "actions": "Actions",
+      "metrics": {
+        "models": "Models",
+        "keys": "Keys",
+        "headers": "Headers",
+        "mappings": "Mappings"
+      },
+      "websocketsTag": "WebSockets",
+      "cloakTag": "Cloak",
+      "noFallbackKey": "No fallback key",
+      "empty": "No resources yet, click \"New\" to add.",
+      "filterPlaceholder": "Search keys, URLs, prefixes…",
+      "description": "Manage resources under {{route}}",
+      "providerIssue": "This provider has an issue"
+    },
+    "status": {
+      "active": "Active",
+      "disabled": "Disabled",
+      "notSet": "Not set",
+      "none": "None",
+      "notConfigured": "Not configured",
+      "defaultSuffix": "(default)"
+    },
+    "detail": {
+      "title": "Details",
+      "metadataTitle": "Metadata",
+      "fields": {
+        "identifier": "Identifier",
+        "baseUrl": "Base URL",
+        "proxyUrl": "Proxy URL",
+        "prefix": "Prefix",
+        "models": "Models",
+        "headers": "Headers",
+        "authIndex": "Auth Index",
+        "excludedModels": "Excluded models",
+        "apiKeyEntries": "API key entries"
+      }
+    },
+    "form": {
+      "createEyebrow": "New",
+      "editEyebrow": "Edit",
+      "name": "Name",
+      "apiKey": "API key",
+      "apiKeyCreatePlaceholder": "Enter API key",
+      "apiKeyEditPlaceholder": "Leave empty to keep unchanged",
+      "baseUrl": "Base URL",
+      "baseUrlRequiredHint": "Required for this provider",
+      "proxyUrl": "Proxy URL",
+      "prefix": "Prefix",
+      "priority": "Priority",
+      "disabled": "Disable this entry",
+      "disabledHint": "Disabled entries won't be used by the gateway",
+      "websockets": "Enable WebSockets",
+      "testModel": "Test model",
+      "testModelClaudeHint": "Used for connectivity testing only; not saved",
+      "testModelAutoWith": "Auto · {{name}}",
+      "testModelAutoEmpty": "Auto (no models added yet)",
+      "testModelCustom": "{{name}} (custom)",
+      "modelsSection": "Custom models",
+      "addModel": "Add model",
+      "headersSection": "Request headers",
+      "addHeader": "Add header",
+      "headers": "Headers",
+      "headersHint": "One per line, format Key: Value",
+      "excludedSection": "Excluded models",
+      "excludedHint": "One model per line; matched models won't be routed",
+      "cloakSection": "Cloak settings",
+      "cloakMode": "Mode",
+      "cloakStrict": "Strict mode",
+      "cloakSensitiveWords": "Sensitive words (one per line)",
+      "apiKeyEntriesSection": "API key entries",
+      "apiKeyEntry": "Key #{{index}}",
+      "addApiKeyEntry": "Add key entry",
+      "validation": {
+        "nameRequired": "Name is required",
+        "apiKeyRequired": "At least one API key is required",
+        "baseUrlRequired": "Base URL is required"
+      }
+    },
+    "ampcode": {
+      "upstreamUrl": "Upstream URL",
+      "upstreamApiKey": "Upstream API key (fallback)",
+      "upstreamApiKeyHint": "Used when no key mapping matches",
+      "keyMappingsSection": "Upstream key mappings",
+      "mappingRow": "Mapping #{{index}}",
+      "clientKeys": "Client keys",
+      "clientKeysHint": "One per line; matched keys forward to the upstream key above",
+      "addMapping": "Add key mapping",
+      "modelMappingsSection": "Model mappings",
+      "addModelMapping": "Add model mapping",
+      "forceModelMappings": "Force model mappings",
+      "forceModelMappingsHint": "Requests that don't match a mapping are rejected"
+    },
+    "delete": {
+      "title": "Delete resource",
+      "confirm": "Delete {{name}}? This action cannot be undone.",
+      "ampcodeTitle": "Clear Amp CLI configuration",
+      "ampcodeConfirm": "Clear all Amp CLI configuration? Upstream URL, keys and model mappings will be removed."
+    },
+    "toast": {
+      "created": "Created",
+      "updated": "Updated",
+      "deleted": "Deleted",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "toggleFailed": "Failed to update status"
+    },
+    "unsavedChanges": {
+      "title": "Discard unsaved changes?",
+      "message": "You have unsaved edits in this form. Closing will discard them.",
+      "discard": "Discard changes",
+      "keepEditing": "Keep editing"
+    },
+    "connectivity": {
+      "test": "Test",
+      "testAll": "Test all",
+      "success": "Reachable",
+      "baseUrlRequired": "Base URL is required",
+      "endpointInvalid": "Endpoint URL is invalid",
+      "apiKeyRequired": "API key is required",
+      "modelRequired": "Test model is required",
+      "timeout": "Timed out after {{seconds}}s",
+      "requestFailed": "Request failed"
+    },
+    "discovery": {
+      "openButton": "Fetch from endpoint",
+      "searchPlaceholder": "Search models",
+      "reload": "Reload",
+      "loading": "Loading models…",
+      "empty": "No models returned by the endpoint",
+      "notLoaded": "Click Reload to fetch models",
+      "selectAll": "Select all",
+      "clearAll": "Clear selection",
+      "selectedCount": "{{selected}} / {{total}}",
+      "alreadyAdded": "Already added",
+      "close": "Close",
+      "apply": "Apply ({{count}})"
+    },
+    "toolbar": {
+      "sortBy": "Sort by",
+      "sort": {
+        "name": "Name",
+        "priority": "Priority",
+        "recentSuccess": "Recent success",
+        "directionAsc": "Ascending",
+        "directionDesc": "Descending"
+      },
+      "filter": {
+        "allModels": "All models",
+        "selectedModels": "{{selected}}/{{total}} models",
+        "selectAll": "Select all",
+        "clear": "Clear",
+        "empty": "No models configured yet"
+      }
+    },
+    "modelCatalog": {
+      "notLoaded": "Not loaded"
+    }
   }
 }

@@ -227,6 +227,7 @@ export function MainLayout() {
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [brandExpanded, setBrandExpanded] = useState(true);
+  const showSidebarLabels = !sidebarCollapsed || sidebarOpen;
   const contentRef = useRef<HTMLDivElement | null>(null);
   const languageMenuRef = useRef<HTMLDivElement | null>(null);
   const themeMenuRef = useRef<HTMLDivElement | null>(null);
@@ -416,20 +417,97 @@ export function MainLayout() {
           ? 'error'
           : 'muted';
 
-  const navItems = [
-    { path: '/', label: t('nav.dashboard'), icon: sidebarIcons.dashboard },
-    { path: '/config', label: t('nav.config_management'), icon: sidebarIcons.config },
-    { path: '/ai-providers', label: t('nav.ai_providers'), icon: sidebarIcons.aiProviders },
-    { path: '/auth-files', label: t('nav.auth_files'), icon: sidebarIcons.authFiles },
-    { path: '/oauth', label: t('nav.oauth', { defaultValue: 'OAuth' }), icon: sidebarIcons.oauth },
-    { path: '/quota', label: t('nav.quota_management'), icon: sidebarIcons.quota },
-    { path: '/usage', label: t('nav.usage_stats'), icon: sidebarIcons.usage },
-    { path: '/monitor', label: t('nav.monitor'), icon: sidebarIcons.monitor },
-    ...(config?.loggingToFile
-      ? [{ path: '/logs', label: t('nav.logs'), icon: sidebarIcons.logs }]
-      : []),
-    { path: '/system', label: t('nav.system_info'), icon: sidebarIcons.system },
+  const navGroups = [
+    {
+      id: 'operate',
+      labelKey: 'nav_groups.operate',
+      items: [
+        {
+          path: '/',
+          labelKey: 'nav.dashboard',
+          metaKey: 'nav_meta.dashboard',
+          icon: sidebarIcons.dashboard,
+        },
+      ],
+    },
+    {
+      id: 'gateway',
+      labelKey: 'nav_groups.gateway',
+      items: [
+        {
+          path: '/ai-providers',
+          labelKey: 'nav.ai_providers',
+          metaKey: 'nav_meta.ai_providers',
+          icon: sidebarIcons.aiProviders,
+        },
+        {
+          path: '/auth-files',
+          labelKey: 'nav.auth_files',
+          metaKey: 'nav_meta.auth_files',
+          icon: sidebarIcons.authFiles,
+        },
+        {
+          path: '/oauth',
+          labelKey: 'nav.oauth',
+          metaKey: 'nav_meta.oauth',
+          icon: sidebarIcons.oauth,
+        },
+      ],
+    },
+    {
+      id: 'observe',
+      labelKey: 'nav_groups.observe',
+      items: [
+        {
+          path: '/quota',
+          labelKey: 'nav.quota_management',
+          metaKey: 'nav_meta.quota_management',
+          icon: sidebarIcons.quota,
+        },
+        {
+          path: '/usage',
+          labelKey: 'nav.usage_stats',
+          metaKey: 'nav_meta.usage_stats',
+          icon: sidebarIcons.usage,
+        },
+        {
+          path: '/monitor',
+          labelKey: 'nav.monitor',
+          metaKey: 'nav_meta.monitor',
+          icon: sidebarIcons.monitor,
+        },
+        ...(config?.loggingToFile
+          ? [
+              {
+                path: '/logs',
+                labelKey: 'nav.logs',
+                metaKey: 'nav_meta.logs',
+                icon: sidebarIcons.logs,
+              },
+            ]
+          : []),
+      ],
+    },
+    {
+      id: 'control',
+      labelKey: 'nav_groups.control',
+      items: [
+        {
+          path: '/config',
+          labelKey: 'nav.config_management',
+          metaKey: 'nav_meta.config_management',
+          icon: sidebarIcons.config,
+        },
+        {
+          path: '/system',
+          labelKey: 'nav.system_info',
+          metaKey: 'nav_meta.system_info',
+          icon: sidebarIcons.system,
+        },
+      ],
+    },
   ];
+  const navItems = navGroups.flatMap((group) => group.items);
   const navOrder = navItems.map((item) => item.path);
   const getRouteOrder = (pathname: string) => {
     const trimmedPath =
@@ -694,17 +772,32 @@ export function MainLayout() {
           className={`sidebar ${sidebarOpen ? 'open' : ''} ${sidebarCollapsed ? 'collapsed' : ''}`}
         >
           <div className="nav-section">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                onClick={() => setSidebarOpen(false)}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                <span className="nav-icon">{item.icon}</span>
-                {!sidebarCollapsed && <span className="nav-label">{item.label}</span>}
-              </NavLink>
+            {navGroups.map((group, idx) => (
+              <div className="nav-group" key={group.id}>
+                {showSidebarLabels
+                  ? <div className="nav-group-label">{t(group.labelKey)}</div>
+                  : idx > 0 && <div className="nav-group-divider" aria-hidden="true" />}
+                {group.items.map((item) => {
+                  const itemLabel = t(item.labelKey);
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                      onClick={() => setSidebarOpen(false)}
+                      title={showSidebarLabels ? undefined : itemLabel}
+                    >
+                      <span className="nav-icon">{item.icon}</span>
+                      {showSidebarLabels && (
+                        <span className="nav-text">
+                          <span className="nav-label">{itemLabel}</span>
+                          <span className="nav-meta">{t(item.metaKey)}</span>
+                        </span>
+                      )}
+                    </NavLink>
+                  );
+                })}
+              </div>
             ))}
           </div>
         </aside>

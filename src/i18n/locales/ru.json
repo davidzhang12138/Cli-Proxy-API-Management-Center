@@ -626,7 +626,9 @@
     "quota_refresh_single": "Обновить квоту",
     "quota_refresh_hint": "Обновить квоту только для этих учётных данных",
     "quota_refresh_success": "Квота для \"{{name}}\" обновлена",
-    "quota_refresh_failed": "Не удалось обновить квоту для \"{{name}}\": {{message}}"
+    "quota_refresh_failed": "Не удалось обновить квоту для \"{{name}}\": {{message}}",
+    "codex_websockets_label": "WebSockets (websockets)",
+    "codex_websockets_hint": "Включает websocket-транспорт Responses API для этих учётных данных Codex."
   },
   "antigravity_quota": {
     "title": "Квота Antigravity",
@@ -1398,7 +1400,8 @@
     "refresh_failed_details_summary": "Успешно {{success}} / {{total}}. Ошибки перечислены ниже.",
     "refresh_failed_reason_with_status": "HTTP {{status}}: {{message}}",
     "filtered_empty_title": "Нет учётных данных по текущим фильтрам",
-    "filtered_empty_desc": "Измените фильтр квоты, модели или режим сортировки."
+    "filtered_empty_desc": "Измените фильтр квоты, модели или режим сортировки.",
+    "refresh_all_credentials": "Обновить все учётные данные"
   },
   "system_info": {
     "title": "Информация о центре управления",
@@ -1814,5 +1817,222 @@
     "input_tokens": "Входные токены",
     "output_tokens": "Выходные токены",
     "last_updated": "Обновлено"
+  },
+  "nav_groups": {
+    "operate": "Работа",
+    "gateway": "Шлюз",
+    "observe": "Наблюдение",
+    "control": "Управление"
+  },
+  "nav_meta": {
+    "dashboard": "Обзор работы",
+    "ai_providers": "Маршрутизация моделей",
+    "auth_files": "Файлы и учётные данные",
+    "oauth": "Авторизация OAuth",
+    "quota_management": "API ключи и лимиты",
+    "logs": "Трассировка запросов",
+    "config_management": "Базовая конфигурация шлюза",
+    "system_info": "Состояние и диагностика"
+  },
+  "providersPage": {
+    "header": {
+      "title": "AI Провайдеры",
+      "activeResources": "{{active}}/{{total}} активных",
+      "providerFamilies": "{{count}} семейств",
+      "updatedAt": "Обновлено {{time}}",
+      "issueCount": "{{count}} проблем"
+    },
+    "actions": {
+      "refresh": "Обновить",
+      "syncing": "Синхронизация",
+      "new": "Создать",
+      "edit": "Изменить",
+      "view": "Просмотр",
+      "delete": "Удалить",
+      "clear": "Очистить",
+      "cancel": "Отмена",
+      "save": "Сохранить",
+      "create": "Создать",
+      "enable": "Включить",
+      "disable": "Отключить"
+    },
+    "categories": {
+      "title": "Провайдеры",
+      "activeCount": "{{active}}/{{total}} активных",
+      "ampcodeActive": "Подключено",
+      "ampcodeInactive": "Не настроено"
+    },
+    "providerNames": {
+      "gemini": "Gemini",
+      "codex": "Codex",
+      "claude": "Claude",
+      "vertex": "Vertex",
+      "openaiCompatibility": "OpenAI-совместимый",
+      "ampcode": "Amp CLI"
+    },
+    "table": {
+      "key": "Ключ",
+      "baseUrl": "Base URL",
+      "prefix": "Префикс",
+      "models": "Модели/Заголовки",
+      "status": "Статус",
+      "actions": "Действия",
+      "metrics": {
+        "models": "Модели",
+        "keys": "Ключи",
+        "headers": "Заголовки",
+        "mappings": "Сопоставления"
+      },
+      "websocketsTag": "WebSockets",
+      "cloakTag": "Cloak",
+      "noFallbackKey": "Резервный ключ не задан",
+      "empty": "Нет ресурсов, нажмите \"Создать\".",
+      "filterPlaceholder": "Поиск по ключам, URL, префиксам…",
+      "description": "Управление ресурсами {{route}}",
+      "providerIssue": "Проблема с провайдером"
+    },
+    "status": {
+      "active": "Активен",
+      "disabled": "Отключён",
+      "notSet": "Не задано",
+      "none": "Нет",
+      "notConfigured": "Не настроено",
+      "defaultSuffix": "(по умолчанию)"
+    },
+    "detail": {
+      "title": "Подробности",
+      "metadataTitle": "Метаданные",
+      "fields": {
+        "identifier": "Идентификатор",
+        "baseUrl": "Base URL",
+        "proxyUrl": "Proxy URL",
+        "prefix": "Префикс",
+        "models": "Моделей",
+        "headers": "Заголовков",
+        "authIndex": "Auth Index",
+        "excludedModels": "Исключённых моделей",
+        "apiKeyEntries": "API-ключей"
+      }
+    },
+    "form": {
+      "createEyebrow": "Создать",
+      "editEyebrow": "Изменить",
+      "name": "Название",
+      "apiKey": "API-ключ",
+      "apiKeyCreatePlaceholder": "Введите API-ключ",
+      "apiKeyEditPlaceholder": "Оставьте пустым, чтобы не менять",
+      "baseUrl": "Base URL",
+      "baseUrlRequiredHint": "Обязательно для этого провайдера",
+      "proxyUrl": "Proxy URL",
+      "prefix": "Префикс",
+      "priority": "Приоритет",
+      "disabled": "Отключить эту запись",
+      "disabledHint": "Отключённые записи не используются шлюзом",
+      "websockets": "Включить WebSockets",
+      "testModel": "Тестовая модель",
+      "testModelClaudeHint": "Используется только для проверки соединения; не сохраняется",
+      "testModelAutoWith": "Авто · {{name}}",
+      "testModelAutoEmpty": "Авто (модели ещё не добавлены)",
+      "testModelCustom": "{{name}} (своя)",
+      "modelsSection": "Пользовательские модели",
+      "addModel": "Добавить модель",
+      "headersSection": "Заголовки запроса",
+      "addHeader": "Добавить заголовок",
+      "headers": "Заголовки",
+      "headersHint": "По одному в строке, формат Key: Value",
+      "excludedSection": "Исключённые модели",
+      "excludedHint": "По одной модели в строке; совпавшие модели не будут направлены",
+      "cloakSection": "Настройки Cloak",
+      "cloakMode": "Режим",
+      "cloakStrict": "Строгий режим",
+      "cloakSensitiveWords": "Стоп-слова (по одному в строке)",
+      "apiKeyEntriesSection": "API-ключи",
+      "apiKeyEntry": "Ключ #{{index}}",
+      "addApiKeyEntry": "Добавить ключ",
+      "validation": {
+        "nameRequired": "Название обязательно",
+        "apiKeyRequired": "Нужен хотя бы один API-ключ",
+        "baseUrlRequired": "Base URL обязателен"
+      }
+    },
+    "ampcode": {
+      "upstreamUrl": "Upstream URL",
+      "upstreamApiKey": "Резервный API-ключ",
+      "upstreamApiKeyHint": "Используется, когда нет совпадений",
+      "keyMappingsSection": "Сопоставление ключей",
+      "mappingRow": "Сопоставление #{{index}}",
+      "clientKeys": "Клиентские ключи",
+      "clientKeysHint": "По одному в строке; совпавшие пересылаются на ключ выше",
+      "addMapping": "Добавить сопоставление",
+      "modelMappingsSection": "Сопоставление моделей",
+      "addModelMapping": "Добавить сопоставление",
+      "forceModelMappings": "Принудительное сопоставление",
+      "forceModelMappingsHint": "Запросы без совпадений отклоняются"
+    },
+    "delete": {
+      "title": "Удалить ресурс",
+      "confirm": "Удалить {{name}}? Действие необратимо.",
+      "ampcodeTitle": "Очистить настройки Amp CLI",
+      "ampcodeConfirm": "Удалить все настройки Amp CLI? Upstream URL, ключи и сопоставления будут удалены."
+    },
+    "toast": {
+      "created": "Создано",
+      "updated": "Обновлено",
+      "deleted": "Удалено",
+      "enabled": "Включено",
+      "disabled": "Отключено",
+      "toggleFailed": "Не удалось обновить статус"
+    },
+    "unsavedChanges": {
+      "title": "Отменить несохранённые изменения?",
+      "message": "В форме есть несохранённые изменения. При закрытии они будут потеряны.",
+      "discard": "Отменить изменения",
+      "keepEditing": "Продолжить"
+    },
+    "connectivity": {
+      "test": "Проверить",
+      "testAll": "Проверить все",
+      "success": "Доступно",
+      "baseUrlRequired": "Base URL обязателен",
+      "endpointInvalid": "Некорректный адрес",
+      "apiKeyRequired": "API-ключ обязателен",
+      "modelRequired": "Нужна тестовая модель",
+      "timeout": "Таймаут после {{seconds}} с",
+      "requestFailed": "Запрос не выполнен"
+    },
+    "discovery": {
+      "openButton": "Получить с конечной точки",
+      "searchPlaceholder": "Поиск моделей",
+      "reload": "Обновить",
+      "loading": "Загрузка моделей…",
+      "empty": "Конечная точка не вернула моделей",
+      "notLoaded": "Нажмите Обновить, чтобы загрузить модели",
+      "selectAll": "Выбрать все",
+      "clearAll": "Снять выбор",
+      "selectedCount": "{{selected}} / {{total}}",
+      "alreadyAdded": "Уже добавлено",
+      "close": "Закрыть",
+      "apply": "Применить ({{count}})"
+    },
+    "toolbar": {
+      "sortBy": "Сортировка",
+      "sort": {
+        "name": "Имя",
+        "priority": "Приоритет",
+        "recentSuccess": "Недавние успехи",
+        "directionAsc": "По возрастанию",
+        "directionDesc": "По убыванию"
+      },
+      "filter": {
+        "allModels": "Все модели",
+        "selectedModels": "{{selected}}/{{total}} моделей",
+        "selectAll": "Выбрать все",
+        "clear": "Очистить",
+        "empty": "Модели ещё не настроены"
+      }
+    },
+    "modelCatalog": {
+      "notLoaded": "Не загружено"
+    }
   }
 }

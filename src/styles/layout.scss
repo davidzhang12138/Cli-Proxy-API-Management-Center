@@ -492,8 +492,32 @@
   .nav-section {
     display: flex;
     flex-direction: column;
-    gap: $spacing-sm;
+    gap: 14px;
     flex: 1;
+  }
+
+  .nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+  }
+
+  .nav-group-label {
+    padding: 0 12px 4px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--text-primary) 42%, transparent);
+    user-select: none;
+  }
+
+  .nav-group-divider {
+    display: none;
+    height: 1px;
+    width: 24px;
+    margin: 4px auto;
+    background: color-mix(in srgb, var(--border-color) 70%, transparent);
   }
 
   .nav-item {
@@ -538,6 +562,22 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .nav-text {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .nav-meta {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-tertiary);
     }
 
     &:hover {
