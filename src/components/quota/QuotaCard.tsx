@@ -8,6 +8,7 @@ import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import { IconRefreshCw } from '@/components/ui/icons';
+import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import { TYPE_COLORS } from '@/utils/quota';
 import { formatCompactNumber } from '@/utils/usage';
 import { Modal } from '@/components/ui/Modal';
@@ -108,6 +109,9 @@ interface QuotaCardProps<TState extends QuotaStatusState> {
   detailsContent?: ReactNode;
   canRefresh?: boolean;
   onRefresh?: () => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onSelectionChange?: (selected: boolean) => void;
   renderQuotaItems: (quota: TState, t: TFunction, helpers: QuotaRenderHelpers) => ReactNode;
 }
 
@@ -129,6 +133,9 @@ export function QuotaCard<TState extends QuotaStatusState>({
   detailsContent,
   canRefresh = false,
   onRefresh,
+  selectionMode = false,
+  selected = false,
+  onSelectionChange,
   renderQuotaItems
 }: QuotaCardProps<TState>) {
   const { t, i18n } = useTranslation();
@@ -175,12 +182,20 @@ export function QuotaCard<TState extends QuotaStatusState>({
     hasUsageModels;
 
   const openModelsModal = () => {
+    if (selectionMode) {
+      onSelectionChange?.(!selected);
+      return;
+    }
     setModelsModalOpen(true);
   };
 
   const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
+    if (selectionMode) {
+      onSelectionChange?.(!selected);
+      return;
+    }
     setModelsModalOpen(true);
   };
 
@@ -195,7 +210,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
   return (
     <>
     <div
-      className={`${styles.fileCard} ${cardClassName} ${styles.fileCardClickable}`}
+      className={`${styles.fileCard} ${cardClassName} ${styles.fileCardClickable}${selected ? ` ${styles.fileCardSelected}` : ''}`}
       onClick={openModelsModal}
       onKeyDown={handleCardKeyDown}
       role="button"
@@ -204,6 +219,19 @@ export function QuotaCard<TState extends QuotaStatusState>({
     >
       <div className={styles.cardHeader}>
         <div className={styles.cardHeaderMain}>
+          {selectionMode && (
+            <div
+              className={styles.cardSelectionCheckbox}
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              <SelectionCheckbox
+                checked={selected}
+                onChange={(value) => onSelectionChange?.(value)}
+                ariaLabel={t('quota_management.top_models_modal_title', { name: item.name })}
+              />
+            </div>
+          )}
           <span
             className={styles.typeBadge}
             style={{
