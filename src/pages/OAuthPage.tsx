@@ -33,6 +33,7 @@ interface ProviderState {
   callbackSubmitting?: boolean;
   callbackStatus?: 'success' | 'error';
   callbackError?: string;
+  oauthProxyUrl?: string;
 }
 
 interface VertexImportResult {
@@ -55,6 +56,7 @@ interface KiroState {
   startUrl: string;
   region: string;
   token: string;
+  proxyUrl: string;
   loading: boolean;
   error?: string;
   success?: boolean;
@@ -189,6 +191,7 @@ export function OAuthPage() {
     startUrl: '',
     region: '',
     token: '',
+    proxyUrl: '',
     loading: false,
   });
   const pollingTimers = useRef<Partial<Record<OAuthProvider, number>>>({});
@@ -246,7 +249,9 @@ export function OAuthPage() {
     clearProviderTimers(provider);
     setStates((prev) => {
       const current = prev[provider] ?? {};
-      const next: ProviderState = {};
+      const next: ProviderState = {
+        oauthProxyUrl: current.oauthProxyUrl
+      };
       if (provider === 'gemini-cli' && current.projectId !== undefined) {
         next.projectId = current.projectId;
       }
@@ -311,6 +316,7 @@ export function OAuthPage() {
         ? 'ALL'
         : rawProjectId
       : undefined;
+    const proxyUrl = states[provider]?.oauthProxyUrl?.trim() || undefined;
     // 项目 ID 可选：留空自动选择第一个可用项目；输入 ALL 获取全部项目
     if (provider === 'gemini-cli') {
       updateProviderState(provider, { projectIdError: undefined });
@@ -328,7 +334,10 @@ export function OAuthPage() {
     try {
       const res = await oauthApi.startAuth(
         provider,
-        provider === 'gemini-cli' ? { projectId: projectId || undefined } : undefined
+        {
+          ...(provider === 'gemini-cli' ? { projectId: projectId || undefined } : {}),
+          ...(proxyUrl ? { proxyUrl } : {})
+        }
       );
       if (!res.state) {
         const message = t('auth_login.missing_state');
@@ -466,17 +475,22 @@ export function OAuthPage() {
   };
 
   const openKiroOAuth = (method: 'builder-id' | 'idc') => {
-    let url = `${resolvedKiroBase}/v0/oauth/kiro/start?method=${method}`;
+    const params = new URLSearchParams({ method });
     if (method === 'idc') {
       const startUrl = kiroState.startUrl.trim();
       const region = kiroState.region.trim();
       if (startUrl) {
-        url += `&start_url=${encodeURIComponent(startUrl)}`;
+        params.set('start_url', startUrl);
       }
       if (region) {
-        url += `&region=${encodeURIComponent(region)}`;
+        params.set('region', region);
       }
     }
+    const proxyUrl = kiroState.proxyUrl.trim();
+    if (proxyUrl) {
+      params.set('proxy-url', proxyUrl);
+    }
+    const url = `${resolvedKiroBase}/v0/oauth/kiro/start?${params.toString()}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -583,6 +597,20 @@ export function OAuthPage() {
                       />
                     </div>
                   )}
+                  <div className={styles.oauthProxyField}>
+                    <Input
+                      label={t('auth_login.oauth_proxy_url_label')}
+                      hint={t('auth_login.oauth_proxy_url_hint')}
+                      value={state.oauthProxyUrl || ''}
+                      disabled={Boolean(state.polling)}
+                      onChange={(e) =>
+                        updateProviderState(provider.id, {
+                          oauthProxyUrl: e.target.value
+                        })
+                      }
+                      placeholder={t('auth_login.oauth_proxy_url_placeholder')}
+                    />
+                  </div>
                   {state.url && (
                     <div className={styles.authUrlBox}>
                       <div className={styles.authUrlLabel}>{t(provider.urlLabelKey)}</div>
@@ -682,6 +710,18 @@ export function OAuthPage() {
         >
           <div className={styles.cardContent}>
             <div className={styles.cardHint}>{t('auth_login.kiro_oauth_hint')}</div>
+
+            <div className={styles.oauthProxyField}>
+              <Input
+                label={t('auth_login.kiro_proxy_url_label')}
+                hint={t('auth_login.oauth_proxy_url_hint')}
+                value={kiroState.proxyUrl}
+                onChange={(e) =>
+                  setKiroState((prev) => ({ ...prev, proxyUrl: e.target.value }))
+                }
+                placeholder={t('auth_login.oauth_proxy_url_placeholder')}
+              />
+            </div>
 
             <div className={styles.formItem}>
               <label className={styles.formItemLabel}>

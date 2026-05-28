@@ -947,6 +947,9 @@
     "xai_callback_hint": "Grok 有時只在頁面顯示 code。可直接貼上 code，系統會自動拼接為 http://127.0.0.1:56121/callback?... 後提交。",
     "xai_callback_required": "請先貼上 Grok 頁面顯示的 code 或完整回調 URL。",
     "xai_callback_state_missing": "缺少本次 xAI 登入的 state，請重新開始 xAI 登入後再提交 code。",
+    "oauth_proxy_url_label": "OAuth 登入代理 URL（選填）",
+    "oauth_proxy_url_placeholder": "socks5://127.0.0.1:1080，或 direct",
+    "oauth_proxy_url_hint": "僅用於本次 OAuth 登入，並會儲存到產生的驗證檔案。支援 http/https/socks5/socks5h，也可填 direct 或 none。",
     "qwen_oauth_title": "Qwen OAuth",
     "qwen_oauth_button": "開始 Qwen 登入",
     "qwen_oauth_hint": "透過裝置授權流程登入 Qwen 服務，自動取得並儲存驗證檔案。",
@@ -997,6 +1000,7 @@
     "iflow_cookie_result_expired": "到期時間",
     "iflow_cookie_result_path": "儲存路徑",
     "iflow_cookie_result_type": "類型",
+    "kiro_proxy_url_label": "Kiro OAuth 代理 URL（選填）",
     "remote_access_disabled": "遠端存取不支援此登入方式，請從本地（localhost）存取"
   },
   "stats": {
