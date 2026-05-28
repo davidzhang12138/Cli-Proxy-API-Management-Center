@@ -1835,6 +1835,8 @@
     "auth_files": "Auth 文件与凭证",
     "oauth": "OAuth 授权登录",
     "quota_management": "API Key 与限额",
+    "usage_stats": "请求与模型用量",
+    "monitor": "实时观测与分析",
     "logs": "请求追踪与排查",
     "config_management": "网关基础配置",
     "system_info": "运行与诊断信息"

@@ -1835,6 +1835,8 @@
     "auth_files": "Auth files & credentials",
     "oauth": "OAuth authorization",
     "quota_management": "API keys & limits",
+    "usage_stats": "Requests & model usage",
+    "monitor": "Live observability",
     "logs": "Request tracing",
     "config_management": "Gateway configuration",
     "system_info": "Runtime & diagnostics"
