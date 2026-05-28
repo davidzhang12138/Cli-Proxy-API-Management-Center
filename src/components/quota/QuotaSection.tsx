@@ -6,7 +6,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { authFilesApi } from '@/services/api';
 import { useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type {
   AntigravityQuotaState,
@@ -768,6 +770,7 @@ interface QuotaSectionProps<TState extends QuotaStatusState, TData> {
   sortMode: QuotaSortMode;
   searchQuery: string;
   fileModelsByName: Record<string, string[]>;
+  onFilesChanged?: () => void;
 }
 
 export function QuotaSection<TState extends QuotaStatusState, TData>({
@@ -781,7 +784,8 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   selectedModel,
   sortMode,
   searchQuery,
-  fileModelsByName
+  fileModelsByName,
+  onFilesChanged,
 }: QuotaSectionProps<TState, TData>) {
   const { t } = useTranslation();
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
@@ -799,6 +803,73 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const [pageJumpValue, setPageJumpValue] = useState('');
   const [refreshSnapshots, setRefreshSnapshots] = useState<Record<string, TState>>({});
   const [refreshResult, setRefreshResult] = useState<QuotaRefreshResult | null>(null);
+
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [batchDisabling, setBatchDisabling] = useState(false);
+  const [batchDisableConfirmNames, setBatchDisableConfirmNames] = useState<string[] | null>(null);
+
+  const toggleSelection = useCallback((name: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  }, []);
+
+  const deselectAll = useCallback(() => {
+    setSelectedKeys(new Set());
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedKeys(new Set());
+  }, []);
+
+  const executeBatchDisable = useCallback(
+    async (names: string[]) => {
+      if (names.length === 0) return;
+      setBatchDisabling(true);
+      setBatchDisableConfirmNames(null);
+
+      try {
+        const results = await Promise.allSettled(
+          names.map((name) => authFilesApi.setStatus(name, true))
+        );
+
+        const successCount = results.filter((r) => r.status === 'fulfilled').length;
+        const failCount = results.length - successCount;
+
+        if (failCount === 0) {
+          showNotification(
+            t('quota_management.batch_disable_success', { count: successCount }),
+            'success'
+          );
+        } else if (successCount > 0) {
+          showNotification(
+            t('quota_management.batch_disable_partial', {
+              success: successCount,
+              failed: failCount
+            }),
+            'warning'
+          );
+        } else {
+          showNotification(t('quota_management.batch_disable_error'), 'error');
+        }
+
+        setRefreshResult(null);
+        exitSelectionMode();
+        onFilesChanged?.();
+      } finally {
+        setBatchDisabling(false);
+      }
+    },
+    [exitSelectionMode, onFilesChanged, showNotification, t]
+  );
 
   const providerFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [files, config]);
 
@@ -1171,6 +1242,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     setLoading
   } = useQuotaPagination(visibleFiles, DEFAULT_ITEMS_PER_PAGE);
 
+  const selectAllPage = useCallback(() => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      pageItems.forEach((file) => next.add(file.name));
+      return next;
+    });
+  }, [pageItems]);
+
   useEffect(() => {
     if (showAllAllowed) return;
     if (viewMode !== 'all') return;
@@ -1366,6 +1445,23 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       title={titleNode}
       extra={
         <div className={styles.headerActions}>
+          <Button
+            variant={selectionMode ? 'danger' : 'secondary'}
+            size="sm"
+            className={selectionMode ? styles.selectModeButtonActive : styles.selectModeButton}
+            onClick={() => {
+              if (selectionMode) {
+                exitSelectionMode();
+              } else {
+                setSelectionMode(true);
+              }
+            }}
+            disabled={batchDisabling}
+          >
+            {selectionMode
+              ? t('quota_management.select_mode_exit')
+              : t('quota_management.select_mode_enter')}
+          </Button>
           <div className={styles.viewModeToggle}>
             <Button
               variant="secondary"
@@ -1444,14 +1540,30 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                     })}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  className={styles.refreshFailureClose}
-                  onClick={() => setRefreshResult(null)}
-                  aria-label={t('common.close')}
-                >
-                  <IconX size={16} />
-                </button>
+                <div className={styles.refreshFailureActions}>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    className={styles.disableFailedButton}
+                    onClick={() =>
+                      setBatchDisableConfirmNames(
+                        refreshResult.errors.map((item) => item.name)
+                      )
+                    }
+                    disabled={batchDisabling}
+                    loading={batchDisabling}
+                  >
+                    {t('quota_management.batch_disable_failed_keys')}
+                  </Button>
+                  <button
+                    type="button"
+                    className={styles.refreshFailureClose}
+                    onClick={() => setRefreshResult(null)}
+                    aria-label={t('common.close')}
+                  >
+                    <IconX size={16} />
+                  </button>
+                </div>
               </div>
               <div className={styles.refreshFailureList}>
                 {refreshResult.errors.map((item) => (
@@ -1540,10 +1652,37 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   canRefresh={!disabled && !item.disabled}
                   onRefresh={() => void refreshQuotaForFile(item)}
                   renderQuotaItems={config.renderQuotaItems}
+                  selectionMode={selectionMode}
+                  selected={selectedKeys.has(item.name)}
+                  onSelectionChange={() => toggleSelection(item.name)}
                 />
               );
             })}
           </div>
+          {selectionMode && selectedKeys.size > 0 && (
+            <div className={styles.batchActionBar}>
+              <div className={styles.batchActionBarInfo}>
+                {t('quota_management.selected_count', { count: selectedKeys.size })}
+              </div>
+              <div className={styles.batchActionBarActions}>
+                <Button variant="secondary" size="sm" onClick={selectAllPage}>
+                  {t('quota_management.select_all_page')}
+                </Button>
+                <Button variant="secondary" size="sm" onClick={deselectAll}>
+                  {t('quota_management.deselect_all')}
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  className={styles.batchDisableButton}
+                  disabled={batchDisabling}
+                  onClick={() => setBatchDisableConfirmNames([...selectedKeys])}
+                >
+                  {t('quota_management.batch_disable')}
+                </Button>
+              </div>
+            </div>
+          )}
           {effectiveViewMode === 'paged' && (
             <div className={styles.pagination}>
               <div className={styles.paginationMeta}>
@@ -1668,6 +1807,49 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             </Button>
           </div>
         </div>
+      )}
+      {batchDisableConfirmNames !== null && (
+        <Modal
+          open
+          onClose={() => setBatchDisableConfirmNames(null)}
+          title={t('quota_management.batch_disable_confirm_title')}
+          closeDisabled={batchDisabling}
+          footer={
+            <div className={styles.batchDisableModalFooter}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setBatchDisableConfirmNames(null)}
+                disabled={batchDisabling}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={batchDisabling}
+                onClick={() => void executeBatchDisable(batchDisableConfirmNames)}
+              >
+                {t('quota_management.batch_disable_confirm_button')}
+              </Button>
+            </div>
+          }
+        >
+          <div className={styles.batchDisableModalBody}>
+            <p className={styles.batchDisableModalHint}>
+              {t('quota_management.batch_disable_confirm_body', {
+                count: batchDisableConfirmNames.length
+              })}
+            </p>
+            <ul className={styles.batchDisableModalList}>
+              {batchDisableConfirmNames.map((name) => (
+                <li key={name} className={styles.batchDisableModalItem}>
+                  {name}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Modal>
       )}
     </Card>
   );
