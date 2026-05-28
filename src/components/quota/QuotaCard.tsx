@@ -111,7 +111,7 @@ interface QuotaCardProps<TState extends QuotaStatusState> {
   onRefresh?: () => void;
   selectionMode?: boolean;
   selected?: boolean;
-  onSelectionChange?: (selected: boolean) => void;
+  onSelectionChange?: () => void;
   renderQuotaItems: (quota: TState, t: TFunction, helpers: QuotaRenderHelpers) => ReactNode;
 }
 
@@ -183,7 +183,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
 
   const openModelsModal = () => {
     if (selectionMode) {
-      onSelectionChange?.(!selected);
+      onSelectionChange?.();
       return;
     }
     setModelsModalOpen(true);
@@ -193,7 +193,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
     if (selectionMode) {
-      onSelectionChange?.(!selected);
+      onSelectionChange?.();
       return;
     }
     setModelsModalOpen(true);
@@ -223,11 +223,15 @@ export function QuotaCard<TState extends QuotaStatusState>({
             <div
               className={styles.cardSelectionCheckbox}
               onClick={(event) => event.stopPropagation()}
-              onKeyDown={(event) => event.stopPropagation()}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.stopPropagation();
+                }
+              }}
             >
               <SelectionCheckbox
                 checked={selected}
-                onChange={(value) => onSelectionChange?.(value)}
+                onChange={() => onSelectionChange?.()}
                 ariaLabel={t('quota_management.top_models_modal_title', { name: item.name })}
               />
             </div>

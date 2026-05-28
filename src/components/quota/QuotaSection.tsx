@@ -1446,7 +1446,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       extra={
         <div className={styles.headerActions}>
           <Button
-            variant={selectionMode ? 'danger' : 'secondary'}
+            variant={selectionMode ? 'primary' : 'secondary'}
             size="sm"
             className={selectionMode ? styles.selectModeButtonActive : styles.selectModeButton}
             onClick={() => {
@@ -1660,7 +1660,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             })}
           </div>
           {selectionMode && selectedKeys.size > 0 && (
-            <div className={styles.batchActionBar}>
+            <div className={styles.batchActionBar} role="status" aria-live="polite">
               <div className={styles.batchActionBarInfo}>
                 {t('quota_management.selected_count', { count: selectedKeys.size })}
               </div>
@@ -1676,7 +1676,8 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   size="sm"
                   className={styles.batchDisableButton}
                   disabled={batchDisabling}
-                  onClick={() => setBatchDisableConfirmNames([...selectedKeys])}
+                  loading={batchDisabling}
+                  onClick={() => setBatchDisableConfirmNames([...selectedKeys].sort())}
                 >
                   {t('quota_management.batch_disable')}
                 </Button>

@@ -1359,14 +1359,14 @@
     "selected_count": "已選 {{count}} 項",
     "select_all_page": "全選當前頁",
     "deselect_all": "取消全選",
-    "batch_disable": "禁用選中項",
-    "batch_disable_failed_keys": "禁用全部失敗",
-    "batch_disable_confirm_title": "確認批量禁用",
-    "batch_disable_confirm_body": "以下 {{count}} 個憑證將被禁用：",
-    "batch_disable_confirm_button": "確認禁用",
-    "batch_disable_success": "成功禁用 {{count}} 個憑證",
-    "batch_disable_partial": "已禁用 {{success}} 個，失敗 {{failed}} 個",
-    "batch_disable_error": "禁用憑證失敗"
+    "batch_disable": "停用選中項",
+    "batch_disable_failed_keys": "停用全部失敗",
+    "batch_disable_confirm_title": "確認批量停用",
+    "batch_disable_confirm_body": "以下 {{count}} 個憑證將被停用：",
+    "batch_disable_confirm_button": "確認停用",
+    "batch_disable_success": "成功停用 {{count}} 個憑證",
+    "batch_disable_partial": "已停用 {{success}} 個，失敗 {{failed}} 個",
+    "batch_disable_error": "停用憑證失敗"
   },
   "system_info": {
     "title": "管理中心資訊",
