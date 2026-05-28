@@ -364,7 +364,8 @@ export function QuotaPage() {
     selectedModel,
     sortMode,
     searchQuery: deferredSearchQuery,
-    fileModelsByName
+    fileModelsByName,
+    onFilesChanged: loadFiles
   };
 
   const renderQuotaSection = (type: ActiveQuotaType) => {
