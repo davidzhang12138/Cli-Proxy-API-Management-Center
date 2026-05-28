@@ -1509,3 +1509,179 @@
     line-height: 1.6;
   }
 }
+
+// Batch disable: refresh failure actions
+.refreshFailureActions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex: 0 0 auto;
+}
+
+.disableFailedButton:global(.btn.btn-sm) {
+  padding-inline: 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger-color) 12%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--danger-color) 26%, var(--border-color));
+  color: var(--danger-color);
+  white-space: nowrap;
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger-color) 18%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--danger-color) 38%, var(--border-color));
+  }
+}
+
+// Batch disable: selection mode toggle
+.selectModeButton:global(.btn.btn-sm) {
+  padding-inline: 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-hover) 48%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--border-color) 92%, transparent);
+  color: var(--text-primary);
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--bg-hover) 72%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+  }
+}
+
+.selectModeButtonActive:global(.btn.btn-sm) {
+  background: color-mix(in srgb, var(--primary-color) 12%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--primary-color) 26%, var(--border-color));
+  color: var(--primary-color);
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--primary-color) 18%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--primary-color) 38%, var(--border-color));
+  }
+}
+
+// Batch disable: card selection checkbox
+.cardSelectionCheckbox {
+  flex: 0 0 auto;
+  margin-right: 2px;
+}
+
+.fileCardSelected {
+  border-color: color-mix(in srgb, var(--primary-color) 40%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 4%, var(--bg-primary));
+}
+
+// Batch disable: floating action bar
+.batchActionBar {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-sm;
+  padding: 10px 14px;
+  margin-top: $spacing-md;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 24%, var(--border-color));
+  background: color-mix(in srgb, var(--bg-secondary) 96%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+
+  @include mobile {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.batchActionBarInfo {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.batchActionBarActions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-wrap: wrap;
+
+  @include mobile {
+    justify-content: stretch;
+  }
+}
+
+.batchDisableButton:global(.btn.btn-sm) {
+  padding-inline: 14px;
+  border-radius: 999px;
+  background: var(--danger-color);
+  border-color: var(--danger-color);
+  color: #fff;
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger-color) 88%, #000);
+    border-color: color-mix(in srgb, var(--danger-color) 88%, #000);
+  }
+}
+
+// Batch disable: confirmation modal
+.batchDisableModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+}
+
+.batchDisableModalHint {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.batchDisableModalList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+}
+
+.batchDisableModalItem {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+  line-height: 1.5;
+  padding: 2px 0;
+}
+
+.batchDisableModalFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: $spacing-sm;
+}
