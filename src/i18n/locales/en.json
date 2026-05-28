@@ -1406,7 +1406,20 @@
     "refresh_failed_reason_with_status": "HTTP {{status}}: {{message}}",
     "filtered_empty_title": "No credentials match the current filters",
     "filtered_empty_desc": "Adjust the quota filter, model filter, or sort mode to continue.",
-    "refresh_all_credentials": "Refresh all credentials"
+    "refresh_all_credentials": "Refresh all credentials",
+    "select_mode_enter": "Select",
+    "select_mode_exit": "Cancel",
+    "selected_count": "{{count}} selected",
+    "select_all_page": "Select all on page",
+    "deselect_all": "Deselect all",
+    "batch_disable": "Disable selected",
+    "batch_disable_failed_keys": "Disable all failed",
+    "batch_disable_confirm_title": "Confirm Batch Disable",
+    "batch_disable_confirm_body": "The following {{count}} credentials will be disabled:",
+    "batch_disable_confirm_button": "Confirm Disable",
+    "batch_disable_success": "Successfully disabled {{count}} credentials",
+    "batch_disable_partial": "Disabled {{success}} credentials, {{failed}} failed",
+    "batch_disable_error": "Failed to disable credentials"
   },
   "system_info": {
     "title": "Management Center Info",

@@ -1406,7 +1406,20 @@
     "refresh_failed_reason_with_status": "HTTP {{status}}：{{message}}",
     "filtered_empty_title": "当前筛选下暂无账号",
     "filtered_empty_desc": "调整配额筛选、模型筛选或排序后再查看。",
-    "refresh_all_credentials": "刷新全部凭证"
+    "refresh_all_credentials": "刷新全部凭证",
+    "select_mode_enter": "选择",
+    "select_mode_exit": "取消",
+    "selected_count": "已选 {{count}} 项",
+    "select_all_page": "全选当前页",
+    "deselect_all": "取消全选",
+    "batch_disable": "禁用选中项",
+    "batch_disable_failed_keys": "禁用全部失败",
+    "batch_disable_confirm_title": "确认批量禁用",
+    "batch_disable_confirm_body": "以下 {{count}} 个凭证将被禁用：",
+    "batch_disable_confirm_button": "确认禁用",
+    "batch_disable_success": "成功禁用 {{count}} 个凭证",
+    "batch_disable_partial": "已禁用 {{success}} 个，失败 {{failed}} 个",
+    "batch_disable_error": "禁用凭证失败"
   },
   "system_info": {
     "title": "管理中心信息",
