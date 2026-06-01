@@ -21,6 +21,7 @@ import {
   formatTimestamp,
   getRateClassName,
   getProviderDisplayParts,
+  buildUsageDateQueryParams,
   filterDataByTimeRange,
   type DateRange,
 } from '@/utils/monitor';
@@ -196,7 +197,7 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
   const fetchLogData = useCallback(async () => {
     setLogLoading(true);
     try {
-      const response = await usageApi.getUsage();
+      const response = await usageApi.getUsage(buildUsageDateQueryParams(timeRange, customRange));
       const usageData = (response?.usage ?? response) as UsageData;
       setLogData(filterDataByTimeRange(usageData, timeRange, customRange, apiFilter));
     } catch (err) {

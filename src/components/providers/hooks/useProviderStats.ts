@@ -21,12 +21,19 @@ export const useProviderStats = (options: UseProviderStatsOptions = {}) => {
 
   // 首次进入页面优先复用缓存，避免跨页面重复拉取 /usage。
   const loadKeyStats = useCallback(async () => {
-    await loadUsageStats({ staleTimeMs: USAGE_STATS_STALE_TIME_MS });
+    await loadUsageStats({
+      staleTimeMs: USAGE_STATS_STALE_TIME_MS,
+      queryParams: { all: true },
+    });
   }, [loadUsageStats]);
 
   // 定时器触发时强制刷新共享 usage。
   const refreshKeyStats = useCallback(async () => {
-    await loadUsageStats({ force: true, staleTimeMs: USAGE_STATS_STALE_TIME_MS });
+    await loadUsageStats({
+      force: true,
+      staleTimeMs: USAGE_STATS_STALE_TIME_MS,
+      queryParams: { all: true },
+    });
   }, [loadUsageStats]);
 
   useInterval(() => {

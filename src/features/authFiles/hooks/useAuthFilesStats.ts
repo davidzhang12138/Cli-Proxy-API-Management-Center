@@ -15,11 +15,18 @@ export function useAuthFilesStats(): UseAuthFilesStatsResult {
   const loadUsageStats = useUsageStatsStore((state) => state.loadUsageStats);
 
   const loadKeyStats = useCallback(async () => {
-    await loadUsageStats({ staleTimeMs: USAGE_STATS_STALE_TIME_MS });
+    await loadUsageStats({
+      staleTimeMs: USAGE_STATS_STALE_TIME_MS,
+      queryParams: { all: true },
+    });
   }, [loadUsageStats]);
 
   const refreshKeyStats = useCallback(async () => {
-    await loadUsageStats({ force: true, staleTimeMs: USAGE_STATS_STALE_TIME_MS });
+    await loadUsageStats({
+      force: true,
+      staleTimeMs: USAGE_STATS_STALE_TIME_MS,
+      queryParams: { all: true },
+    });
   }, [loadUsageStats]);
 
   return { keyStats, usageDetails, loadKeyStats, refreshKeyStats };

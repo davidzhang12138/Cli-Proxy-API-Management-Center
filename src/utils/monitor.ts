@@ -3,6 +3,7 @@
  */
 
 import type { UsageData } from '@/pages/MonitorPage';
+import type { UsageQueryParams } from '@/services/api/usage';
 
 /**
  * 日期范围接口
@@ -246,6 +247,21 @@ export function formatLocalDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+export function buildUsageDateQueryParams(
+  timeRange: TimeRangeValue,
+  customRange?: DateRange
+): UsageQueryParams {
+  if (timeRange === 'custom' && customRange) {
+    return {
+      start: customRange.start.toISOString(),
+      end: customRange.end.toISOString(),
+    };
+  }
+
+  const days = typeof timeRange === 'number' && timeRange > 0 ? Math.floor(timeRange) : 7;
+  return { days };
 }
 
 /**

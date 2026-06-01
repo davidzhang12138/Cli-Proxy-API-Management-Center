@@ -20,7 +20,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useThemeStore } from '@/stores';
 import { usageApi, providersApi, authFilesApi } from '@/services/api';
-import { filterDataByApiFilter, filterDataByTimeRange } from '@/utils/monitor';
+import { buildUsageDateQueryParams, filterDataByApiFilter, filterDataByTimeRange } from '@/utils/monitor';
 import { buildSourceInfoMap, type SourceInfoMap } from '@/utils/sourceResolver';
 import { normalizeAuthIndex } from '@/utils/usage';
 import type { CredentialInfo } from '@/types/sourceInfo';
@@ -83,18 +83,13 @@ function DeferredSection({
   label: string;
   minHeight?: number;
 }) {
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(() => typeof IntersectionObserver === 'undefined');
   const placeholderRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (mounted) return;
     const node = placeholderRef.current;
     if (!node) return;
-
-    if (typeof IntersectionObserver === 'undefined') {
-      setMounted(true);
-      return;
-    }
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -263,7 +258,7 @@ export function MonitorPage() {
     // 渠道映射并行加载，但不阻塞主数据展示
     loadProviderMap();
     try {
-      const response = await usageApi.getUsage();
+      const response = await usageApi.getUsage(buildUsageDateQueryParams(timeRange));
       // API 返回的数据可能在 response.usage 或直接在 response 中
       const data = response?.usage ?? response;
       setUsageData(data as UsageData);
@@ -274,7 +269,7 @@ export function MonitorPage() {
     } finally {
       setLoading(false);
     }
-  }, [t, loadProviderMap]);
+  }, [t, loadProviderMap, timeRange]);
 
   // 初始加载
   useEffect(() => {

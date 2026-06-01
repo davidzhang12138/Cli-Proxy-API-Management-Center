@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { usageApi } from '@/services/api';
+import type { UsageQueryParams } from '@/services/api/usage';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { collectUsageDetails, computeKeyStatsFromDetails, type KeyStats, type UsageDetail } from '@/utils/usage';
 import i18n from '@/i18n';
@@ -9,6 +10,7 @@ export const USAGE_STATS_STALE_TIME_MS = 240_000;
 export type LoadUsageStatsOptions = {
   force?: boolean;
   staleTimeMs?: number;
+  queryParams?: UsageQueryParams;
 };
 
 type UsageStatsSnapshot = Record<string, unknown>;
@@ -30,6 +32,12 @@ const createEmptyKeyStats = (): KeyStats => ({ bySource: {}, byAuthIndex: {} });
 let usageRequestToken = 0;
 let inFlightUsageRequest: { id: number; scopeKey: string; promise: Promise<void> } | null = null;
 
+const buildUsageScopeKey = (
+  apiBase: string,
+  managementKey: string,
+  queryParams?: UsageQueryParams
+) => `${apiBase}::${managementKey}::${JSON.stringify(queryParams ?? {})}`;
+
 const getErrorMessage = (error: unknown) =>
   error instanceof Error
     ? error.message
@@ -49,8 +57,9 @@ export const useUsageStatsStore = create<UsageStatsState>((set, get) => ({
   loadUsageStats: async (options = {}) => {
     const force = options.force === true;
     const staleTimeMs = options.staleTimeMs ?? USAGE_STATS_STALE_TIME_MS;
+    const queryParams = options.queryParams;
     const { apiBase = '', managementKey = '' } = useAuthStore.getState();
-    const scopeKey = `${apiBase}::${managementKey}`;
+    const scopeKey = buildUsageScopeKey(apiBase, managementKey, queryParams);
     const state = get();
     const scopeChanged = state.scopeKey !== scopeKey;
 
@@ -91,7 +100,7 @@ export const useUsageStatsStore = create<UsageStatsState>((set, get) => ({
 
     const requestPromise = (async () => {
       try {
-        const usageResponse = await usageApi.getUsage();
+        const usageResponse = await usageApi.getUsage(queryParams);
         const rawUsage = usageResponse?.usage ?? usageResponse;
         const usage =
           rawUsage && typeof rawUsage === 'object' ? (rawUsage as UsageStatsSnapshot) : null;

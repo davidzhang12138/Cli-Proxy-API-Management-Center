@@ -266,7 +266,11 @@ export function QuotaPage() {
     await Promise.all([
       loadConfig(),
       loadFiles(),
-      loadUsageStats({ force: true, staleTimeMs: USAGE_STATS_STALE_TIME_MS })
+      loadUsageStats({
+        force: true,
+        staleTimeMs: USAGE_STATS_STALE_TIME_MS,
+        queryParams: { all: true },
+      })
     ]);
   }, [loadConfig, loadFiles, loadUsageStats]);
 
@@ -275,7 +279,10 @@ export function QuotaPage() {
   useEffect(() => {
     loadFiles();
     loadConfig();
-    void loadUsageStats({ staleTimeMs: USAGE_STATS_STALE_TIME_MS }).catch(() => {});
+    void loadUsageStats({
+      staleTimeMs: USAGE_STATS_STALE_TIME_MS,
+      queryParams: { all: true },
+    }).catch(() => {});
   }, [loadFiles, loadConfig, loadUsageStats]);
 
   useEffect(() => {

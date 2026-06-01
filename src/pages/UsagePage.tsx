@@ -130,6 +130,9 @@ export function UsagePage() {
     source: OpenAIProviderConfig[] | undefined;
     providers: OpenAIProviderConfig[];
   } | null>(null);
+  // Chart lines state
+  const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
+  const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
 
   // Data hook
   const {
@@ -146,13 +149,9 @@ export function UsagePage() {
     importInputRef,
     exporting,
     importing,
-  } = useUsageData();
+  } = useUsageData(timeRange);
 
   useHeaderRefresh(loadUsage);
-
-  // Chart lines state
-  const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
-  const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
 
   useEffect(() => {
     let cancelled = false;

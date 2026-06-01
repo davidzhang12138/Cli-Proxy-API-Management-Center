@@ -129,7 +129,8 @@ export function useTraceResolver(options: UseTraceResolverOptions): UseTraceReso
       const [, authFilesResponse] = await Promise.all([
         loadUsageStats({
           force: forceUsage,
-          staleTimeMs: USAGE_STATS_STALE_TIME_MS
+          staleTimeMs: USAGE_STATS_STALE_TIME_MS,
+          queryParams: { all: true },
         }),
         authFresh ? Promise.resolve(null) : authFilesApi.list().catch(() => null)
       ]);
