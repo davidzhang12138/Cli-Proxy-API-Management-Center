@@ -8,7 +8,7 @@ import type { AuthFileItem } from '@/types';
 import { useQuotaStore } from '@/stores';
 import { getStatusFromError } from '@/utils/quota';
 import type { QuotaConfig } from './quotaConfigs';
-import { refreshManagedQuotaStates } from './managedQuotaRefresh';
+import { canUseManagedQuotaRefresh, refreshManagedQuotaStates } from './managedQuotaRefresh';
 
 type QuotaScope = 'page' | 'all';
 
@@ -81,33 +81,9 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
         let successCount = 0;
         let errorCount = 0;
 
-        const managedResults = await refreshManagedQuotaStates(config, targets).catch(() => null);
-        const results = managedResults
-          ? managedResults.map((result): LoadQuotaResult<TData> => {
-              completedCount += 1;
-              if (result.status === 'success') {
-                successCount += 1;
-              } else {
-                errorCount += 1;
-              }
-              onProgress?.({
-                completedCount,
-                total: targets.length,
-                successCount,
-                errorCount,
-              });
-              return result.status === 'success'
-                ? {
-                    name: result.name,
-                    status: 'success',
-                    data: result.state as TData,
-                  }
-                : {
-                    name: result.name,
-                    status: 'error',
-                    error: result.error || t('common.unknown_error'),
-                  };
-            })
+        const canUseManagedRefresh = canUseManagedQuotaRefresh(config, targets);
+        const results: LoadQuotaResult<TData>[] = canUseManagedRefresh
+          ? []
           : await Promise.all(
               targets.map(async (file): Promise<LoadQuotaResult<TData>> => {
                 try {
@@ -131,24 +107,89 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
               })
             );
 
+        if (canUseManagedRefresh) {
+          results.push(
+            ...(await Promise.all(
+              targets.map(async (file): Promise<LoadQuotaResult<TData>> => {
+                const fileManagedResults = await refreshManagedQuotaStates(config, [file]).catch(
+                  () => null
+                );
+                const managedResult = fileManagedResults?.[0];
+                let result: LoadQuotaResult<TData>;
+
+                if (managedResult?.status === 'success') {
+                  result = {
+                    name: managedResult.name,
+                    status: 'success',
+                    data: managedResult.state as TData,
+                  };
+                } else if (managedResult?.status === 'error' && !managedResult.fallbackable) {
+                  result = {
+                    name: managedResult.name,
+                    status: 'error',
+                    error: managedResult.error || t('common.unknown_error'),
+                  };
+                } else {
+                  try {
+                    const data = await config.fetchQuota(file, t);
+                    result = { name: file.name, status: 'success', data };
+                  } catch (err: unknown) {
+                    const message = err instanceof Error ? err.message : t('common.unknown_error');
+                    const errorStatus = getStatusFromError(err);
+                    result = { name: file.name, status: 'error', error: message, errorStatus };
+                  }
+                }
+
+                completedCount += 1;
+                if (result.status === 'success') {
+                  successCount += 1;
+                  setQuota((prev) => ({
+                    ...prev,
+                    [result.name]:
+                      managedResult?.status === 'success'
+                        ? (result.data as TState)
+                        : config.buildSuccessState(result.data as TData),
+                  }));
+                } else {
+                  errorCount += 1;
+                  setQuota((prev) => ({
+                    ...prev,
+                    [result.name]: config.buildErrorState(
+                      result.error || t('common.unknown_error'),
+                      result.errorStatus
+                    ),
+                  }));
+                }
+                onProgress?.({
+                  completedCount,
+                  total: targets.length,
+                  successCount,
+                  errorCount,
+                });
+                return result;
+              })
+            ))
+          );
+        }
+
         if (requestId !== requestIdRef.current) return null;
 
-        setQuota((prev) => {
-          const nextState = { ...prev };
-          results.forEach((result) => {
-            if (result.status === 'success') {
-              nextState[result.name] = managedResults
-                ? (result.data as TState)
-                : config.buildSuccessState(result.data as TData);
-            } else {
-              nextState[result.name] = config.buildErrorState(
-                result.error || t('common.unknown_error'),
-                result.errorStatus
-              );
-            }
+        if (!canUseManagedRefresh) {
+          setQuota((prev) => {
+            const nextState = { ...prev };
+            results.forEach((result) => {
+              if (result.status === 'success') {
+                nextState[result.name] = config.buildSuccessState(result.data as TData);
+              } else {
+                nextState[result.name] = config.buildErrorState(
+                  result.error || t('common.unknown_error'),
+                  result.errorStatus
+                );
+              }
+            });
+            return nextState;
           });
-          return nextState;
-        });
+        }
 
         return {
           total: results.length,

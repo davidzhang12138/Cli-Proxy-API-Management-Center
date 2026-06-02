@@ -65,6 +65,39 @@ const buildAuthFileWithQuotaEntry = (file: AuthFileItem, entry: AuthQuotaEntry):
   };
 };
 
+const buildManagedQuotaResult = <TState, TData>(
+  config: QuotaConfig<TState, TData>,
+  file: AuthFileItem,
+  entries: AuthQuotaEntry[]
+): ManagedQuotaRefreshResult<TState> => {
+  const entry = findQuotaEntryForFile(entries, file);
+  if (!entry) {
+    return {
+      name: file.name,
+      status: 'error',
+      error: 'Quota snapshot was not returned',
+      fallbackable: true,
+    };
+  }
+
+  const quotaError = readQuotaError(entry);
+  if (quotaError) {
+    return { name: file.name, status: 'error', error: quotaError };
+  }
+
+  const state = config.buildSnapshotState?.(buildAuthFileWithQuotaEntry(file, entry)) ?? null;
+  if (!state) {
+    return {
+      name: file.name,
+      status: 'error',
+      error: 'Quota snapshot is unavailable',
+      fallbackable: true,
+    };
+  }
+
+  return { name: file.name, status: 'success', state };
+};
+
 export const canUseManagedQuotaRefresh = <TState, TData>(
   config: QuotaConfig<TState, TData>,
   targets: AuthFileItem[]
@@ -78,42 +111,27 @@ export const refreshManagedQuotaStates = async <TState, TData>(
 ): Promise<ManagedQuotaRefreshResult<TState>[] | null> => {
   if (!canUseManagedQuotaRefresh(config, targets)) return null;
 
-  const ids = Array.from(new Set(targets.map(readAuthFileId).filter(Boolean)));
-  const authIndexes = Array.from(new Set(targets.map(readAuthFileIndex).filter(Boolean)));
-  const response = await authFilesApi.refreshAuthQuotas({
-    ids,
-    auth_indexes: authIndexes,
-  });
-  const entries = Array.isArray(response.auths) ? response.auths : [];
+  const results = await Promise.all(
+    targets.map(async (file): Promise<ManagedQuotaRefreshResult<TState>> => {
+      const id = readAuthFileId(file);
+      const authIndex = readAuthFileIndex(file);
+      if (!id && !authIndex) {
+        return {
+          name: file.name,
+          status: 'error',
+          error: 'Quota snapshot target is unavailable',
+          fallbackable: true,
+        };
+      }
 
-  const results: ManagedQuotaRefreshResult<TState>[] = targets.map((file) => {
-    const entry = findQuotaEntryForFile(entries, file);
-    if (!entry) {
-      return {
-        name: file.name,
-        status: 'error',
-        error: 'Quota snapshot was not returned',
-        fallbackable: true,
-      };
-    }
-
-    const quotaError = readQuotaError(entry);
-    if (quotaError) {
-      return { name: file.name, status: 'error', error: quotaError };
-    }
-
-    const state = config.buildSnapshotState?.(buildAuthFileWithQuotaEntry(file, entry)) ?? null;
-    if (!state) {
-      return {
-        name: file.name,
-        status: 'error',
-        error: 'Quota snapshot is unavailable',
-        fallbackable: true,
-      };
-    }
-
-    return { name: file.name, status: 'success', state };
-  });
+      const response = await authFilesApi.refreshAuthQuotas({
+        ids: id ? [id] : [],
+        auth_indexes: authIndex ? [authIndex] : [],
+      });
+      const entries = Array.isArray(response.auths) ? response.auths : [];
+      return buildManagedQuotaResult(config, file, entries);
+    })
+  );
 
   return results.every((result) => result.status === 'error' && result.fallbackable)
     ? null

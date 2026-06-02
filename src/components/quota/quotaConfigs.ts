@@ -63,6 +63,7 @@ import {
   parseCodexUsagePayload,
   parseGeminiCliQuotaPayload,
   parseGeminiCliCodeAssistPayload,
+  parseUsageQuotaSnapshot,
   parseKimiUsagePayload,
   parseKiroQuotaPayload,
   parseXaiBillingPayload,
@@ -144,6 +145,69 @@ export const filterVisibleAntigravityGroups = (
   const visibleGroups = groups.filter((group) => ANTIGRAVITY_VISIBLE_GROUP_IDS.has(group.id));
   if (visibleGroups.length > 0) return visibleGroups;
   return groups.slice(0, ANTIGRAVITY_FALLBACK_VISIBLE_GROUP_LIMIT);
+};
+
+const snapshotResourceId = (resourceType?: string, fallback = 'quota'): string =>
+  (resourceType || fallback)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || fallback;
+
+const snapshotResourceLabel = (resourceType?: string, fallback = 'Quota'): string => {
+  if (!resourceType) return fallback;
+  return resourceType
+    .trim()
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+};
+
+const computeSnapshotUsage = (
+  totalLimit: number | null,
+  currentUsage: number | null,
+  remaining: number | null,
+  exhausted: boolean
+) => {
+  const normalizedLimit =
+    totalLimit ?? (remaining !== null && currentUsage !== null ? remaining + currentUsage : null);
+  const normalizedUsage =
+    currentUsage ??
+    (normalizedLimit !== null && remaining !== null
+      ? Math.max(0, normalizedLimit - remaining)
+      : exhausted
+        ? normalizedLimit
+        : null);
+  const normalizedRemaining =
+    remaining ??
+    (normalizedLimit !== null && normalizedUsage !== null
+      ? Math.max(0, normalizedLimit - normalizedUsage)
+      : exhausted
+        ? 0
+        : null);
+  const usedPercent =
+    normalizedLimit !== null && normalizedLimit > 0 && normalizedUsage !== null
+      ? Math.max(0, Math.min(100, (normalizedUsage / normalizedLimit) * 100))
+      : exhausted
+        ? 100
+        : null;
+  const remainingFraction =
+    normalizedLimit !== null && normalizedLimit > 0 && normalizedRemaining !== null
+      ? Math.max(0, Math.min(1, normalizedRemaining / normalizedLimit))
+      : normalizedRemaining !== null && normalizedRemaining > 0 && !exhausted
+        ? 1
+        : exhausted
+          ? 0
+          : null;
+
+  return {
+    normalizedLimit,
+    normalizedUsage,
+    normalizedRemaining,
+    usedPercent,
+    remainingFraction,
+  };
 };
 
 export interface QuotaConfig<TState, TData> {
@@ -268,21 +332,22 @@ const fetchAntigravityQuota = async (
   throw createStatusError(lastError || t('common.unknown_error'), priorityStatus ?? lastStatus);
 };
 
+const CODEX_WINDOW_META = {
+  codeFiveHour: { id: 'five-hour', labelKey: 'codex_quota.primary_window' },
+  codeWeekly: { id: 'weekly', labelKey: 'codex_quota.secondary_window' },
+  codeReviewFiveHour: {
+    id: 'code-review-five-hour',
+    labelKey: 'codex_quota.code_review_primary_window',
+  },
+  codeReviewWeekly: {
+    id: 'code-review-weekly',
+    labelKey: 'codex_quota.code_review_secondary_window',
+  },
+} as const;
+
 const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): CodexQuotaWindow[] => {
   const FIVE_HOUR_SECONDS = 18000;
   const WEEK_SECONDS = 604800;
-  const WINDOW_META = {
-    codeFiveHour: { id: 'five-hour', labelKey: 'codex_quota.primary_window' },
-    codeWeekly: { id: 'weekly', labelKey: 'codex_quota.secondary_window' },
-    codeReviewFiveHour: {
-      id: 'code-review-five-hour',
-      labelKey: 'codex_quota.code_review_primary_window',
-    },
-    codeReviewWeekly: {
-      id: 'code-review-weekly',
-      labelKey: 'codex_quota.code_review_secondary_window',
-    },
-  } as const;
 
   const rateLimit = payload.rate_limit ?? payload.rateLimit ?? undefined;
   const codeReviewLimit =
@@ -369,18 +434,18 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
 
   const rateWindows = pickClassifiedWindows(rateLimit);
   addWindow(
-    WINDOW_META.codeFiveHour.id,
-    t(WINDOW_META.codeFiveHour.labelKey),
-    WINDOW_META.codeFiveHour.labelKey,
+    CODEX_WINDOW_META.codeFiveHour.id,
+    t(CODEX_WINDOW_META.codeFiveHour.labelKey),
+    CODEX_WINDOW_META.codeFiveHour.labelKey,
     undefined,
     rateWindows.fiveHourWindow,
     rawLimitReached,
     rawAllowed
   );
   addWindow(
-    WINDOW_META.codeWeekly.id,
-    t(WINDOW_META.codeWeekly.labelKey),
-    WINDOW_META.codeWeekly.labelKey,
+    CODEX_WINDOW_META.codeWeekly.id,
+    t(CODEX_WINDOW_META.codeWeekly.labelKey),
+    CODEX_WINDOW_META.codeWeekly.labelKey,
     undefined,
     rateWindows.weeklyWindow,
     rawLimitReached,
@@ -391,18 +456,18 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
   const codeReviewLimitReached = codeReviewLimit?.limit_reached ?? codeReviewLimit?.limitReached;
   const codeReviewAllowed = codeReviewLimit?.allowed;
   addWindow(
-    WINDOW_META.codeReviewFiveHour.id,
-    t(WINDOW_META.codeReviewFiveHour.labelKey),
-    WINDOW_META.codeReviewFiveHour.labelKey,
+    CODEX_WINDOW_META.codeReviewFiveHour.id,
+    t(CODEX_WINDOW_META.codeReviewFiveHour.labelKey),
+    CODEX_WINDOW_META.codeReviewFiveHour.labelKey,
     undefined,
     codeReviewWindows.fiveHourWindow,
     codeReviewLimitReached,
     codeReviewAllowed
   );
   addWindow(
-    WINDOW_META.codeReviewWeekly.id,
-    t(WINDOW_META.codeReviewWeekly.labelKey),
-    WINDOW_META.codeReviewWeekly.labelKey,
+    CODEX_WINDOW_META.codeReviewWeekly.id,
+    t(CODEX_WINDOW_META.codeReviewWeekly.labelKey),
+    CODEX_WINDOW_META.codeReviewWeekly.labelKey,
     undefined,
     codeReviewWindows.weeklyWindow,
     codeReviewLimitReached,
@@ -455,6 +520,123 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
   }
 
   return windows;
+};
+
+const codexSnapshotResourceId = (resourceType?: string): string =>
+  snapshotResourceId(resourceType, 'usage');
+
+const codexSnapshotAdditionalName = (value: string): string => {
+  const normalized = value
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return snapshotResourceLabel(normalized, 'Codex');
+};
+
+const codexSnapshotResourceMeta = (
+  resourceType?: string
+): Pick<CodexQuotaWindow, 'id' | 'label' | 'labelKey' | 'labelParams'> => {
+  const normalized = (resourceType ?? '').trim().toLowerCase();
+  if (normalized === 'primary_window') {
+    return { ...CODEX_WINDOW_META.codeFiveHour, label: '' };
+  }
+  if (normalized === 'secondary_window') {
+    return { ...CODEX_WINDOW_META.codeWeekly, label: '' };
+  }
+  if (normalized === 'code_review_primary_window') {
+    return { ...CODEX_WINDOW_META.codeReviewFiveHour, label: '' };
+  }
+  if (normalized === 'code_review_secondary_window') {
+    return { ...CODEX_WINDOW_META.codeReviewWeekly, label: '' };
+  }
+
+  if (normalized.endsWith('_primary_window')) {
+    const name = codexSnapshotAdditionalName(normalized.slice(0, -'_primary_window'.length));
+    return {
+      id: `${snapshotResourceId(name, 'additional')}-five-hour`,
+      label: '',
+      labelKey: 'codex_quota.additional_primary_window',
+      labelParams: { name },
+    };
+  }
+  if (normalized.endsWith('_secondary_window')) {
+    const name = codexSnapshotAdditionalName(normalized.slice(0, -'_secondary_window'.length));
+    return {
+      id: `${snapshotResourceId(name, 'additional')}-weekly`,
+      label: '',
+      labelKey: 'codex_quota.additional_secondary_window',
+      labelParams: { name },
+    };
+  }
+
+  return {
+    id: codexSnapshotResourceId(resourceType),
+    label: snapshotResourceLabel(resourceType, 'Codex'),
+  };
+};
+
+const buildCodexQuotaStateFromUsageQuota = (
+  file: AuthFileItem
+): Pick<CodexQuotaState, 'windows' | 'planType'> | null => {
+  const snapshot = parseUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota);
+  if (!snapshot || !snapshot.known || snapshot.error) return null;
+
+  const toWindow = (
+    resourceType: string | undefined,
+    totalLimit: number | null,
+    currentUsage: number | null,
+    remaining: number | null,
+    exhausted: boolean
+  ): CodexQuotaWindow | null => {
+    const usage = computeSnapshotUsage(totalLimit, currentUsage, remaining, exhausted);
+
+    if (
+      usage.normalizedLimit === null &&
+      usage.normalizedUsage === null &&
+      usage.normalizedRemaining === null
+    ) {
+      return null;
+    }
+    const resetLabel = formatQuotaResetTime(snapshot.nextReset);
+    const meta = codexSnapshotResourceMeta(resourceType);
+
+    return {
+      ...meta,
+      usedPercent: usage.usedPercent,
+      resetLabel,
+      resetTime: snapshot.nextReset,
+    };
+  };
+
+  const windows =
+    snapshot.resources.length > 0
+      ? snapshot.resources
+          .map((resource) =>
+            toWindow(
+              resource.resourceType,
+              resource.totalLimit,
+              resource.currentUsage,
+              resource.remaining,
+              resource.exhausted
+            )
+          )
+          .filter((window): window is CodexQuotaWindow => Boolean(window))
+      : [
+          toWindow(
+            snapshot.resourceType,
+            snapshot.totalLimit,
+            snapshot.currentUsage,
+            snapshot.remaining,
+            snapshot.exhausted
+          ),
+        ].filter((window): window is CodexQuotaWindow => Boolean(window));
+
+  if (windows.length === 0) return null;
+
+  return {
+    windows,
+    planType: normalizePlanType(snapshot.resourceType) ?? resolveCodexPlanType(file),
+  };
 };
 
 const fetchCodexQuota = async (
@@ -992,6 +1174,137 @@ const renderGeminiCliItems = (
   return h(Fragment, null, ...nodes);
 };
 
+const buildGeminiCliQuotaStateFromUsageQuota = (
+  file: AuthFileItem
+): Pick<GeminiCliQuotaState, 'buckets' | 'tierLabel' | 'tierId' | 'creditBalance'> | null => {
+  const snapshot = parseUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota);
+  if (!snapshot || !snapshot.known || snapshot.error) return null;
+
+  const toBucket = (
+    resourceType: string | undefined,
+    totalLimit: number | null,
+    currentUsage: number | null,
+    remaining: number | null,
+    exhausted: boolean
+  ): GeminiCliQuotaBucketState | null => {
+    const usage = computeSnapshotUsage(totalLimit, currentUsage, remaining, exhausted);
+    if (
+      usage.normalizedLimit === null &&
+      usage.normalizedUsage === null &&
+      usage.normalizedRemaining === null
+    ) {
+      return null;
+    }
+    return {
+      id: snapshotResourceId(resourceType, 'quota'),
+      label: snapshotResourceLabel(resourceType, 'Gemini CLI'),
+      remainingFraction: usage.remainingFraction,
+      remainingAmount: usage.normalizedRemaining,
+      resetTime: snapshot.nextReset,
+      tokenType: null,
+      modelIds: resourceType ? [resourceType] : undefined,
+    };
+  };
+
+  const buckets =
+    snapshot.resources.length > 0
+      ? snapshot.resources
+          .map((resource) =>
+            toBucket(
+              resource.resourceType,
+              resource.totalLimit,
+              resource.currentUsage,
+              resource.remaining,
+              resource.exhausted
+            )
+          )
+          .filter((bucket): bucket is GeminiCliQuotaBucketState => Boolean(bucket))
+      : [
+          toBucket(
+            snapshot.resourceType,
+            snapshot.totalLimit,
+            snapshot.currentUsage,
+            snapshot.remaining,
+            snapshot.exhausted
+          ),
+        ].filter((bucket): bucket is GeminiCliQuotaBucketState => Boolean(bucket));
+
+  if (buckets.length === 0) return null;
+
+  return {
+    buckets,
+    tierLabel: null,
+    tierId: null,
+    creditBalance: null,
+  };
+};
+
+const buildKimiQuotaStateFromUsageQuota = (
+  file: AuthFileItem
+): Pick<KimiQuotaState, 'rows'> | null => {
+  const snapshot = parseUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota);
+  if (!snapshot || !snapshot.known || snapshot.error) return null;
+
+  const toRow = (
+    resourceType: string | undefined,
+    totalLimit: number | null,
+    currentUsage: number | null,
+    remaining: number | null,
+    exhausted: boolean
+  ): KimiQuotaRow | null => {
+    const usage = computeSnapshotUsage(totalLimit, currentUsage, remaining, exhausted);
+    if (
+      usage.normalizedLimit === null &&
+      usage.normalizedUsage === null &&
+      usage.normalizedRemaining === null
+    ) {
+      return null;
+    }
+
+    const limit = usage.normalizedLimit ?? usage.normalizedUsage ?? 0;
+    const used =
+      usage.normalizedUsage ??
+      (limit > 0 && usage.normalizedRemaining !== null
+        ? Math.max(0, limit - usage.normalizedRemaining)
+        : exhausted
+          ? limit
+          : 0);
+
+    return {
+      id: snapshotResourceId(resourceType, 'quota'),
+      label: snapshotResourceLabel(resourceType, 'Kimi'),
+      used: Math.round(Math.max(0, used)),
+      limit: Math.round(Math.max(0, limit)),
+      resetHint: snapshot.nextReset,
+    };
+  };
+
+  const rows =
+    snapshot.resources.length > 0
+      ? snapshot.resources
+          .map((resource) =>
+            toRow(
+              resource.resourceType,
+              resource.totalLimit,
+              resource.currentUsage,
+              resource.remaining,
+              resource.exhausted
+            )
+          )
+          .filter((row): row is KimiQuotaRow => Boolean(row))
+      : [
+          toRow(
+            snapshot.resourceType,
+            snapshot.totalLimit,
+            snapshot.currentUsage,
+            snapshot.remaining,
+            snapshot.exhausted
+          ),
+        ].filter((row): row is KimiQuotaRow => Boolean(row));
+
+  return rows.length ? { rows } : null;
+};
+
 const buildClaudeQuotaWindows = (
   payload: ClaudeUsagePayload,
   t: TFunction
@@ -1206,6 +1519,41 @@ const renderClaudeItems = (
   return h(Fragment, null, ...nodes);
 };
 
+const buildClaudeQuotaStateFromUsageQuota = (
+  file: AuthFileItem
+): Pick<ClaudeQuotaState, 'windows' | 'planType'> | null => {
+  const snapshot = parseUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota);
+  if (!snapshot || !snapshot.known || snapshot.error) return null;
+
+  const usage = computeSnapshotUsage(
+    snapshot.totalLimit,
+    snapshot.currentUsage,
+    snapshot.remaining,
+    snapshot.exhausted
+  );
+  if (
+    usage.normalizedLimit === null &&
+    usage.normalizedUsage === null &&
+    usage.normalizedRemaining === null
+  ) {
+    return null;
+  }
+
+  const resourceType = snapshot.resourceType;
+  return {
+    windows: [
+      {
+        id: snapshotResourceId(resourceType, 'quota'),
+        label: snapshotResourceLabel(resourceType, 'Claude'),
+        usedPercent: usage.usedPercent,
+        resetLabel: formatQuotaResetTime(snapshot.nextReset),
+        resetTime: snapshot.nextReset,
+      },
+    ],
+    planType: resolveClaudePlanType({ organization: { rate_limit_tier: resourceType } }),
+  };
+};
+
 export const CLAUDE_CONFIG: QuotaConfig<
   ClaudeQuotaState,
   { windows: ClaudeQuotaWindow[]; extraUsage?: ClaudeExtraUsage | null; planType?: string | null }
@@ -1230,6 +1578,18 @@ export const CLAUDE_CONFIG: QuotaConfig<
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    if (!hasKnownUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota)) return null;
+    const data = buildClaudeQuotaStateFromUsageQuota(file);
+    return data
+      ? {
+          status: 'success',
+          windows: data.windows,
+          extraUsage: null,
+          planType: data.planType,
+        }
+      : null;
+  },
   cardClassName: styles.claudeCard,
   controlsClassName: styles.claudeControls,
   controlClassName: styles.claudeControl,
@@ -1288,6 +1648,11 @@ export const CODEX_CONFIG: QuotaConfig<
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    if (!hasKnownUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota)) return null;
+    const data = buildCodexQuotaStateFromUsageQuota(file);
+    return data ? { status: 'success', windows: data.windows, planType: data.planType } : null;
+  },
   cardClassName: styles.codexCard,
   controlsClassName: styles.codexControls,
   controlClassName: styles.codexControl,
@@ -1341,6 +1706,19 @@ export const GEMINI_CLI_CONFIG: QuotaConfig<
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    if (!hasKnownUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota)) return null;
+    const data = buildGeminiCliQuotaStateFromUsageQuota(file);
+    return data
+      ? {
+          status: 'success',
+          buckets: data.buckets,
+          tierLabel: data.tierLabel,
+          tierId: data.tierId,
+          creditBalance: data.creditBalance,
+        }
+      : null;
+  },
   cardClassName: styles.geminiCliCard,
   controlsClassName: styles.geminiCliControls,
   controlClassName: styles.geminiCliControl,
@@ -1916,6 +2294,37 @@ const buildXaiBillingSummary = (
   };
 };
 
+const buildXaiQuotaStateFromUsageQuota = (
+  file: AuthFileItem
+): Pick<XaiQuotaState, 'billing'> | null => {
+  const snapshot = parseUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota);
+  if (!snapshot || !snapshot.known || snapshot.error) return null;
+
+  const usage = computeSnapshotUsage(
+    snapshot.totalLimit,
+    snapshot.currentUsage,
+    snapshot.remaining,
+    snapshot.exhausted
+  );
+  if (
+    usage.normalizedLimit === null &&
+    usage.normalizedUsage === null &&
+    usage.normalizedRemaining === null
+  ) {
+    return null;
+  }
+
+  return {
+    billing: {
+      monthlyLimitCents: usage.normalizedLimit,
+      usedCents: usage.normalizedUsage,
+      onDemandCapCents: null,
+      billingPeriodEnd: snapshot.nextReset,
+      usedPercent: usage.usedPercent,
+    },
+  };
+};
+
 const fetchXaiQuota = async (file: AuthFileItem, t: TFunction): Promise<XaiBillingSummary> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndex = normalizeAuthIndex(rawAuthIndex);
@@ -2032,6 +2441,11 @@ export const KIMI_CONFIG: QuotaConfig<KimiQuotaState, KimiQuotaRow[]> = {
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    if (!hasKnownUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota)) return null;
+    const data = buildKimiQuotaStateFromUsageQuota(file);
+    return data ? { status: 'success', rows: data.rows } : null;
+  },
   cardClassName: styles.kimiCard,
   controlsClassName: styles.kimiControls,
   controlClassName: styles.kimiControl,
@@ -2055,6 +2469,11 @@ export const XAI_CONFIG: QuotaConfig<XaiQuotaState, XaiBillingSummary> = {
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    if (!hasKnownUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota)) return null;
+    const data = buildXaiQuotaStateFromUsageQuota(file);
+    return data ? { status: 'success', billing: data.billing } : null;
+  },
   cardClassName: styles.xaiCard,
   controlsClassName: styles.xaiControls,
   controlClassName: styles.xaiControl,
