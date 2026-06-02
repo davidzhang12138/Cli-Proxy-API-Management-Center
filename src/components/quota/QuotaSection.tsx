@@ -20,7 +20,7 @@ import type {
   GeminiCliQuotaState,
   KimiQuotaState,
   KiroQuotaState,
-  ResolvedTheme
+  ResolvedTheme,
 } from '@/types';
 import { formatQuotaResetTime, getStatusFromError } from '@/utils/quota';
 import {
@@ -28,12 +28,13 @@ import {
   loadModelPrices,
   normalizeAuthIndex,
   normalizeUsageSourceId,
-  type UsageDetail
+  type UsageDetail,
 } from '@/utils/usage';
 import { QuotaCard } from './QuotaCard';
 import type { QuotaStatusState, QuotaUsageModelSummary } from './QuotaCard';
 import { useQuotaLoader } from './useQuotaLoader';
 import { getEffectiveKiroQuotaState, type QuotaConfig } from './quotaConfigs';
+import { refreshManagedQuotaStates } from './managedQuotaRefresh';
 import { useGridColumns } from './useGridColumns';
 import { IconRefreshCw, IconX } from '@/components/ui/icons';
 import styles from '@/pages/QuotaPage.module.scss';
@@ -55,7 +56,12 @@ const DEFAULT_ITEMS_PER_PAGE = 6;
 const PAGE_SIZE_OPTIONS = [6, 12, 24];
 const MAX_ITEMS_PER_PAGE = 24;
 const MAX_SHOW_ALL_THRESHOLD = 30;
-const ANTIGRAVITY_VISIBLE_GROUP_IDS = new Set(['claude-gpt', 'gemini-3-1-pro-series', 'gemini-3-flash']);
+const ANTIGRAVITY_VISIBLE_GROUP_IDS = new Set([
+  'google-one-ai-credits',
+  'claude-gpt',
+  'gemini-3-1-pro-series',
+  'gemini-3-flash',
+]);
 
 interface FileUsageSummary {
   totalTokens: number | null;
@@ -186,11 +192,7 @@ const getCodexWindowDurationMs = (windowId: string): number | null => {
   ) {
     return 5 * HOUR_MS;
   }
-  if (
-    windowId === 'weekly' ||
-    windowId.endsWith('-weekly') ||
-    windowId.includes('-weekly-')
-  ) {
+  if (windowId === 'weekly' || windowId.endsWith('-weekly') || windowId.includes('-weekly-')) {
     return 7 * DAY_MS;
   }
   return null;
@@ -228,11 +230,9 @@ const matchesCodexWindowModel = (
   const rawCandidates = [
     window.id,
     window.label,
-    typeof window.labelParams?.name === 'string' ? window.labelParams.name : ''
+    typeof window.labelParams?.name === 'string' ? window.labelParams.name : '',
   ];
-  const candidates = rawCandidates
-    .map((value) => normalizeModelKey(String(value)))
-    .filter(Boolean);
+  const candidates = rawCandidates.map((value) => normalizeModelKey(String(value))).filter(Boolean);
 
   return candidates.some(
     (candidate) =>
@@ -247,9 +247,9 @@ const isAntigravityQuotaState = (
 ): quotaState is AntigravityQuotaState =>
   Boolean(
     quotaState &&
-      quotaState.status === 'success' &&
-      'groups' in quotaState &&
-      Array.isArray(quotaState.groups)
+    quotaState.status === 'success' &&
+    'groups' in quotaState &&
+    Array.isArray(quotaState.groups)
   );
 
 const getAntigravityGroups = (
@@ -265,7 +265,10 @@ const getAntigravityGroups = (
 const getCodexAvailabilityWindows = (state: CodexQuotaState) =>
   (state.windows ?? []).filter((window) => !window.id.startsWith('code-review-'));
 
-const buildPaginationItems = (currentPage: number, totalPages: number): Array<number | 'ellipsis'> => {
+const buildPaginationItems = (
+  currentPage: number,
+  totalPages: number
+): Array<number | 'ellipsis'> => {
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
@@ -275,7 +278,15 @@ const buildPaginationItems = (currentPage: number, totalPages: number): Array<nu
   }
 
   if (currentPage >= totalPages - 3) {
-    return [1, 'ellipsis', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [
+      1,
+      'ellipsis',
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
   }
 
   return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
@@ -289,7 +300,7 @@ const buildEmptyUsageSummary = (ready: boolean): FileUsageSummary => ({
   reasoningTokens: ready ? 0 : null,
   startedAtMs: null,
   latestUsedAtMs: null,
-  models: []
+  models: [],
 });
 
 const getRecentUsageTimestampForModel = (
@@ -325,7 +336,9 @@ const quotaStateMatchesModel = (
     case 'gemini-cli': {
       const state = quotaState as GeminiCliQuotaState;
       return state.buckets.some((bucket) =>
-        (bucket.modelIds ?? []).some((model) => normalizeModelKey(model) === normalizedSelectedModel)
+        (bucket.modelIds ?? []).some(
+          (model) => normalizeModelKey(model) === normalizedSelectedModel
+        )
       );
     }
     default:
@@ -356,7 +369,9 @@ const getQuotaRemainingRatioForModel = (
       const state = quotaState as GeminiCliQuotaState;
       const ratios = state.buckets
         .filter((bucket) =>
-          (bucket.modelIds ?? []).some((model) => normalizeModelKey(model) === normalizedSelectedModel)
+          (bucket.modelIds ?? []).some(
+            (model) => normalizeModelKey(model) === normalizedSelectedModel
+          )
         )
         .map((bucket) => clampQuotaRatio(bucket.remainingFraction))
         .filter((ratio): ratio is number => ratio !== null);
@@ -499,7 +514,10 @@ const getQuotaResetTimestampForModel = (
     case 'claude': {
       const state = quotaState as ClaudeQuotaState;
       return pickEarliest(
-        state.windows.map((window) => toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel))
+        state.windows.map(
+          (window) =>
+            toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel)
+        )
       );
     }
     case 'codex': {
@@ -519,14 +537,19 @@ const getQuotaResetTimestampForModel = (
             : availabilityWindows;
 
       return pickEarliest(
-        sourceWindows.map((window) => toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel))
+        sourceWindows.map(
+          (window) =>
+            toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel)
+        )
       );
     }
     case 'gemini-cli': {
       const state = quotaState as GeminiCliQuotaState;
       const matchedBuckets = normalizedSelectedModel
         ? state.buckets.filter((bucket) =>
-            (bucket.modelIds ?? []).some((model) => normalizeModelKey(model) === normalizedSelectedModel)
+            (bucket.modelIds ?? []).some(
+              (model) => normalizeModelKey(model) === normalizedSelectedModel
+            )
           )
         : state.buckets;
       return pickEarliest(matchedBuckets.map((bucket) => toResetTimestamp(bucket.resetTime)));
@@ -535,7 +558,7 @@ const getQuotaResetTimestampForModel = (
       const state = getEffectiveKiroQuotaState(quotaState as KiroQuotaState);
       return pickEarliest([
         toResetTimestamp(state.nextReset),
-        toResetTimestamp(state.bonusNextReset)
+        toResetTimestamp(state.bonusNextReset),
       ]);
     }
     default:
@@ -590,7 +613,7 @@ const getQuotaUsageWindowStartTimestamp = (
       const state = getEffectiveKiroQuotaState(quotaState as KiroQuotaState);
       return pickEarliestTimestamp([
         subtractOneCalendarMonth(toResetTimestamp(state.nextReset)),
-        subtractOneCalendarMonth(toResetTimestamp(state.bonusNextReset))
+        subtractOneCalendarMonth(toResetTimestamp(state.bonusNextReset)),
       ]);
     }
     default:
@@ -684,8 +707,7 @@ const getQuotaUsedRatioForUsageModel = (
   }
 
   const remainingRatio = getQuotaRemainingRatio(quotaType, quotaState);
-  const overallUsedRatio =
-    remainingRatio === null ? null : clampQuotaRatio(1 - remainingRatio);
+  const overallUsedRatio = remainingRatio === null ? null : clampQuotaRatio(1 - remainingRatio);
   if (
     overallUsedRatio === null ||
     fileTotalTokens === null ||
@@ -725,9 +747,12 @@ const useQuotaPagination = <T,>(items: T[], defaultPageSize = 6): QuotaPaginatio
     setPageSizeState(size);
   }, []);
 
-  const goToPage = useCallback((targetPage: number) => {
-    setPage(Math.min(Math.max(1, targetPage), totalPages));
-  }, [totalPages]);
+  const goToPage = useCallback(
+    (targetPage: number) => {
+      setPage(Math.min(Math.max(1, targetPage), totalPages));
+    },
+    [totalPages]
+  );
 
   const goToPrev = useCallback(() => {
     setPage((prev) => Math.max(1, prev - 1));
@@ -754,7 +779,7 @@ const useQuotaPagination = <T,>(items: T[], defaultPageSize = 6): QuotaPaginatio
     goToNext,
     loading,
     loadingScope,
-    setLoading
+    setLoading,
   };
 };
 
@@ -853,7 +878,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           showNotification(
             t('quota_management.batch_disable_partial', {
               success: successCount,
-              failed: failCount
+              failed: failCount,
             }),
             'warning'
           );
@@ -871,7 +896,10 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     [exitSelectionMode, onFilesChanged, showNotification, t]
   );
 
-  const providerFiles = useMemo(() => files.filter((file) => config.filterFn(file)), [files, config]);
+  const providerFiles = useMemo(
+    () => files.filter((file) => config.filterFn(file)),
+    [files, config]
+  );
 
   useEffect(() => {
     purgeStaleEntries();
@@ -917,7 +945,11 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const usageSummaryByFileName = useMemo(() => {
     const normalizedSelectedModel =
       selectedModel && selectedModel !== 'all' ? normalizeModelKey(selectedModel) : '';
-    const accumulateDetail = (summary: FileUsageSummary, detail: UsageDetail, timestampMs: number | null) => {
+    const accumulateDetail = (
+      summary: FileUsageSummary,
+      detail: UsageDetail,
+      timestampMs: number | null
+    ) => {
       const inputTokens = toNonNegativeNumber(detail.tokens.input_tokens);
       const outputTokens = toNonNegativeNumber(detail.tokens.output_tokens);
       const cachedTokens = Math.max(
@@ -956,7 +988,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           existing.totalCost += totalCost;
           existing.latestUsedAtMs =
             timestampMs === null
-              ? existing.latestUsedAtMs ?? null
+              ? (existing.latestUsedAtMs ?? null)
               : existing.latestUsedAtMs === null || existing.latestUsedAtMs === undefined
                 ? timestampMs
                 : Math.max(existing.latestUsedAtMs, timestampMs);
@@ -965,7 +997,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             model: modelName,
             totalTokens,
             totalCost,
-            latestUsedAtMs: timestampMs
+            latestUsedAtMs: timestampMs,
           });
         }
         summary.models.sort((left, right) => {
@@ -1032,7 +1064,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     providerFiles,
     selectedModel,
     usageDetailsIndex,
-    usageStatsReady
+    usageStatsReady,
   ]);
 
   const preserveQuotaSnapshot = useCallback(
@@ -1069,11 +1101,10 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     return [...providerFiles]
       .filter((file) => {
         const quotaState = getQuotaStateForList(file.name);
-        const ratio =
-          normalizedSelectedModel
-            ? getQuotaRemainingRatioForModel(config.type, quotaState, normalizedSelectedModel) ??
-              getQuotaRemainingRatio(config.type, quotaState)
-            : getQuotaRemainingRatio(config.type, quotaState);
+        const ratio = normalizedSelectedModel
+          ? (getQuotaRemainingRatioForModel(config.type, quotaState, normalizedSelectedModel) ??
+            getQuotaRemainingRatio(config.type, quotaState))
+          : getQuotaRemainingRatio(config.type, quotaState);
         const matchesQuota =
           availabilityFilter === 'all'
             ? true
@@ -1126,9 +1157,13 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           file.provider,
           String(file['auth_index'] ?? file.authIndex ?? ''),
           ...supportedModels,
-          ...usageModels.map((model) => model.model)
+          ...usageModels.map((model) => model.model),
         ]
-          .map((value) => String(value ?? '').trim().toLowerCase())
+          .map((value) =>
+            String(value ?? '')
+              .trim()
+              .toLowerCase()
+          )
           .filter(Boolean);
 
         return searchFields.some((field) => field.includes(normalizedSearchQuery));
@@ -1160,9 +1195,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           if (leftReset === null) return 1;
           if (rightReset === null) return -1;
           if (leftReset !== rightReset) {
-            return sortMode === 'model_reset_asc'
-              ? leftReset - rightReset
-              : rightReset - leftReset;
+            return sortMode === 'model_reset_asc' ? leftReset - rightReset : rightReset - leftReset;
           }
           return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
         }
@@ -1190,16 +1223,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
         }
 
-        const leftRatio =
-          normalizedSelectedModel
-            ? getQuotaRemainingRatioForModel(config.type, leftState, normalizedSelectedModel) ??
-              getQuotaRemainingRatio(config.type, leftState)
-            : getQuotaRemainingRatio(config.type, leftState);
-        const rightRatio =
-          normalizedSelectedModel
-            ? getQuotaRemainingRatioForModel(config.type, rightState, normalizedSelectedModel) ??
-              getQuotaRemainingRatio(config.type, rightState)
-            : getQuotaRemainingRatio(config.type, rightState);
+        const leftRatio = normalizedSelectedModel
+          ? (getQuotaRemainingRatioForModel(config.type, leftState, normalizedSelectedModel) ??
+            getQuotaRemainingRatio(config.type, leftState))
+          : getQuotaRemainingRatio(config.type, leftState);
+        const rightRatio = normalizedSelectedModel
+          ? (getQuotaRemainingRatioForModel(config.type, rightState, normalizedSelectedModel) ??
+            getQuotaRemainingRatio(config.type, rightState))
+          : getQuotaRemainingRatio(config.type, rightState);
 
         if (leftRatio === null && rightRatio === null) {
           return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
@@ -1222,7 +1253,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     searchQuery,
     selectedModel,
     sortMode,
-    usageSummaryByFileName
+    usageSummaryByFileName,
   ]);
 
   const showAllAllowed = visibleFiles.length <= MAX_SHOW_ALL_THRESHOLD;
@@ -1239,7 +1270,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     goToNext,
     loading: sectionLoading,
     loadingScope,
-    setLoading
+    setLoading,
   } = useQuotaPagination(visibleFiles, DEFAULT_ITEMS_PER_PAGE);
 
   const selectAllPage = useCallback(() => {
@@ -1281,11 +1312,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
 
   const formatFailedNames = useCallback(
     (errors: QuotaRefreshFailure[]) => {
-      const visibleNames = errors.slice(0, 3).map((item) => item.name).join(', ');
+      const visibleNames = errors
+        .slice(0, 3)
+        .map((item) => item.name)
+        .join(', ');
       if (errors.length <= 3) return visibleNames;
       return t('quota_management.refresh_failed_names_more', {
         names: visibleNames,
-        count: errors.length - 3
+        count: errors.length - 3,
       });
     },
     [t]
@@ -1305,67 +1339,64 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     [config, setQuota]
   );
 
-  const refreshCurrentPage = useCallback(
-    async () => {
-      const targets = pageItems;
-      if (targets.length === 0) {
-        setRefreshResult(null);
+  const refreshCurrentPage = useCallback(async () => {
+    const targets = pageItems;
+    if (targets.length === 0) {
+      setRefreshResult(null);
+      showNotification(t('notification.data_refreshed'), 'success');
+      return;
+    }
+    setRefreshResult(null);
+    preserveQuotaSnapshot(targets);
+    primeQuotaRefreshState(targets);
+    setRefreshProgress({ completedCount: 0, total: targets.length });
+    try {
+      const summary = await loadQuota(targets, 'page', setLoading, (progress) => {
+        setRefreshProgress({
+          completedCount: progress.completedCount,
+          total: progress.total,
+        });
+      });
+      if (summary && summary.errorCount === 0) {
         showNotification(t('notification.data_refreshed'), 'success');
         return;
       }
-      setRefreshResult(null);
-      preserveQuotaSnapshot(targets);
-      primeQuotaRefreshState(targets);
-      setRefreshProgress({ completedCount: 0, total: targets.length });
-      try {
-        const summary = await loadQuota(targets, 'page', setLoading, (progress) => {
-          setRefreshProgress({
-            completedCount: progress.completedCount,
-            total: progress.total
-          });
-        });
-        if (summary && summary.errorCount === 0) {
-          showNotification(t('notification.data_refreshed'), 'success');
-          return;
-        }
-        if (summary) {
-          setRefreshResult(summary);
-          showNotification(
-            summary.successCount > 0
-              ? t('quota_management.refresh_result_partial', {
-                  success: summary.successCount,
-                  failed: summary.errorCount,
-                  total: summary.total,
-                  names: formatFailedNames(summary.errors)
-                })
-              : t('quota_management.refresh_result_failed', {
-                  failed: summary.errorCount,
-                  total: summary.total,
-                  names: formatFailedNames(summary.errors)
-                }),
-            summary.successCount > 0 ? 'warning' : 'error',
-            8000
-          );
-        } else {
-          showNotification(t('notification.refresh_failed'), 'error');
-        }
-      } finally {
-        clearQuotaSnapshot(targets);
-        setRefreshProgress(null);
+      if (summary) {
+        setRefreshResult(summary);
+        showNotification(
+          summary.successCount > 0
+            ? t('quota_management.refresh_result_partial', {
+                success: summary.successCount,
+                failed: summary.errorCount,
+                total: summary.total,
+                names: formatFailedNames(summary.errors),
+              })
+            : t('quota_management.refresh_result_failed', {
+                failed: summary.errorCount,
+                total: summary.total,
+                names: formatFailedNames(summary.errors),
+              }),
+          summary.successCount > 0 ? 'warning' : 'error',
+          8000
+        );
+      } else {
+        showNotification(t('notification.refresh_failed'), 'error');
       }
-    },
-    [
-      clearQuotaSnapshot,
-      formatFailedNames,
-      loadQuota,
-      pageItems,
-      preserveQuotaSnapshot,
-      primeQuotaRefreshState,
-      setLoading,
-      showNotification,
-      t
-    ]
-  );
+    } finally {
+      clearQuotaSnapshot(targets);
+      setRefreshProgress(null);
+    }
+  }, [
+    clearQuotaSnapshot,
+    formatFailedNames,
+    loadQuota,
+    pageItems,
+    preserveQuotaSnapshot,
+    primeQuotaRefreshState,
+    setLoading,
+    showNotification,
+    t,
+  ]);
 
   useEffect(() => {
     if (loading) return;
@@ -1377,13 +1408,18 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       const nextState: Record<string, TState> = {};
       providerFiles.forEach((file) => {
         const cached = prev[file.name];
-        if (cached) {
+        const snapshotState = config.buildSnapshotState?.(file);
+        if (cached?.status === 'loading') {
+          nextState[file.name] = cached;
+        } else if (snapshotState) {
+          nextState[file.name] = snapshotState;
+        } else if (cached) {
           nextState[file.name] = cached;
         }
       });
       return nextState;
     });
-  }, [loading, providerFiles, setQuota]);
+  }, [config, loading, providerFiles, setQuota]);
 
   const refreshQuotaForFile = useCallback(
     async (file: AuthFileItem) => {
@@ -1393,14 +1429,28 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       preserveQuotaSnapshot([file]);
       setQuota((prev) => ({
         ...prev,
-        [file.name]: config.buildLoadingState()
+        [file.name]: config.buildLoadingState(),
       }));
 
       try {
+        const managedResults = await refreshManagedQuotaStates(config, [file]).catch(() => null);
+        const managedResult = managedResults?.[0];
+        if (managedResult?.status === 'success') {
+          setQuota((prev) => ({
+            ...prev,
+            [file.name]: managedResult.state as TState,
+          }));
+          showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
+          return;
+        }
+        if (managedResult?.status === 'error' && managedResult.error) {
+          throw new Error(managedResult.error);
+        }
+
         const data = await config.fetchQuota(file, t);
         setQuota((prev) => ({
           ...prev,
-          [file.name]: config.buildSuccessState(data)
+          [file.name]: config.buildSuccessState(data),
         }));
         showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
       } catch (err: unknown) {
@@ -1408,7 +1458,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         const status = getStatusFromError(err);
         setQuota((prev) => ({
           ...prev,
-          [file.name]: config.buildErrorState(message, status)
+          [file.name]: config.buildErrorState(message, status),
         }));
         showNotification(
           t('auth_files.quota_refresh_failed', { name: file.name, message }),
@@ -1418,7 +1468,16 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         clearQuotaSnapshot([file]);
       }
     },
-    [clearQuotaSnapshot, config, disabled, preserveQuotaSnapshot, quota, setQuota, showNotification, t]
+    [
+      clearQuotaSnapshot,
+      config,
+      disabled,
+      preserveQuotaSnapshot,
+      quota,
+      setQuota,
+      showNotification,
+      t,
+    ]
   );
 
   const titleNode = (
@@ -1437,7 +1496,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       : t('quota_management.refresh_progress', {
           label: t('quota_management.refresh_page_short'),
           completed: refreshProgress.completedCount,
-          total: refreshProgress.total
+          total: refreshProgress.total,
         });
 
   return (
@@ -1490,7 +1549,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
               {t('auth_files.view_mode_all')}
             </Button>
           </div>
-          {refreshProgressLabel && <div className={styles.refreshProgressBadge}>{refreshProgressLabel}</div>}
+          {refreshProgressLabel && (
+            <div className={styles.refreshProgressBadge}>{refreshProgressLabel}</div>
+          )}
           <div className={styles.refreshActions}>
             <Button
               variant="secondary"
@@ -1530,13 +1591,13 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                 <div>
                   <strong>
                     {t('quota_management.refresh_failed_details_title', {
-                      count: refreshResult.errorCount
+                      count: refreshResult.errorCount,
                     })}
                   </strong>
                   <span>
                     {t('quota_management.refresh_failed_details_summary', {
                       success: refreshResult.successCount,
-                      total: refreshResult.total
+                      total: refreshResult.total,
                     })}
                   </span>
                 </div>
@@ -1546,9 +1607,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                     size="sm"
                     className={styles.disableFailedButton}
                     onClick={() =>
-                      setBatchDisableConfirmNames(
-                        refreshResult.errors.map((item) => item.name)
-                      )
+                      setBatchDisableConfirmNames(refreshResult.errors.map((item) => item.name))
                     }
                     disabled={batchDisabling}
                     loading={batchDisabling}
@@ -1575,7 +1634,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                       {item.errorStatus
                         ? t('quota_management.refresh_failed_reason_with_status', {
                             status: item.errorStatus,
-                            message: item.error
+                            message: item.error,
                           })
                         : item.error}
                     </span>
@@ -1586,7 +1645,8 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           )}
           <div ref={gridRef} className={config.gridClassName}>
             {pageItems.map((item) => {
-              const usageSummary = usageSummaryByFileName.get(item.name) ?? buildEmptyUsageSummary(usageStatsReady);
+              const usageSummary =
+                usageSummaryByFileName.get(item.name) ?? buildEmptyUsageSummary(usageStatsReady);
               const quotaState = quota[item.name];
               const enrichedTopModels = usageSummary.models.map((model) => ({
                 ...model,
@@ -1596,7 +1656,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   model.model,
                   usageSummary.totalTokens,
                   model.totalTokens
-                )
+                ),
               }));
               const antigravityGroups =
                 config.type === 'antigravity' ? getAntigravityGroups(quotaState) : [];
@@ -1614,17 +1674,22 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                           const resetLabel = formatQuotaResetTime(group.resetTime);
                           const expired = isPastResetTime(group.resetTime);
                           return (
-                          <div key={group.id} className={styles.quotaUsageModalItem}>
-                            <span className={styles.quotaUsageModalModel} title={group.models.join(', ')}>
-                              {group.label}
-                            </span>
-                            <span className={styles.quotaUsageModalValue}>
-                              {`${Math.round(Math.max(0, Math.min(1, group.remainingFraction)) * 100)}%`}
-                            </span>
-                            <span className={expired ? styles.quotaResetExpired : styles.quotaReset}>
-                              {resetLabel}
-                            </span>
-                          </div>
+                            <div key={group.id} className={styles.quotaUsageModalItem}>
+                              <span
+                                className={styles.quotaUsageModalModel}
+                                title={group.models.join(', ')}
+                              >
+                                {group.label}
+                              </span>
+                              <span className={styles.quotaUsageModalValue}>
+                                {`${Math.round(Math.max(0, Math.min(1, group.remainingFraction)) * 100)}%`}
+                              </span>
+                              <span
+                                className={expired ? styles.quotaResetExpired : styles.quotaReset}
+                              >
+                                {resetLabel}
+                              </span>
+                            </div>
                           );
                         })}
                     </div>
@@ -1688,7 +1753,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             <div className={styles.pagination}>
               <div className={styles.paginationMeta}>
                 <div className={styles.pageSizeControl}>
-                  <label htmlFor={`${config.type}-page-size`}>{t('quota_management.page_size_label')}</label>
+                  <label htmlFor={`${config.type}-page-size`}>
+                    {t('quota_management.page_size_label')}
+                  </label>
                   <select
                     id={`${config.type}-page-size`}
                     className={styles.pageSizeSelect}
@@ -1711,7 +1778,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   {t('auth_files.pagination_info', {
                     current: currentPage,
                     total: totalPages,
-                    count: visibleFiles.length
+                    count: visibleFiles.length,
                   })}
                 </div>
               </div>
@@ -1839,7 +1906,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           <div className={styles.batchDisableModalBody}>
             <p className={styles.batchDisableModalHint}>
               {t('quota_management.batch_disable_confirm_body', {
-                count: batchDisableConfirmNames.length
+                count: batchDisableConfirmNames.length,
               })}
             </p>
             <ul className={styles.batchDisableModalList}>

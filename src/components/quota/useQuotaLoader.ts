@@ -8,6 +8,7 @@ import type { AuthFileItem } from '@/types';
 import { useQuotaStore } from '@/stores';
 import { getStatusFromError } from '@/utils/quota';
 import type { QuotaConfig } from './quotaConfigs';
+import { refreshManagedQuotaStates } from './managedQuotaRefresh';
 
 type QuotaScope = 'page' | 'all';
 
@@ -80,28 +81,55 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
         let successCount = 0;
         let errorCount = 0;
 
-        const results = await Promise.all(
-          targets.map(async (file): Promise<LoadQuotaResult<TData>> => {
-            try {
-              const data = await config.fetchQuota(file, t);
-              successCount += 1;
-              return { name: file.name, status: 'success', data };
-            } catch (err: unknown) {
-              const message = err instanceof Error ? err.message : t('common.unknown_error');
-              const errorStatus = getStatusFromError(err);
-              errorCount += 1;
-              return { name: file.name, status: 'error', error: message, errorStatus };
-            } finally {
+        const managedResults = await refreshManagedQuotaStates(config, targets).catch(() => null);
+        const results = managedResults
+          ? managedResults.map((result): LoadQuotaResult<TData> => {
               completedCount += 1;
+              if (result.status === 'success') {
+                successCount += 1;
+              } else {
+                errorCount += 1;
+              }
               onProgress?.({
                 completedCount,
                 total: targets.length,
                 successCount,
-                errorCount
+                errorCount,
               });
-            }
-          })
-        );
+              return result.status === 'success'
+                ? {
+                    name: result.name,
+                    status: 'success',
+                    data: result.state as TData,
+                  }
+                : {
+                    name: result.name,
+                    status: 'error',
+                    error: result.error || t('common.unknown_error'),
+                  };
+            })
+          : await Promise.all(
+              targets.map(async (file): Promise<LoadQuotaResult<TData>> => {
+                try {
+                  const data = await config.fetchQuota(file, t);
+                  successCount += 1;
+                  return { name: file.name, status: 'success', data };
+                } catch (err: unknown) {
+                  const message = err instanceof Error ? err.message : t('common.unknown_error');
+                  const errorStatus = getStatusFromError(err);
+                  errorCount += 1;
+                  return { name: file.name, status: 'error', error: message, errorStatus };
+                } finally {
+                  completedCount += 1;
+                  onProgress?.({
+                    completedCount,
+                    total: targets.length,
+                    successCount,
+                    errorCount,
+                  });
+                }
+              })
+            );
 
         if (requestId !== requestIdRef.current) return null;
 
@@ -109,7 +137,9 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
           const nextState = { ...prev };
           results.forEach((result) => {
             if (result.status === 'success') {
-              nextState[result.name] = config.buildSuccessState(result.data as TData);
+              nextState[result.name] = managedResults
+                ? (result.data as TState)
+                : config.buildSuccessState(result.data as TData);
             } else {
               nextState[result.name] = config.buildErrorState(
                 result.error || t('common.unknown_error'),
@@ -136,8 +166,8 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
             .map((result) => ({
               name: result.name,
               error: result.error || t('common.unknown_error'),
-              errorStatus: result.errorStatus
-            }))
+              errorStatus: result.errorStatus,
+            })),
         };
       } finally {
         if (requestId === requestIdRef.current) {

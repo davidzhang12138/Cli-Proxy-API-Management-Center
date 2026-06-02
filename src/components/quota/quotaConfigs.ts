@@ -73,10 +73,13 @@ import {
   formatQuotaResetTime,
   formatKimiResetHint,
   buildAntigravityQuotaGroups,
+  buildAntigravityQuotaGroupsFromUsageQuota,
   buildGeminiCliQuotaBuckets,
+  buildKiroQuotaDataFromUsageQuota,
   buildKimiQuotaRows,
   createStatusError,
   getStatusFromError,
+  hasKnownUsageQuotaSnapshot,
   isAntigravityFile,
   isClaudeFile,
   isCodexFile,
@@ -138,6 +141,7 @@ export interface QuotaConfig<TState, TData> {
   buildLoadingState: () => TState;
   buildSuccessState: (data: TData) => TState;
   buildErrorState: (message: string, status?: number) => TState;
+  buildSnapshotState?: (file: AuthFileItem) => TState | null;
   cardClassName: string;
   controlsClassName: string;
   controlClassName: string;
@@ -737,7 +741,9 @@ const renderAntigravityItems = (
   const { styles: styleMap, QuotaProgressBar } = helpers;
   const { createElement: h } = React;
   const groups = (quota.groups ?? []).filter((group) =>
-    ['claude-gpt', 'gemini-3-1-pro-series', 'gemini-3-flash'].includes(group.id)
+    ['google-one-ai-credits', 'claude-gpt', 'gemini-3-1-pro-series', 'gemini-3-flash'].includes(
+      group.id
+    )
   );
 
   if (groups.length === 0) {
@@ -1223,6 +1229,11 @@ export const ANTIGRAVITY_CONFIG: QuotaConfig<AntigravityQuotaState, AntigravityQ
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    if (!hasKnownUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota)) return null;
+    const groups = buildAntigravityQuotaGroupsFromUsageQuota(file.usage_quota ?? file.usageQuota);
+    return groups.length ? { status: 'success', groups } : null;
+  },
   cardClassName: styles.antigravityCard,
   controlsClassName: styles.antigravityControls,
   controlClassName: styles.antigravityControl,
@@ -1337,7 +1348,9 @@ const isExpiredIsoTimestamp = (value?: string): boolean => {
   return Number.isFinite(timestamp) && timestamp <= Date.now();
 };
 
-export const hasActiveKiroBonus = (quota: Pick<KiroQuotaState, 'bonusLimit' | 'bonusStatus' | 'bonusNextReset'>) => {
+export const hasActiveKiroBonus = (
+  quota: Pick<KiroQuotaState, 'bonusLimit' | 'bonusStatus' | 'bonusNextReset'>
+) => {
   const bonusStatusUpper = normalizeStringValue(quota.bonusStatus)?.toUpperCase() ?? '';
   return (
     typeof quota.bonusLimit === 'number' &&
@@ -1407,10 +1420,7 @@ const toIsoFromKiroTimestamp = (value: number | null): string | undefined => {
   return date.toISOString();
 };
 
-const fetchKiroQuota = async (
-  file: AuthFileItem,
-  t: TFunction
-): Promise<KiroQuotaData> => {
+const fetchKiroQuota = async (file: AuthFileItem, t: TFunction): Promise<KiroQuotaData> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndex = normalizeAuthIndex(rawAuthIndex);
   if (!authIndex) {
@@ -1442,9 +1452,7 @@ const fetchKiroQuota = async (
   let bonusNextResetTimestamp: number | null = null;
 
   breakdownList.forEach((breakdown) => {
-    const limit = normalizeNumberValue(
-      breakdown.usageLimitWithPrecision ?? breakdown.usageLimit
-    );
+    const limit = normalizeNumberValue(breakdown.usageLimitWithPrecision ?? breakdown.usageLimit);
     const usage = normalizeNumberValue(
       breakdown.currentUsageWithPrecision ?? breakdown.currentUsage
     );
@@ -1523,6 +1531,12 @@ const renderKiroItems = (
   const { createElement: h, Fragment } = React;
   const effectiveQuota = getEffectiveKiroQuotaState(quota);
   const nodes: ReactNode[] = [];
+  const formatResourceType = (value: string): string => {
+    const normalized = value.trim().toUpperCase();
+    const key = `kiro_quota.resource_${normalized.toLowerCase()}`;
+    const translated = t(key);
+    return translated === key ? value : translated;
+  };
 
   if (effectiveQuota.subscriptionType) {
     nodes.push(
@@ -1530,7 +1544,11 @@ const renderKiroItems = (
         'div',
         { key: 'subscription', className: styleMap.codexPlan },
         h('span', { className: styleMap.codexPlanLabel }, t('kiro_quota.subscription_label')),
-        h('span', { className: styleMap.codexPlanValue }, effectiveQuota.subscriptionType)
+        h(
+          'span',
+          { className: styleMap.codexPlanValue },
+          formatResourceType(effectiveQuota.subscriptionType)
+        )
       )
     );
   }
@@ -1554,7 +1572,10 @@ const renderKiroItems = (
     return Math.round((remaining / limit) * 100);
   };
 
-  const baseRemainingPercent = buildRemainingPercent(effectiveQuota.baseRemaining, effectiveQuota.baseLimit);
+  const baseRemainingPercent = buildRemainingPercent(
+    effectiveQuota.baseRemaining,
+    effectiveQuota.baseLimit
+  );
   if (effectiveQuota.baseLimit !== null && effectiveQuota.baseLimit > 0) {
     nodes.push(
       h(
@@ -1572,7 +1593,9 @@ const renderKiroItems = (
               ? h(
                   'span',
                   { className: styleMap.quotaAmount },
-                  t('kiro_quota.remaining_credits', { count: Math.round(effectiveQuota.baseRemaining) })
+                  t('kiro_quota.remaining_credits', {
+                    count: Math.round(effectiveQuota.baseRemaining),
+                  })
                 )
               : null,
             h('span', { className: resetClassName }, resetLabel)
@@ -1587,7 +1610,10 @@ const renderKiroItems = (
     );
   }
 
-  const bonusRemainingPercent = buildRemainingPercent(effectiveQuota.bonusRemaining, effectiveQuota.bonusLimit);
+  const bonusRemainingPercent = buildRemainingPercent(
+    effectiveQuota.bonusRemaining,
+    effectiveQuota.bonusLimit
+  );
   if (effectiveQuota.bonusLimit !== null && effectiveQuota.bonusLimit > 0) {
     nodes.push(
       h(
@@ -1605,7 +1631,9 @@ const renderKiroItems = (
               ? h(
                   'span',
                   { className: styleMap.quotaAmount },
-                  t('kiro_quota.remaining_credits', { count: Math.round(effectiveQuota.bonusRemaining) })
+                  t('kiro_quota.remaining_credits', {
+                    count: Math.round(effectiveQuota.bonusRemaining),
+                  })
                 )
               : null,
             h('span', { className: bonusResetClassName }, bonusResetLabel)
@@ -1641,7 +1669,9 @@ const renderKiroItems = (
             ? h(
                 'span',
                 { className: styleMap.quotaAmount },
-                t('kiro_quota.remaining_credits', { count: Math.round(effectiveQuota.remainingCredits) })
+                t('kiro_quota.remaining_credits', {
+                  count: Math.round(effectiveQuota.remainingCredits),
+                })
               )
             : null
         )
@@ -1709,6 +1739,28 @@ export const KIRO_CONFIG: QuotaConfig<KiroQuotaState, KiroQuotaData> = {
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    if (!hasKnownUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota)) return null;
+    const data = buildKiroQuotaDataFromUsageQuota(file.usage_quota ?? file.usageQuota);
+    return data
+      ? {
+          status: 'success',
+          baseUsage: data.baseUsage,
+          baseLimit: data.baseLimit,
+          baseRemaining: data.baseRemaining,
+          bonusUsage: data.bonusUsage,
+          bonusLimit: data.bonusLimit,
+          bonusRemaining: data.bonusRemaining,
+          bonusStatus: data.bonusStatus,
+          bonusNextReset: data.bonusNextReset,
+          currentUsage: data.currentUsage,
+          usageLimit: data.usageLimit,
+          remainingCredits: data.remainingCredits,
+          nextReset: data.nextReset,
+          subscriptionType: data.subscriptionType,
+        }
+      : null;
+  },
   cardClassName: styles.kiroCard,
   controlsClassName: styles.kiroControls,
   controlClassName: styles.kiroControl,
@@ -1716,10 +1768,7 @@ export const KIRO_CONFIG: QuotaConfig<KiroQuotaState, KiroQuotaData> = {
   renderQuotaItems: renderKiroItems,
 };
 
-const fetchKimiQuota = async (
-  file: AuthFileItem,
-  t: TFunction
-): Promise<KimiQuotaRow[]> => {
+const fetchKimiQuota = async (file: AuthFileItem, t: TFunction): Promise<KimiQuotaRow[]> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
   const authIndex = normalizeAuthIndex(rawAuthIndex);
   if (!authIndex) {

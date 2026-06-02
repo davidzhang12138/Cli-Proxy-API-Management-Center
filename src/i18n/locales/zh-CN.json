@@ -754,7 +754,9 @@
     "base_credits_label": "基础额度",
     "bonus_credits_label": "赠送额度",
     "total_credits_label": "合计额度",
-    "remaining_credits": "剩余 {{count}}"
+    "remaining_credits": "剩余 {{count}}",
+    "resource_agentic_request": "Agentic 请求",
+    "resource_google_one_ai": "Google One AI"
   },
   "xai_quota": {
     "title": "Grok 额度",

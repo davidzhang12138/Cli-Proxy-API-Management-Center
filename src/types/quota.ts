@@ -74,6 +74,35 @@ export interface AntigravityQuotaGroupDefinition {
   labelFromModel?: boolean;
 }
 
+export interface UsageQuotaSnapshotPayload {
+  known?: boolean | string | number;
+  total_limit?: number | string | null;
+  totalLimit?: number | string | null;
+  current_usage?: number | string | null;
+  currentUsage?: number | string | null;
+  remaining?: number | string | null;
+  exhausted?: boolean | string | number | null;
+  resource_type?: string | null;
+  resourceType?: string | null;
+  next_reset?: string | number | null;
+  nextReset?: string | number | null;
+  checked_at?: string | number | null;
+  checkedAt?: string | number | null;
+  error?: string | null;
+}
+
+export interface UsageQuotaSnapshot {
+  known: boolean;
+  totalLimit: number | null;
+  currentUsage: number | null;
+  remaining: number | null;
+  exhausted: boolean;
+  resourceType?: string;
+  nextReset?: string;
+  checkedAt?: string;
+  error?: string;
+}
+
 export interface GeminiCliQuotaGroupDefinition {
   id: string;
   label: string;

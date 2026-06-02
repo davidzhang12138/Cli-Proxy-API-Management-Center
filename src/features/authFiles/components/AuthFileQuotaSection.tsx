@@ -9,7 +9,9 @@ import {
   KIRO_CONFIG,
   KIMI_CONFIG,
   XAI_CONFIG,
+  type QuotaConfig,
 } from '@/components/quota';
+import { refreshManagedQuotaStates } from '@/components/quota/managedQuotaRefresh';
 import { IconRefreshCw } from '@/components/ui/icons';
 import { useNotificationStore, useQuotaStore } from '@/stores';
 import type { AuthFileItem } from '@/types';
@@ -73,14 +75,7 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     if (file.disabled) return;
     if (quota?.status === 'loading') return;
 
-    const config = getQuotaConfig(quotaType) as unknown as {
-      i18nPrefix: string;
-      fetchQuota: (file: AuthFileItem, t: TFunction) => Promise<unknown>;
-      buildLoadingState: () => unknown;
-      buildSuccessState: (data: unknown) => unknown;
-      buildErrorState: (message: string, status?: number) => unknown;
-      renderQuotaItems: (quota: unknown, t: TFunction, helpers: unknown) => unknown;
-    };
+    const config = getQuotaConfig(quotaType) as QuotaConfig<unknown, unknown>;
 
     updateQuotaState((prev: Record<string, unknown>) => ({
       ...prev,
@@ -88,6 +83,20 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     }));
 
     try {
+      const managedResults = await refreshManagedQuotaStates(config, [file]).catch(() => null);
+      const managedResult = managedResults?.[0];
+      if (managedResult?.status === 'success') {
+        updateQuotaState((prev: Record<string, unknown>) => ({
+          ...prev,
+          [file.name]: managedResult.state,
+        }));
+        showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
+        return;
+      }
+      if (managedResult?.status === 'error' && managedResult.error) {
+        throw new Error(managedResult.error);
+      }
+
       const data = await config.fetchQuota(file, t);
       updateQuotaState((prev: Record<string, unknown>) => ({
         ...prev,

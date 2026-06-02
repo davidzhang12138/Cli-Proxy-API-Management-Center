@@ -3,7 +3,14 @@
  */
 
 import { apiClient } from './client';
-import type { AuthFilesResponse } from '@/types/authFile';
+import type {
+  AuthFilesListOptions,
+  AuthFilesResponse,
+  AuthQuotaEntry,
+  AuthQuotasResponse,
+  RefreshAuthQuotasRequest,
+  RefreshAuthQuotasResponse,
+} from '@/types/authFile';
 import type { OAuthModelAliasEntry } from '@/types';
 import { parseTimestampMs } from '@/utils/timestamp';
 
@@ -71,6 +78,32 @@ const normalizeBatchFileNames = (value: unknown): string[] => {
   return normalizeRequestedAuthFileNames(value.map((item) => String(item ?? '')));
 };
 
+const buildAuthFilesListParams = (options?: AuthFilesListOptions): Record<string, unknown> => {
+  if (!options) return {};
+  const params: Record<string, unknown> = {};
+  if (typeof options.page === 'number' && Number.isFinite(options.page)) {
+    params.page = Math.max(1, Math.round(options.page));
+  }
+  const pageSize =
+    typeof options.pageSize === 'number' && Number.isFinite(options.pageSize)
+      ? options.pageSize
+      : typeof options.perPage === 'number' && Number.isFinite(options.perPage)
+        ? options.perPage
+        : null;
+  if (pageSize !== null) {
+    params.page_size = Math.max(1, Math.round(pageSize));
+  }
+  const provider = options.provider?.trim();
+  if (provider) params.provider = provider;
+  const type = options.type?.trim();
+  if (type) params.type = type;
+  const source = options.source?.trim();
+  if (source) params.source = source;
+  const status = options.status?.trim();
+  if (status) params.status = status;
+  return params;
+};
+
 const normalizeBatchFailures = (value: unknown): AuthFileBatchFailure[] => {
   if (!Array.isArray(value)) return [];
 
@@ -125,6 +158,11 @@ const normalizeBatchDeleteResponse = (
 };
 
 const readTextField = (entry: AuthFileEntry, key: string): string => {
+  const value = entry[key];
+  return typeof value === 'string' ? value.trim() : '';
+};
+
+const readQuotaTextField = (entry: AuthQuotaEntry, key: keyof AuthQuotaEntry): string => {
   const value = entry[key];
   return typeof value === 'string' ? value.trim() : '';
 };
@@ -231,8 +269,127 @@ const dedupeAuthFilesResponse = (payload: AuthFilesResponse): AuthFilesResponse 
   return {
     ...payload,
     files: normalizedFiles,
-    total: normalizedFiles.length,
+    total: payload?.pagination?.total ?? payload?.total ?? normalizedFiles.length,
   };
+};
+
+const authFileMatchKeys = (entry: AuthFileEntry): string[] => {
+  const keys = [
+    readTextField(entry, 'id'),
+    readTextField(entry, 'auth_index'),
+    String(entry.authIndex ?? '').trim(),
+    readTextField(entry, 'name'),
+  ];
+  return keys.filter(Boolean);
+};
+
+const authQuotaMatchKeys = (entry: AuthQuotaEntry): string[] => {
+  const keys = [
+    readQuotaTextField(entry, 'id'),
+    readQuotaTextField(entry, 'auth_index'),
+    readQuotaTextField(entry, 'authIndex'),
+  ];
+  return keys.filter(Boolean);
+};
+
+const buildAuthFileFromQuotaEntry = (entry: AuthQuotaEntry): AuthFileEntry | null => {
+  const provider = readQuotaTextField(entry, 'provider');
+  const usageQuota = entry.usage_quota ?? entry.usageQuota;
+  if (!provider || !usageQuota) return null;
+
+  const id = readQuotaTextField(entry, 'id');
+  const authIndex =
+    readQuotaTextField(entry, 'auth_index') || readQuotaTextField(entry, 'authIndex');
+  const label = readQuotaTextField(entry, 'label');
+  const account = readQuotaTextField(entry, 'account');
+  const name = label || account || authIndex || id;
+  if (!name) return null;
+
+  return {
+    id,
+    auth_index: authIndex,
+    authIndex,
+    name,
+    type: provider,
+    provider,
+    label,
+    account_type:
+      readQuotaTextField(entry, 'account_type') || readQuotaTextField(entry, 'accountType'),
+    account,
+    status: readQuotaTextField(entry, 'status'),
+    disabled: entry.disabled,
+    unavailable: entry.unavailable,
+    runtimeOnly: true,
+    source: 'memory',
+    size: 0,
+    success: entry.success,
+    failed: entry.failed,
+    usage_quota: usageQuota,
+  };
+};
+
+const mergeAuthQuotaSnapshots = (
+  filesPayload: AuthFilesResponse,
+  quotasPayload: AuthQuotasResponse | null,
+  options: { includeSynthetic?: boolean } = {}
+): AuthFilesResponse => {
+  const includeSynthetic = options.includeSynthetic !== false;
+  const normalized = dedupeAuthFilesResponse(filesPayload);
+  const quotaEntries = Array.isArray(quotasPayload?.auths) ? quotasPayload.auths : [];
+  if (quotaEntries.length === 0) return normalized;
+
+  const files = [...normalized.files];
+  const byKey = new Map<string, AuthFileEntry>();
+  files.forEach((file) => {
+    authFileMatchKeys(file).forEach((key) => byKey.set(key, file));
+  });
+
+  quotaEntries.forEach((entry) => {
+    const usageQuota = entry.usage_quota ?? entry.usageQuota;
+    if (!usageQuota) return;
+
+    const matched = authQuotaMatchKeys(entry)
+      .map((key) => byKey.get(key))
+      .find((file): file is AuthFileEntry => Boolean(file));
+
+    if (matched) {
+      matched.usage_quota = usageQuota;
+      if (!hasMeaningfulValue(matched.success)) matched.success = entry.success;
+      if (!hasMeaningfulValue(matched.failed)) matched.failed = entry.failed;
+      if (!hasMeaningfulValue(matched.status)) matched.status = entry.status;
+      if (matched.disabled === undefined) matched.disabled = entry.disabled;
+      if (matched.unavailable === undefined) matched.unavailable = entry.unavailable;
+      return;
+    }
+
+    if (!includeSynthetic) return;
+    const synthetic = buildAuthFileFromQuotaEntry(entry);
+    if (!synthetic) return;
+    files.push(synthetic);
+    authFileMatchKeys(synthetic).forEach((key) => byKey.set(key, synthetic));
+  });
+
+  files.sort((left, right) =>
+    readTextField(left, 'name').localeCompare(readTextField(right, 'name'), undefined, {
+      sensitivity: 'accent',
+    })
+  );
+
+  return {
+    ...normalized,
+    files,
+    total: includeSynthetic
+      ? files.length
+      : (normalized.pagination?.total ?? normalized.total ?? files.length),
+  };
+};
+
+const getAuthQuotasIfAvailable = async (): Promise<AuthQuotasResponse | null> => {
+  try {
+    return await apiClient.get<AuthQuotasResponse>('/auth-quotas', { params: { all: true } });
+  } catch {
+    return null;
+  }
 };
 
 const parseAuthFileJsonObject = (rawText: string): Record<string, unknown> => {
@@ -302,10 +459,7 @@ const normalizeOauthModelAlias = (payload: unknown): Record<string, OAuthModelAl
   if (!payload || typeof payload !== 'object') return {};
 
   const record = payload as Record<string, unknown>;
-  const source =
-    record['oauth-model-alias'] ??
-    record.items ??
-    payload;
+  const source = record['oauth-model-alias'] ?? record.items ?? payload;
   if (!source || typeof source !== 'object') return {};
 
   const result: Record<string, OAuthModelAliasEntry[]> = {};
@@ -317,17 +471,17 @@ const normalizeOauthModelAlias = (payload: unknown): Record<string, OAuthModelAl
     if (!key) return;
     if (!Array.isArray(mappings)) return;
 
-	    const seen = new Set<string>();
-	    const normalized = mappings
-	      .map((item) => {
-	        if (!item || typeof item !== 'object') return null;
-	        const entry = item as Record<string, unknown>;
-	        const name = String(entry.name ?? entry.id ?? entry.model ?? '').trim();
-	        const alias = String(entry.alias ?? '').trim();
-	        if (!name || !alias) return null;
-	        const fork = entry.fork === true;
-	        return fork ? { name, alias, fork } : { name, alias };
-	      })
+    const seen = new Set<string>();
+    const normalized = mappings
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const entry = item as Record<string, unknown>;
+        const name = String(entry.name ?? entry.id ?? entry.model ?? '').trim();
+        const alias = String(entry.alias ?? '').trim();
+        if (!name || !alias) return null;
+        const fork = entry.fork === true;
+        return fork ? { name, alias, fork } : { name, alias };
+      })
       .filter(Boolean)
       .filter((entry) => {
         const aliasEntry = entry as OAuthModelAliasEntry;
@@ -348,7 +502,30 @@ const normalizeOauthModelAlias = (payload: unknown): Record<string, OAuthModelAl
 const OAUTH_MODEL_ALIAS_ENDPOINT = '/oauth-model-alias';
 
 export const authFilesApi = {
-  list: async () => dedupeAuthFilesResponse(await apiClient.get<AuthFilesResponse>('/auth-files')),
+  list: async (options?: AuthFilesListOptions) => {
+    const params = buildAuthFilesListParams(options);
+    const [filesPayload, quotasPayload] = await Promise.all([
+      apiClient.get<AuthFilesResponse>('/auth-files', {
+        params: Object.keys(params).length ? params : undefined,
+      }),
+      getAuthQuotasIfAvailable(),
+    ]);
+    return mergeAuthQuotaSnapshots(filesPayload, quotasPayload, {
+      includeSynthetic: Object.keys(params).length === 0,
+    });
+  },
+
+  getAuthQuotas: (all = true) =>
+    apiClient.get<AuthQuotasResponse>('/auth-quotas', { params: { all } }),
+
+  refreshAuthQuotas: (request: RefreshAuthQuotasRequest = {}) => {
+    const authIndexes = request.auth_indexes ?? request.authIndexes;
+    return apiClient.post<RefreshAuthQuotasResponse>('/auth-quotas/refresh', {
+      all: request.all === true,
+      ids: request.ids ?? [],
+      auth_indexes: authIndexes ?? [],
+    });
+  },
 
   setStatus: (name: string, disabled: boolean) =>
     apiClient.patch<AuthFileStatusResponse>('/auth-files/status', { name, disabled }),
@@ -389,9 +566,12 @@ export const authFilesApi = {
   deleteAll: () => apiClient.delete('/auth-files', { params: { all: true } }),
 
   downloadText: async (name: string): Promise<string> => {
-    const response = await apiClient.getRaw(`/auth-files/download?name=${encodeURIComponent(name)}`, {
-      responseType: 'blob'
-    });
+    const response = await apiClient.getRaw(
+      `/auth-files/download?name=${encodeURIComponent(name)}`,
+      {
+        responseType: 'blob',
+      }
+    );
     const blob = response.data as Blob;
     return blob.text();
   },
@@ -431,8 +611,12 @@ export const authFilesApi = {
     const normalizedChannel = String(channel ?? '')
       .trim()
       .toLowerCase();
-    const normalizedAliases = normalizeOauthModelAlias({ [normalizedChannel]: aliases })[normalizedChannel] ?? [];
-    await apiClient.patch(OAUTH_MODEL_ALIAS_ENDPOINT, { channel: normalizedChannel, aliases: normalizedAliases });
+    const normalizedAliases =
+      normalizeOauthModelAlias({ [normalizedChannel]: aliases })[normalizedChannel] ?? [];
+    await apiClient.patch(OAUTH_MODEL_ALIAS_ENDPOINT, {
+      channel: normalizedChannel,
+      aliases: normalizedAliases,
+    });
   },
 
   deleteOauthModelAlias: async (channel: string) => {
@@ -441,16 +625,23 @@ export const authFilesApi = {
       .toLowerCase();
 
     try {
-      await apiClient.patch(OAUTH_MODEL_ALIAS_ENDPOINT, { channel: normalizedChannel, aliases: [] });
+      await apiClient.patch(OAUTH_MODEL_ALIAS_ENDPOINT, {
+        channel: normalizedChannel,
+        aliases: [],
+      });
     } catch (err: unknown) {
       const status = getStatusCode(err);
       if (status !== 405) throw err;
-      await apiClient.delete(`${OAUTH_MODEL_ALIAS_ENDPOINT}?channel=${encodeURIComponent(normalizedChannel)}`);
+      await apiClient.delete(
+        `${OAUTH_MODEL_ALIAS_ENDPOINT}?channel=${encodeURIComponent(normalizedChannel)}`
+      );
     }
   },
 
   // 获取认证凭证支持的模型
-  async getModelsForAuthFile(name: string): Promise<{ id: string; display_name?: string; type?: string; owned_by?: string }[]> {
+  async getModelsForAuthFile(
+    name: string
+  ): Promise<{ id: string; display_name?: string; type?: string; owned_by?: string }[]> {
     const data = await apiClient.get<Record<string, unknown>>(
       `/auth-files/models?name=${encodeURIComponent(name)}`
     );
@@ -461,8 +652,12 @@ export const authFilesApi = {
   },
 
   // 获取指定 channel 的模型定义
-  async getModelDefinitions(channel: string): Promise<{ id: string; display_name?: string; type?: string; owned_by?: string }[]> {
-    const normalizedChannel = String(channel ?? '').trim().toLowerCase();
+  async getModelDefinitions(
+    channel: string
+  ): Promise<{ id: string; display_name?: string; type?: string; owned_by?: string }[]> {
+    const normalizedChannel = String(channel ?? '')
+      .trim()
+      .toLowerCase();
     if (!normalizedChannel) return [];
     const data = await apiClient.get<Record<string, unknown>>(
       `/model-definitions/${encodeURIComponent(normalizedChannel)}`
@@ -471,5 +666,5 @@ export const authFilesApi = {
     return Array.isArray(models)
       ? (models as { id: string; display_name?: string; type?: string; owned_by?: string }[])
       : [];
-  }
+  },
 };

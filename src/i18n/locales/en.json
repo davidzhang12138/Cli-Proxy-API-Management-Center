@@ -754,7 +754,9 @@
     "base_credits_label": "Base Credits",
     "bonus_credits_label": "Bonus Credits",
     "total_credits_label": "Total Credits",
-    "remaining_credits": "Remaining {{count}}"
+    "remaining_credits": "Remaining {{count}}",
+    "resource_agentic_request": "Agentic Requests",
+    "resource_google_one_ai": "Google One AI"
   },
   "xai_quota": {
     "title": "Grok Quota",
