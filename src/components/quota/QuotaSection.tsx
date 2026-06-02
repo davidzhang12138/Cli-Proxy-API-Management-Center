@@ -33,7 +33,11 @@ import {
 import { QuotaCard } from './QuotaCard';
 import type { QuotaStatusState, QuotaUsageModelSummary } from './QuotaCard';
 import { useQuotaLoader } from './useQuotaLoader';
-import { getEffectiveKiroQuotaState, type QuotaConfig } from './quotaConfigs';
+import {
+  ANTIGRAVITY_VISIBLE_GROUP_IDS,
+  getEffectiveKiroQuotaState,
+  type QuotaConfig,
+} from './quotaConfigs';
 import { refreshManagedQuotaStates } from './managedQuotaRefresh';
 import { useGridColumns } from './useGridColumns';
 import { IconRefreshCw, IconX } from '@/components/ui/icons';
@@ -56,13 +60,6 @@ const DEFAULT_ITEMS_PER_PAGE = 6;
 const PAGE_SIZE_OPTIONS = [6, 12, 24];
 const MAX_ITEMS_PER_PAGE = 24;
 const MAX_SHOW_ALL_THRESHOLD = 30;
-const ANTIGRAVITY_VISIBLE_GROUP_IDS = new Set([
-  'google-one-ai-credits',
-  'claude-gpt',
-  'gemini-3-1-pro-series',
-  'gemini-3-flash',
-]);
-
 interface FileUsageSummary {
   totalTokens: number | null;
   inputTokens: number | null;

@@ -102,6 +102,13 @@ type QuotaType = 'antigravity' | 'claude' | 'codex' | 'gemini-cli' | 'kiro' | 'k
 const DEFAULT_ANTIGRAVITY_PROJECT_ID = 'bamboo-precept-lgxtn';
 const QUOTA_PROGRESS_HIGH_THRESHOLD = 70;
 const QUOTA_PROGRESS_MEDIUM_THRESHOLD = 30;
+export const ANTIGRAVITY_VISIBLE_GROUP_IDS = new Set([
+  'google-one-ai-credits',
+  'claude-gpt',
+  'gemini-3-1-pro-series',
+  'gemini-3-flash',
+]);
+const ANTIGRAVITY_FALLBACK_VISIBLE_GROUP_LIMIT = 4;
 const geminiCliSupplementaryRequestIds = new Map<string, number>();
 const geminiCliSupplementaryCache = new Map<
   string,
@@ -130,6 +137,14 @@ export interface QuotaStore {
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
   clearQuotaCache: () => void;
 }
+
+export const filterVisibleAntigravityGroups = (
+  groups: AntigravityQuotaGroup[]
+): AntigravityQuotaGroup[] => {
+  const visibleGroups = groups.filter((group) => ANTIGRAVITY_VISIBLE_GROUP_IDS.has(group.id));
+  if (visibleGroups.length > 0) return visibleGroups;
+  return groups.slice(0, ANTIGRAVITY_FALLBACK_VISIBLE_GROUP_LIMIT);
+};
 
 export interface QuotaConfig<TState, TData> {
   type: QuotaType;
@@ -742,12 +757,13 @@ const renderAntigravityItems = (
   const { styles: styleMap, QuotaProgressBar } = helpers;
   const { createElement: h } = React;
   const groups = quota.groups ?? [];
+  const visibleGroups = filterVisibleAntigravityGroups(groups);
 
   if (groups.length === 0) {
     return h('div', { className: styleMap.quotaMessage }, t('antigravity_quota.empty_models'));
   }
 
-  return groups.map((group) => {
+  return visibleGroups.map((group) => {
     const clamped = Math.max(0, Math.min(1, group.remainingFraction));
     const percent = Math.round(clamped * 100);
     const remainingAmountLabel =

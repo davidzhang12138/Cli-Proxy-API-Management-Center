@@ -1,11 +1,14 @@
 import type {
   AntigravityQuotaGroup,
+  AntigravityModelsPayload,
   KiroQuotaState,
   UsageQuotaResource,
   UsageQuotaResourcePayload,
   UsageQuotaSnapshot,
   UsageQuotaSnapshotPayload,
 } from '@/types';
+import { ANTIGRAVITY_QUOTA_GROUPS } from './constants';
+import { buildAntigravityQuotaGroups } from './builders';
 import { normalizeNumberValue, normalizeStringValue } from './parsers';
 
 type KiroQuotaData = Omit<KiroQuotaState, 'status' | 'error' | 'errorStatus'>;
@@ -100,6 +103,62 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
   };
 };
 
+const usageQuotaResourceToAntigravityGroup = (
+  resource: UsageQuotaResource,
+  resetTime?: string
+): AntigravityQuotaGroup | null => {
+  const remaining = resource.remaining ?? (resource.exhausted ? 0 : null);
+  const inferredLimit =
+    resource.totalLimit ??
+    (remaining !== null && resource.currentUsage !== null
+      ? remaining + resource.currentUsage
+      : null);
+  if (remaining === null && inferredLimit === null) return null;
+
+  const remainingFraction =
+    inferredLimit !== null && inferredLimit > 0
+      ? Math.max(0, Math.min(1, (remaining ?? 0) / inferredLimit))
+      : remaining !== null && remaining > 0 && !resource.exhausted
+        ? 1
+        : 0;
+  const resourceType = resource.resourceType;
+
+  const group: AntigravityQuotaGroup = {
+    id: usageQuotaResourceId(resourceType),
+    label: usageQuotaResourceLabel(resourceType),
+    models: resourceType ? [resourceType] : [],
+    remainingFraction,
+    resetTime,
+  };
+  if (remaining !== null && resource.totalLimit === null) {
+    group.remainingAmount = remaining;
+  }
+  if (resource.minimumCreditAmountForUsage !== null) {
+    group.minimumAmount = resource.minimumCreditAmountForUsage;
+  }
+  return group;
+};
+
+const usageQuotaResourceToAntigravityModel = (
+  resource: UsageQuotaResource,
+  resetTime?: string
+): AntigravityModelsPayload[string] | null => {
+  const group = usageQuotaResourceToAntigravityGroup(resource, resetTime);
+  if (!group) return null;
+
+  return {
+    displayName: group.label,
+    quotaInfo: {
+      remainingFraction: group.remainingFraction,
+      resetTime,
+    },
+  };
+};
+
+const ANTIGRAVITY_GROUPED_RESOURCE_TYPES = new Set(
+  ANTIGRAVITY_QUOTA_GROUPS.flatMap((group) => group.identifiers)
+);
+
 export const parseUsageQuotaSnapshot = (value: unknown): UsageQuotaSnapshot | null => {
   const payload = readUsageQuotaSnapshotPayload(value);
   if (!payload) return null;
@@ -189,40 +248,26 @@ export const buildAntigravityQuotaGroupsFromUsageQuota = (
   if (!snapshot || !snapshot.known || snapshot.error) return [];
 
   if (snapshot.resources.length > 0) {
-    return snapshot.resources
-      .map((resource): AntigravityQuotaGroup | null => {
-        const remaining = resource.remaining ?? (resource.exhausted ? 0 : null);
-        const inferredLimit =
-          resource.totalLimit ??
-          (remaining !== null && resource.currentUsage !== null
-            ? remaining + resource.currentUsage
-            : null);
-        if (remaining === null && inferredLimit === null) return null;
+    const groupedModels: AntigravityModelsPayload = {};
+    const fallbackGroups: AntigravityQuotaGroup[] = [];
 
-        const remainingFraction =
-          inferredLimit !== null && inferredLimit > 0
-            ? Math.max(0, Math.min(1, (remaining ?? 0) / inferredLimit))
-            : remaining !== null && remaining > 0 && !resource.exhausted
-              ? 1
-              : 0;
-        const resourceType = resource.resourceType;
+    snapshot.resources.forEach((resource) => {
+      const resourceType = resource.resourceType;
+      if (resourceType && ANTIGRAVITY_GROUPED_RESOURCE_TYPES.has(resourceType)) {
+        const model = usageQuotaResourceToAntigravityModel(resource, snapshot.nextReset);
+        if (model) {
+          groupedModels[resourceType] = model;
+        }
+        return;
+      }
 
-        const group: AntigravityQuotaGroup = {
-          id: usageQuotaResourceId(resourceType),
-          label: usageQuotaResourceLabel(resourceType),
-          models: resourceType ? [resourceType] : [],
-          remainingFraction,
-          resetTime: snapshot.nextReset,
-        };
-        if (remaining !== null && resource.totalLimit === null) {
-          group.remainingAmount = remaining;
-        }
-        if (resource.minimumCreditAmountForUsage !== null) {
-          group.minimumAmount = resource.minimumCreditAmountForUsage;
-        }
-        return group;
-      })
-      .filter((group): group is AntigravityQuotaGroup => Boolean(group));
+      const group = usageQuotaResourceToAntigravityGroup(resource, snapshot.nextReset);
+      if (group) {
+        fallbackGroups.push(group);
+      }
+    });
+
+    return [...buildAntigravityQuotaGroups(groupedModels), ...fallbackGroups];
   }
 
   const totalLimit = snapshot.totalLimit;
