@@ -214,7 +214,7 @@ export const buildAntigravityQuotaGroupsFromUsageQuota = (
           remainingFraction,
           resetTime: snapshot.nextReset,
         };
-        if (remaining !== null) {
+        if (remaining !== null && resource.totalLimit === null) {
           group.remainingAmount = remaining;
         }
         if (resource.minimumCreditAmountForUsage !== null) {

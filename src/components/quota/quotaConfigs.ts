@@ -1603,7 +1603,9 @@ const renderKiroItems = (
                   })
                 )
               : null,
-            h('span', { className: resetClassName }, resetLabel)
+            resetLabel !== '-'
+              ? h('span', { className: resetClassName }, resetLabel)
+              : null
           )
         ),
         h(QuotaProgressBar, {
@@ -1641,7 +1643,9 @@ const renderKiroItems = (
                   })
                 )
               : null,
-            h('span', { className: bonusResetClassName }, bonusResetLabel)
+            bonusResetLabel !== '-'
+              ? h('span', { className: bonusResetClassName }, bonusResetLabel)
+              : null
           )
         ),
         h(QuotaProgressBar, {
