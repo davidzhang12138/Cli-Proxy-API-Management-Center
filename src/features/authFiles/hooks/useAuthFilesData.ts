@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { authFilesApi } from '@/services/api';
 import { apiClient } from '@/services/api/client';
 import { useNotificationStore } from '@/stores';
-import type { AuthFileItem } from '@/types';
+import type {
+  AuthFileItem,
+  AuthFilesCategories,
+  AuthFilesListOptions,
+  AuthFilesPagination,
+} from '@/types';
 import { formatFileSize } from '@/utils/format';
 import { MAX_AUTH_FILE_SIZE } from '@/utils/constants';
 import { downloadBlob } from '@/utils/download';
@@ -25,6 +30,8 @@ type DeleteAllOptions = {
 
 export type UseAuthFilesDataResult = {
   files: AuthFileItem[];
+  pagination: AuthFilesPagination | null;
+  categories: AuthFilesCategories | null;
   selectedFiles: Set<string>;
   selectionCount: number;
   loading: boolean;
@@ -35,7 +42,7 @@ export type UseAuthFilesDataResult = {
   statusUpdating: Record<string, boolean>;
   batchStatusUpdating: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
-  loadFiles: () => Promise<void>;
+  loadFiles: (options?: AuthFilesListOptions | null) => Promise<void>;
   handleUploadClick: () => void;
   handleFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleDelete: (name: string) => void;
@@ -56,6 +63,8 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   const { showNotification, showConfirmation } = useNotificationStore();
 
   const [files, setFiles] = useState<AuthFileItem[]>([]);
+  const [pagination, setPagination] = useState<AuthFilesPagination | null>(null);
+  const [categories, setCategories] = useState<AuthFilesCategories | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -67,6 +76,8 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const batchStatusPendingRef = useRef(false);
+  const lastListOptionsRef = useRef<AuthFilesListOptions | undefined>(undefined);
+  const categoriesRef = useRef<AuthFilesCategories | null>(null);
   const selectionCount = selectedFiles.size;
   const toggleSelect = useCallback((name: string) => {
     setSelectedFiles((prev) => {
@@ -116,13 +127,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   }, []);
 
   const applyDeletedFiles = useCallback((names: string[]) => {
-    const deletedNames = Array.from(
-      new Set(
-        names
-          .map((name) => name.trim())
-          .filter(Boolean)
-      )
-    );
+    const deletedNames = Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
     if (deletedNames.length === 0) return;
 
     const deletedSet = new Set(deletedNames);
@@ -159,19 +164,48 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     });
   }, [files, selectedFiles.size]);
 
-  const loadFiles = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await authFilesApi.list();
-      setFiles(data?.files || []);
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
+  const loadFiles = useCallback(
+    async (options?: AuthFilesListOptions | null) => {
+      const optionsProvided = options !== undefined;
+      if (optionsProvided) {
+        lastListOptionsRef.current = options ?? undefined;
+      }
+      setLoading(true);
+      setError('');
+      try {
+        const effectiveOptions = optionsProvided
+          ? (options ?? undefined)
+          : lastListOptionsRef.current;
+        const data = await authFilesApi.list(effectiveOptions);
+        let nextCategories = data?.categories ?? null;
+        if (effectiveOptions?.provider) {
+          const previousProviders = categoriesRef.current?.providers;
+          if (previousProviders?.length) {
+            nextCategories = nextCategories
+              ? { ...nextCategories, providers: previousProviders }
+              : categoriesRef.current;
+          } else {
+            const categoryData = await authFilesApi.list({ page: 1, pageSize: 1 });
+            if (categoryData.categories?.providers?.length) {
+              nextCategories = nextCategories
+                ? { ...nextCategories, providers: categoryData.categories.providers }
+                : categoryData.categories;
+            }
+          }
+        }
+        setFiles(data?.files || []);
+        setPagination(data?.pagination ?? null);
+        categoriesRef.current = nextCategories;
+        setCategories(nextCategories);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
+        setError(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [t]
+  );
 
   const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -229,9 +263,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         }
 
         if (result.failed.length > 0) {
-          const details = result.failed
-            .map((item) => `${item.name}: ${item.error}`)
-            .join('; ');
+          const details = result.failed.map((item) => `${item.name}: ${item.error}`).join('; ');
           showNotification(`${t('notification.upload_failed')}: ${details}`, 'error');
         }
       } catch (err: unknown) {
@@ -336,9 +368,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
                 return;
               }
 
-              const result = await authFilesApi.deleteFiles(
-                filesToDelete.map((file) => file.name)
-              );
+              const result = await authFilesApi.deleteFiles(filesToDelete.map((file) => file.name));
               const success = result.deleted;
               const failed = result.failed.length;
 
@@ -533,7 +563,10 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         );
 
         if (failCount === 0) {
-          showNotification(t('auth_files.batch_status_success', { count: successCount }), 'success');
+          showNotification(
+            t('auth_files.batch_status_success', { count: successCount }),
+            'success'
+          );
         } else {
           showNotification(
             t('auth_files.batch_status_partial', { success: successCount, failed: failCount }),
@@ -636,6 +669,8 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
 
   return {
     files,
+    pagination,
+    categories,
     selectedFiles,
     selectionCount,
     loading,

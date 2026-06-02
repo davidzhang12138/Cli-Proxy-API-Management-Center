@@ -10,7 +10,7 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties
+  type CSSProperties,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconFilterAll } from '@/components/ui/icons';
@@ -18,10 +18,15 @@ import {
   getAuthFileIcon,
   getTypeColor,
   getTypeLabel,
-  type ResolvedTheme
+  type ResolvedTheme,
 } from '@/features/authFiles/constants';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
-import { USAGE_STATS_STALE_TIME_MS, useAuthStore, useThemeStore, useUsageStatsStore } from '@/stores';
+import {
+  USAGE_STATS_STALE_TIME_MS,
+  useAuthStore,
+  useThemeStore,
+  useUsageStatsStore,
+} from '@/stores';
 import { authFilesApi, configFileApi } from '@/services/api';
 import {
   QuotaSection,
@@ -53,10 +58,18 @@ const QUOTA_CONFIGS = [
   KIRO_CONFIG,
   XAI_CONFIG,
   GEMINI_CLI_CONFIG,
-  KIMI_CONFIG
+  KIMI_CONFIG,
 ] as const;
 type ActiveQuotaType = (typeof QUOTA_CONFIGS)[number]['type'];
 type ActiveQuotaFilter = 'all' | ActiveQuotaType;
+type QuotaPaginationState = Record<ActiveQuotaType, { page: number; pageSize: number }>;
+
+const DEFAULT_QUOTA_PAGE_SIZE = 6;
+const createDefaultQuotaPaginationState = (): QuotaPaginationState =>
+  QUOTA_CONFIGS.reduce((result, config) => {
+    result[config.type] = { page: 1, pageSize: DEFAULT_QUOTA_PAGE_SIZE };
+    return result;
+  }, {} as QuotaPaginationState);
 
 const compareModelNames = (left: string, right: string) =>
   left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
@@ -95,7 +108,7 @@ const extractModelToken = (value: unknown): string | null => {
     record.model,
     record.display_name,
     record.displayName,
-    record.alias
+    record.alias,
   ];
 
   for (const candidate of candidates) {
@@ -112,7 +125,13 @@ const extractModelToken = (value: unknown): string | null => {
 const extractInlineModels = (file: AuthFileItem): string[] => {
   const values: string[] = [];
   const arrayFields = [file['models'], file['modelIds'], file['model_ids']];
-  const singleFields = [file['model'], file['modelId'], file['model_id'], file['testModel'], file['test-model']];
+  const singleFields = [
+    file['model'],
+    file['modelId'],
+    file['model_id'],
+    file['testModel'],
+    file['test-model'],
+  ];
 
   arrayFields.forEach((field) => {
     if (Array.isArray(field)) {
@@ -149,6 +168,10 @@ export function QuotaPage() {
   const loadUsageStats = useUsageStatsStore((state) => state.loadUsageStats);
 
   const [files, setFiles] = useState<AuthFileItem[]>([]);
+  const [filesByType, setFilesByType] = useState<Partial<Record<ActiveQuotaType, AuthFileItem[]>>>(
+    {}
+  );
+  const [totalByType, setTotalByType] = useState<Partial<Record<ActiveQuotaType, number>>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [availabilityFilter, setAvailabilityFilter] = useState<QuotaAvailabilityFilter>('all');
@@ -159,16 +182,34 @@ export function QuotaPage() {
   const [fileModelsByName, setFileModelsByName] = useState<Record<string, string[]>>({});
   const [modelCatalogLoading, setModelCatalogLoading] = useState(false);
   const [modelReloadKey, setModelReloadKey] = useState(0);
+  const [quotaPagination, setQuotaPagination] = useState<QuotaPaginationState>(
+    createDefaultQuotaPaginationState
+  );
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const fileModelsRef = useRef<Record<string, string[]>>({});
+  const filesByTypeRef = useRef<Partial<Record<ActiveQuotaType, AuthFileItem[]>>>({});
+  const totalByTypeRef = useRef<Partial<Record<ActiveQuotaType, number>>>({});
 
   useEffect(() => {
     fileModelsRef.current = fileModelsByName;
   }, [fileModelsByName]);
 
+  useEffect(() => {
+    filesByTypeRef.current = filesByType;
+  }, [filesByType]);
+
+  useEffect(() => {
+    totalByTypeRef.current = totalByType;
+  }, [totalByType]);
+
   const disableControls = connectionStatus !== 'connected';
   const usageStatsReady = usageLastRefreshedAt !== null;
+  const serverPaginationEnabled =
+    deferredSearchQuery.trim().length === 0 &&
+    availabilityFilter === 'all' &&
+    selectedModel === 'all' &&
+    sortMode === 'default';
 
   const quotaFiles = useMemo(
     () => files.filter((file) => QUOTA_CONFIGS.some((config) => config.filterFn(file))),
@@ -176,11 +217,23 @@ export function QuotaPage() {
   );
   const quotaTypeCounts = useMemo(
     () =>
-      QUOTA_CONFIGS.reduce<Record<ActiveQuotaType, number>>((result, config) => {
-        result[config.type] = quotaFiles.filter((file) => config.filterFn(file)).length;
-        return result;
-      }, {} as Record<ActiveQuotaType, number>),
-    [quotaFiles]
+      QUOTA_CONFIGS.reduce<Record<ActiveQuotaType, number>>(
+        (result, config) => {
+          result[config.type] = serverPaginationEnabled
+            ? (totalByType[config.type] ?? 0)
+            : quotaFiles.filter((file) => config.filterFn(file)).length;
+          return result;
+        },
+        {} as Record<ActiveQuotaType, number>
+      ),
+    [quotaFiles, serverPaginationEnabled, totalByType]
+  );
+  const totalQuotaFileCount = useMemo(
+    () =>
+      serverPaginationEnabled
+        ? QUOTA_CONFIGS.reduce((sum, config) => sum + (quotaTypeCounts[config.type] ?? 0), 0)
+        : quotaFiles.length,
+    [quotaFiles.length, quotaTypeCounts, serverPaginationEnabled]
   );
   const availableQuotaConfigs = useMemo(
     () => QUOTA_CONFIGS.filter((config) => (quotaTypeCounts[config.type] ?? 0) > 0),
@@ -250,15 +303,67 @@ export function QuotaPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await authFilesApi.list();
-      setFiles(data?.files || []);
+      if (serverPaginationEnabled) {
+        const typesToLoad =
+          activeQuotaFilter === 'all'
+            ? QUOTA_CONFIGS.map((config) => config.type)
+            : [activeQuotaFilter];
+        const [responses, categoriesData] = await Promise.all([
+          Promise.all(
+            typesToLoad.map(async (type) => {
+              const pageState = quotaPagination[type];
+              const data = await authFilesApi.list({
+                page: pageState.page,
+                pageSize: pageState.pageSize,
+                provider: type,
+              });
+              return { type, data };
+            })
+          ),
+          activeQuotaFilter === 'all'
+            ? Promise.resolve(null)
+            : authFilesApi.list({ page: 1, pageSize: 1 }).catch(() => null),
+        ]);
+        const nextFilesByType: Partial<Record<ActiveQuotaType, AuthFileItem[]>> = {
+          ...filesByTypeRef.current,
+        };
+        const nextTotalByType: Partial<Record<ActiveQuotaType, number>> = {
+          ...totalByTypeRef.current,
+        };
+        categoriesData?.categories?.providers?.forEach((item) => {
+          const matched = QUOTA_CONFIGS.find((config) => config.type === item.name);
+          if (matched) {
+            nextTotalByType[matched.type] = item.count;
+          }
+        });
+        responses.forEach(({ type, data }) => {
+          nextFilesByType[type] = data?.files ?? [];
+          nextTotalByType[type] =
+            data?.pagination?.total ?? data?.total ?? data?.files?.length ?? 0;
+        });
+        const mergedFiles = QUOTA_CONFIGS.flatMap((config) => nextFilesByType[config.type] ?? []);
+        setFilesByType(nextFilesByType);
+        setTotalByType(nextTotalByType);
+        setFiles(mergedFiles);
+      } else {
+        const data = await authFilesApi.list();
+        const nextFiles = data?.files || [];
+        setFiles(nextFiles);
+        setFilesByType({});
+        setTotalByType(
+          QUOTA_CONFIGS.reduce<Partial<Record<ActiveQuotaType, number>>>((result, config) => {
+            result[config.type] = nextFiles.filter((file) => config.filterFn(file)).length;
+            return result;
+          }, {})
+        );
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
       setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [activeQuotaFilter, quotaPagination, serverPaginationEnabled, t]);
 
   const handleHeaderRefresh = useCallback(async () => {
     setFileModelsByName({});
@@ -270,7 +375,7 @@ export function QuotaPage() {
         force: true,
         staleTimeMs: USAGE_STATS_STALE_TIME_MS,
         queryParams: { all: true },
-      })
+      }),
     ]);
   }, [loadConfig, loadFiles, loadUsageStats]);
 
@@ -333,7 +438,7 @@ export function QuotaPage() {
             remoteModels
               .map((item) => extractModelToken(item.id ?? item.display_name ?? item))
               .filter((item): item is string => Boolean(item))
-          )
+          ),
         };
       })
     ).then((results) => {
@@ -362,7 +467,6 @@ export function QuotaPage() {
   }, [modelOptions, selectedModel]);
 
   const commonSectionProps = {
-    files,
     loading,
     disabled: disableControls,
     usageDetails,
@@ -372,26 +476,111 @@ export function QuotaPage() {
     sortMode,
     searchQuery: deferredSearchQuery,
     fileModelsByName,
-    onFilesChanged: loadFiles
+    onFilesChanged: loadFiles,
   };
 
+  const updateQuotaPage = useCallback((type: ActiveQuotaType, page: number) => {
+    setQuotaPagination((prev) => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        page: Math.max(1, Math.round(page)),
+      },
+    }));
+  }, []);
+
+  const updateQuotaPageSize = useCallback((type: ActiveQuotaType, pageSize: number) => {
+    setQuotaPagination((prev) => ({
+      ...prev,
+      [type]: {
+        page: 1,
+        pageSize: Math.max(1, Math.round(pageSize)),
+      },
+    }));
+  }, []);
+
+  const getQuotaSectionProps = useCallback(
+    (type: ActiveQuotaType) => {
+      const pageState = quotaPagination[type];
+      const total = totalByType[type] ?? 0;
+      return {
+        files: serverPaginationEnabled ? (filesByType[type] ?? []) : files,
+        serverPagination: serverPaginationEnabled
+          ? {
+              enabled: true,
+              total,
+              totalPages: Math.max(1, Math.ceil(total / Math.max(1, pageState.pageSize))),
+              currentPage: pageState.page,
+              pageSize: pageState.pageSize,
+              onPageChange: (nextPage: number) => updateQuotaPage(type, nextPage),
+              onPageSizeChange: (nextPageSize: number) => updateQuotaPageSize(type, nextPageSize),
+            }
+          : undefined,
+      };
+    },
+    [
+      files,
+      filesByType,
+      quotaPagination,
+      serverPaginationEnabled,
+      totalByType,
+      updateQuotaPage,
+      updateQuotaPageSize,
+    ]
+  );
+
   const renderQuotaSection = (type: ActiveQuotaType) => {
+    const sectionProps = getQuotaSectionProps(type);
     switch (type) {
       case ANTIGRAVITY_CONFIG.type:
-        return <QuotaSection key={type} config={ANTIGRAVITY_CONFIG} {...commonSectionProps} />;
+        return (
+          <QuotaSection
+            key={type}
+            config={ANTIGRAVITY_CONFIG}
+            {...commonSectionProps}
+            {...sectionProps}
+          />
+        );
       case CODEX_CONFIG.type:
-        return <QuotaSection key={type} config={CODEX_CONFIG} {...commonSectionProps} />;
+        return (
+          <QuotaSection
+            key={type}
+            config={CODEX_CONFIG}
+            {...commonSectionProps}
+            {...sectionProps}
+          />
+        );
       case KIRO_CONFIG.type:
-        return <QuotaSection key={type} config={KIRO_CONFIG} {...commonSectionProps} />;
+        return (
+          <QuotaSection key={type} config={KIRO_CONFIG} {...commonSectionProps} {...sectionProps} />
+        );
       case XAI_CONFIG.type:
-        return <QuotaSection key={type} config={XAI_CONFIG} {...commonSectionProps} />;
+        return (
+          <QuotaSection key={type} config={XAI_CONFIG} {...commonSectionProps} {...sectionProps} />
+        );
       case GEMINI_CLI_CONFIG.type:
-        return <QuotaSection key={type} config={GEMINI_CLI_CONFIG} {...commonSectionProps} />;
+        return (
+          <QuotaSection
+            key={type}
+            config={GEMINI_CLI_CONFIG}
+            {...commonSectionProps}
+            {...sectionProps}
+          />
+        );
       case KIMI_CONFIG.type:
-        return <QuotaSection key={type} config={KIMI_CONFIG} {...commonSectionProps} />;
+        return (
+          <QuotaSection key={type} config={KIMI_CONFIG} {...commonSectionProps} {...sectionProps} />
+        );
       case CLAUDE_CONFIG.type:
       default:
-        return <QuotaSection key={type} config={CLAUDE_CONFIG} {...commonSectionProps} />;
+        return (
+          <QuotaSection
+            key={type}
+            config={CLAUDE_CONFIG}
+            {...commonSectionProps}
+            {...sectionProps}
+          />
+        );
     }
   };
 
@@ -409,11 +598,11 @@ export function QuotaPage() {
           <div className={styles.filterTags}>
             {(
               [
-                { type: 'all' as const, count: quotaFiles.length },
+                { type: 'all' as const, count: totalQuotaFileCount },
                 ...availableQuotaConfigs.map((config) => ({
                   type: config.type,
-                  count: quotaTypeCounts[config.type] ?? 0
-                }))
+                  count: quotaTypeCounts[config.type] ?? 0,
+                })),
               ] as Array<{ type: ActiveQuotaFilter; count: number }>
             ).map(({ type, count }) => {
               const isActive = activeQuotaFilter === type;
@@ -425,7 +614,7 @@ export function QuotaPage() {
               const buttonStyle = {
                 '--filter-color': color.text,
                 '--filter-surface': color.bg,
-                '--filter-active-text': resolvedTheme === 'dark' ? '#111827' : '#ffffff'
+                '--filter-active-text': resolvedTheme === 'dark' ? '#111827' : '#ffffff',
               } as CSSProperties;
 
               return (
@@ -437,6 +626,9 @@ export function QuotaPage() {
                   onClick={() => {
                     startTransition(() => {
                       setActiveQuotaFilter(type);
+                      if (type !== 'all') {
+                        updateQuotaPage(type, 1);
+                      }
                     });
                   }}
                 >
@@ -483,7 +675,9 @@ export function QuotaPage() {
             </div>
 
             <div className={styles.filterControl}>
-              <label htmlFor="quota-availability-filter">{t('quota_management.quota_filter_label')}</label>
+              <label htmlFor="quota-availability-filter">
+                {t('quota_management.quota_filter_label')}
+              </label>
               <select
                 id="quota-availability-filter"
                 className={styles.pageSizeSelect}
@@ -529,10 +723,18 @@ export function QuotaPage() {
                 <option value="default">{t('quota_management.sort_default')}</option>
                 <option value="quota_desc">{t('quota_management.sort_quota_desc')}</option>
                 <option value="quota_asc">{t('quota_management.sort_quota_asc')}</option>
-                <option value="model_reset_asc">{t('quota_management.sort_model_reset_asc')}</option>
-                <option value="model_reset_desc">{t('quota_management.sort_model_reset_desc')}</option>
-                <option value="model_recent_usage_asc">{t('quota_management.sort_model_recent_usage_asc')}</option>
-                <option value="model_recent_usage_desc">{t('quota_management.sort_model_recent_usage_desc')}</option>
+                <option value="model_reset_asc">
+                  {t('quota_management.sort_model_reset_asc')}
+                </option>
+                <option value="model_reset_desc">
+                  {t('quota_management.sort_model_reset_desc')}
+                </option>
+                <option value="model_recent_usage_asc">
+                  {t('quota_management.sort_model_recent_usage_asc')}
+                </option>
+                <option value="model_recent_usage_desc">
+                  {t('quota_management.sort_model_recent_usage_desc')}
+                </option>
               </select>
             </div>
 

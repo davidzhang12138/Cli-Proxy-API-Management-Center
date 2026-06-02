@@ -796,6 +796,15 @@ interface QuotaSectionProps<TState extends QuotaStatusState, TData> {
   searchQuery: string;
   fileModelsByName: Record<string, string[]>;
   onFilesChanged?: () => void;
+  serverPagination?: {
+    enabled: boolean;
+    total: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+    onPageChange: (page: number) => void;
+    onPageSizeChange: (pageSize: number) => void;
+  };
 }
 
 export function QuotaSection<TState extends QuotaStatusState, TData>({
@@ -811,6 +820,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   searchQuery,
   fileModelsByName,
   onFilesChanged,
+  serverPagination,
 }: QuotaSectionProps<TState, TData>) {
   const { t } = useTranslation();
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
@@ -1256,9 +1266,11 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     usageSummaryByFileName,
   ]);
 
+  const localPagination = useQuotaPagination(visibleFiles, DEFAULT_ITEMS_PER_PAGE);
+  const isServerPagination = serverPagination?.enabled === true;
   const showAllAllowed = visibleFiles.length <= MAX_SHOW_ALL_THRESHOLD;
-  const effectiveViewMode: ViewMode = viewMode === 'all' && !showAllAllowed ? 'paged' : viewMode;
-
+  const effectiveViewMode: ViewMode =
+    isServerPagination || (viewMode === 'all' && !showAllAllowed) ? 'paged' : viewMode;
   const {
     totalPages,
     currentPage,
@@ -1271,7 +1283,28 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     loading: sectionLoading,
     loadingScope,
     setLoading,
-  } = useQuotaPagination(visibleFiles, DEFAULT_ITEMS_PER_PAGE);
+  } = isServerPagination
+    ? {
+        totalPages: Math.max(1, serverPagination.totalPages),
+        currentPage: Math.min(
+          serverPagination.currentPage,
+          Math.max(1, serverPagination.totalPages)
+        ),
+        pageItems: visibleFiles,
+        setPageSize: serverPagination.onPageSizeChange,
+        syncPageSize: serverPagination.onPageSizeChange,
+        goToPage: serverPagination.onPageChange,
+        goToPrev: () =>
+          serverPagination.onPageChange(Math.max(1, serverPagination.currentPage - 1)),
+        goToNext: () =>
+          serverPagination.onPageChange(
+            Math.min(Math.max(1, serverPagination.totalPages), serverPagination.currentPage + 1)
+          ),
+        loading: localPagination.loading,
+        loadingScope: localPagination.loadingScope,
+        setLoading: localPagination.setLoading,
+      }
+    : localPagination;
 
   const selectAllPage = useCallback(() => {
     setSelectedKeys((prev) => {
@@ -1298,12 +1331,19 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   }, [showAllAllowed, viewMode]);
 
   useEffect(() => {
+    if (isServerPagination) return;
     if (effectiveViewMode === 'all') {
       syncPageSize(Math.max(1, visibleFiles.length));
     } else {
       syncPageSize(Math.min(pageSizePreference, MAX_ITEMS_PER_PAGE));
     }
-  }, [effectiveViewMode, pageSizePreference, syncPageSize, visibleFiles.length]);
+  }, [
+    effectiveViewMode,
+    isServerPagination,
+    pageSizePreference,
+    syncPageSize,
+    visibleFiles.length,
+  ]);
 
   const [refreshProgress, setRefreshProgress] = useState<{
     completedCount: number;
@@ -1483,7 +1523,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   const titleNode = (
     <div className={styles.titleWrapper}>
       <span>{t(`${config.i18nPrefix}.title`)}</span>
-      {visibleFiles.length > 0 && <span className={styles.countBadge}>{visibleFiles.length}</span>}
+      {(serverPagination?.total ?? visibleFiles.length) > 0 && (
+        <span className={styles.countBadge}>{serverPagination?.total ?? visibleFiles.length}</span>
+      )}
     </div>
   );
 
@@ -1539,12 +1581,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                 effectiveViewMode === 'all' ? styles.viewModeButtonActive : ''
               }`}
               onClick={() => {
+                if (isServerPagination) return;
                 if (visibleFiles.length > MAX_SHOW_ALL_THRESHOLD) {
                   setShowTooManyWarning(true);
                 } else {
                   setViewMode('all');
                 }
               }}
+              disabled={isServerPagination}
             >
               {t('auth_files.view_mode_all')}
             </Button>
@@ -1778,7 +1822,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   {t('auth_files.pagination_info', {
                     current: currentPage,
                     total: totalPages,
-                    count: visibleFiles.length,
+                    count: serverPagination?.total ?? visibleFiles.length,
                   })}
                 </div>
               </div>

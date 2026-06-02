@@ -65,7 +65,10 @@ const DEFAULT_REGULAR_PAGE_SIZE = 9;
 const DEFAULT_COMPACT_PAGE_SIZE = 12;
 const AUTH_FILES_PAGE_SIZE_OPTIONS = [6, 9, 12, 18, 24, 30];
 
-const buildPaginationItems = (currentPage: number, totalPages: number): Array<number | 'ellipsis'> => {
+const buildPaginationItems = (
+  currentPage: number,
+  totalPages: number
+): Array<number | 'ellipsis'> => {
   if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
@@ -75,14 +78,21 @@ const buildPaginationItems = (currentPage: number, totalPages: number): Array<nu
   }
 
   if (currentPage >= totalPages - 3) {
-    return [1, 'ellipsis', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [
+      1,
+      'ellipsis',
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
   }
 
   return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages];
 };
 
-const escapeWildcardSearchSegment = (value: string) =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeWildcardSearchSegment = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const buildWildcardSearch = (value: string): RegExp | null => {
   if (!value.includes('*')) return null;
@@ -145,6 +155,8 @@ export function AuthFilesPage() {
     batchDownload,
     batchSetStatus,
     batchDelete,
+    pagination,
+    categories,
   } = useAuthFilesData();
 
   const statusBarCache = useAuthFilesStatusBarCache(files);
@@ -198,6 +210,26 @@ export function AuthFilesPage() {
     ? (normalizedFilter as QuotaProviderType)
     : null;
   const pageSize = compactMode ? pageSizeByMode.compact : pageSizeByMode.regular;
+  const normalizedSearch = search.trim();
+  const serverPaginationEnabled =
+    uiStateHydrated &&
+    normalizedSearch.length === 0 &&
+    !problemOnly &&
+    sortMode !== 'priority' &&
+    sortMode !== 'created';
+  const serverListOptions = useMemo(
+    () =>
+      serverPaginationEnabled
+        ? {
+            page,
+            pageSize,
+            provider: normalizedFilter === 'all' ? undefined : normalizedFilter,
+            status: disabledOnly ? 'disabled' : undefined,
+          }
+        : undefined,
+    [disabledOnly, normalizedFilter, page, pageSize, serverPaginationEnabled]
+  );
+  const effectiveListOptions = serverPaginationEnabled ? serverListOptions : null;
 
   useEffect(() => {
     const persistedCompactMode = readPersistedAuthFilesCompactMode();
@@ -216,10 +248,7 @@ export function AuthFilesPage() {
       if (typeof persisted.disabledOnly === 'boolean') {
         setDisabledOnly(persisted.disabledOnly);
       }
-      if (
-        typeof persistedCompactMode !== 'boolean' &&
-        typeof persisted.compactMode === 'boolean'
-      ) {
+      if (typeof persistedCompactMode !== 'boolean' && typeof persisted.compactMode === 'boolean') {
         setCompactMode(persisted.compactMode);
       }
       if (typeof persisted.search === 'string') {
@@ -235,11 +264,11 @@ export function AuthFilesPage() {
       const regularPageSize =
         typeof persisted.regularPageSize === 'number' && Number.isFinite(persisted.regularPageSize)
           ? clampCardPageSize(persisted.regularPageSize)
-          : legacyPageSize ?? DEFAULT_REGULAR_PAGE_SIZE;
+          : (legacyPageSize ?? DEFAULT_REGULAR_PAGE_SIZE);
       const compactPageSize =
         typeof persisted.compactPageSize === 'number' && Number.isFinite(persisted.compactPageSize)
           ? clampCardPageSize(persisted.compactPageSize)
-          : legacyPageSize ?? DEFAULT_COMPACT_PAGE_SIZE;
+          : (legacyPageSize ?? DEFAULT_COMPACT_PAGE_SIZE);
       setPageSizeByMode({
         regular: regularPageSize,
         compact: compactPageSize,
@@ -287,9 +316,7 @@ export function AuthFilesPage() {
         Math.abs(curr - pageSize) < Math.abs(prev - pageSize) ? curr : prev
       );
       if (nearest === pageSize) return current;
-      return compactMode
-        ? { ...current, compact: nearest }
-        : { ...current, regular: nearest };
+      return compactMode ? { ...current, compact: nearest } : { ...current, regular: nearest };
     });
   }, [compactMode, pageSize]);
 
@@ -307,39 +334,51 @@ export function AuthFilesPage() {
       if (!isAuthFilesSortMode(value) || value === sortMode) return;
       setSortMode(value);
       setPage(1);
-      void loadFiles().catch(() => {});
     },
-    [loadFiles, sortMode]
+    [sortMode]
   );
 
   const handleHeaderRefresh = useCallback(async () => {
-    await Promise.all([loadFiles(), loadExcluded(), loadModelAlias()]);
-  }, [loadFiles, loadExcluded, loadModelAlias]);
+    await Promise.all([loadFiles(effectiveListOptions), loadExcluded(), loadModelAlias()]);
+  }, [effectiveListOptions, loadFiles, loadExcluded, loadModelAlias]);
 
   useHeaderRefresh(handleHeaderRefresh);
 
   useEffect(() => {
-    if (!isCurrentLayer) return;
-    loadFiles();
+    if (!isCurrentLayer || !uiStateHydrated) return;
+    loadFiles(effectiveListOptions);
     loadExcluded();
     loadModelAlias();
-  }, [isCurrentLayer, loadFiles, loadExcluded, loadModelAlias]);
+  }, [
+    effectiveListOptions,
+    isCurrentLayer,
+    loadFiles,
+    loadExcluded,
+    loadModelAlias,
+    uiStateHydrated,
+  ]);
 
   useInterval(
     () => {
-      void loadFiles().catch(() => {});
+      void loadFiles(effectiveListOptions).catch(() => {});
     },
-    isCurrentLayer ? 240_000 : null
+    isCurrentLayer && uiStateHydrated ? 240_000 : null
   );
 
   const existingTypes = useMemo(() => {
     const types = new Set<string>(['all']);
-    files.forEach((file) => {
-      const type = normalizeProviderKey(String(file.type ?? file.provider ?? ''));
+    categories?.providers?.forEach((item) => {
+      const type = normalizeProviderKey(item.name);
       if (type) types.add(type);
     });
+    if (!categories?.providers?.length) {
+      files.forEach((file) => {
+        const type = normalizeProviderKey(String(file.type ?? file.provider ?? ''));
+        if (type) types.add(type);
+      });
+    }
     return Array.from(types);
-  }, [files]);
+  }, [categories, files]);
 
   const filesMatchingStatusFilters = useMemo(
     () =>
@@ -362,6 +401,15 @@ export function AuthFilesPage() {
   );
 
   const typeCounts = useMemo(() => {
+    if (categories?.providers?.length && !problemOnly && !disabledOnly) {
+      const providerTotal = categories.providers.reduce((sum, item) => sum + item.count, 0);
+      const counts: Record<string, number> = { all: providerTotal || pagination?.total || 0 };
+      categories.providers.forEach((item) => {
+        const type = normalizeProviderKey(item.name);
+        if (type) counts[type] = item.count;
+      });
+      return counts;
+    }
     const counts: Record<string, number> = { all: filesMatchingStatusFilters.length };
     filesMatchingStatusFilters.forEach((file) => {
       const type = normalizeProviderKey(String(file.type ?? file.provider ?? ''));
@@ -369,9 +417,8 @@ export function AuthFilesPage() {
       counts[type] = (counts[type] || 0) + 1;
     });
     return counts;
-  }, [filesMatchingStatusFilters]);
+  }, [categories, disabledOnly, filesMatchingStatusFilters, pagination, problemOnly]);
 
-  const normalizedSearch = search.trim();
   const wildcardSearch = useMemo(() => buildWildcardSearch(normalizedSearch), [normalizedSearch]);
 
   const filtered = useMemo(() => {
@@ -420,10 +467,17 @@ export function AuthFilesPage() {
     return copy;
   }, [filtered, sortMode]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
+  const totalPages = serverPaginationEnabled
+    ? Math.max(1, pagination?.total_pages ?? 1)
+    : Math.max(1, Math.ceil(sorted.length / pageSize));
+  const currentPage = serverPaginationEnabled
+    ? Math.min(page, totalPages)
+    : Math.min(page, totalPages);
   const start = (currentPage - 1) * pageSize;
-  const pageItems = sorted.slice(start, start + pageSize);
+  const pageItems = serverPaginationEnabled ? sorted : sorted.slice(start, start + pageSize);
+  const totalVisibleCount = serverPaginationEnabled
+    ? (pagination?.total ?? sorted.length)
+    : sorted.length;
   const paginationItems = useMemo(
     () => buildPaginationItems(currentPage, totalPages),
     [currentPage, totalPages]
@@ -635,7 +689,7 @@ export function AuthFilesPage() {
   const titleNode = (
     <div className={styles.titleWrapper}>
       <span>{t('auth_files.title_section')}</span>
-      {files.length > 0 && <span className={styles.countBadge}>{files.length}</span>}
+      {totalVisibleCount > 0 && <span className={styles.countBadge}>{totalVisibleCount}</span>}
     </div>
   );
 
@@ -822,7 +876,7 @@ export function AuthFilesPage() {
               </div>
             )}
 
-            {!loading && sorted.length > pageSize && (
+            {!loading && totalVisibleCount > pageSize && (
               <div className={styles.pagination}>
                 <div className={styles.paginationMeta}>
                   <div className={styles.pageSizeControl}>
@@ -847,7 +901,7 @@ export function AuthFilesPage() {
                     {t('auth_files.pagination_info', {
                       current: currentPage,
                       total: totalPages,
-                      count: sorted.length,
+                      count: totalVisibleCount,
                     })}
                   </div>
                 </div>
