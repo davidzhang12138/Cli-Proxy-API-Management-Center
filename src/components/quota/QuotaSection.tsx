@@ -799,6 +799,7 @@ interface QuotaSectionProps<TState extends QuotaStatusState, TData> {
     totalPages: number;
     currentPage: number;
     pageSize: number;
+    loading?: boolean;
     onPageChange: (page: number) => void;
     onPageSizeChange: (pageSize: number) => void;
   };
@@ -1527,6 +1528,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   );
 
   const isRefreshing = sectionLoading || loading;
+  const isPageLoading = serverPagination?.loading === true;
   const isRefreshingPage = isRefreshing && loadingScope === 'page';
   const paginationItems = buildPaginationItems(currentPage, totalPages);
   const refreshProgressLabel =
@@ -1806,7 +1808,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                       setPageSizePreference(nextPageSize);
                       setPageSize(nextPageSize);
                     }}
-                    disabled={isRefreshing}
+                    disabled={isRefreshing || isPageLoading}
                   >
                     {PAGE_SIZE_OPTIONS.map((option) => (
                       <option key={option} value={option}>
@@ -1821,6 +1823,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                     total: totalPages,
                     count: serverPagination?.total ?? visibleFiles.length,
                   })}
+                  {isPageLoading && (
+                    <span className={styles.paginationLoading}>{t('common.loading')}</span>
+                  )}
                 </div>
               </div>
 
@@ -1829,7 +1834,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   variant="secondary"
                   size="sm"
                   onClick={goToPrev}
-                  disabled={currentPage <= 1}
+                  disabled={isPageLoading || currentPage <= 1}
                 >
                   {t('auth_files.pagination_prev')}
                 </Button>
@@ -1850,6 +1855,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                           item === currentPage ? styles.paginationNumberButtonActive : ''
                         }`}
                         onClick={() => goToPage(item)}
+                        disabled={isPageLoading || item === currentPage}
                         aria-current={item === currentPage ? 'page' : undefined}
                       >
                         {item}
@@ -1861,7 +1867,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   variant="secondary"
                   size="sm"
                   onClick={goToNext}
-                  disabled={currentPage >= totalPages}
+                  disabled={isPageLoading || currentPage >= totalPages}
                 >
                   {t('auth_files.pagination_next')}
                 </Button>
@@ -1880,6 +1886,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   className={styles.paginationJumpInput}
                   value={pageJumpValue}
                   onChange={(event) => setPageJumpValue(event.target.value)}
+                  disabled={isPageLoading}
                   onKeyDown={(event) => {
                     if (event.key !== 'Enter') return;
                     const targetPage = Number(pageJumpValue);
@@ -1898,7 +1905,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                     goToPage(targetPage);
                     setPageJumpValue('');
                   }}
-                  disabled={!pageJumpValue.trim()}
+                  disabled={isPageLoading || !pageJumpValue.trim()}
                 >
                   {t('quota_management.page_jump_confirm')}
                 </Button>

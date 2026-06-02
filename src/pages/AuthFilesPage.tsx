@@ -128,6 +128,7 @@ export function AuthFilesPage() {
   const batchActionAnimationRef = useRef<AnimationPlaybackControlsWithThen | null>(null);
   const previousSelectionCountRef = useRef(0);
   const selectionCountRef = useRef(0);
+  const wasCurrentLayerRef = useRef(isCurrentLayer);
 
   const {
     files,
@@ -239,9 +240,6 @@ export function AuthFilesPage() {
 
     const persisted = readAuthFilesUiState();
     if (persisted) {
-      if (typeof persisted.filter === 'string' && persisted.filter.trim()) {
-        setFilter(normalizeProviderKey(persisted.filter));
-      }
       if (typeof persisted.problemOnly === 'boolean') {
         setProblemOnly(persisted.problemOnly);
       }
@@ -285,7 +283,7 @@ export function AuthFilesPage() {
     if (!uiStateHydrated) return;
 
     writeAuthFilesUiState({
-      filter,
+      filter: 'all',
       problemOnly,
       disabledOnly,
       compactMode,
@@ -346,8 +344,20 @@ export function AuthFilesPage() {
 
   useEffect(() => {
     if (!isCurrentLayer || !uiStateHydrated) return;
+    const returnedFromAnotherPage = !wasCurrentLayerRef.current;
+    wasCurrentLayerRef.current = true;
+    if (returnedFromAnotherPage && filter !== 'all') {
+      setFilter('all');
+      setPage(1);
+      return;
+    }
     loadFiles(effectiveListOptions);
-  }, [effectiveListOptions, isCurrentLayer, loadFiles, uiStateHydrated]);
+  }, [effectiveListOptions, filter, isCurrentLayer, loadFiles, uiStateHydrated]);
+
+  useEffect(() => {
+    if (isCurrentLayer) return;
+    wasCurrentLayerRef.current = false;
+  }, [isCurrentLayer]);
 
   useEffect(() => {
     if (!isCurrentLayer) return;

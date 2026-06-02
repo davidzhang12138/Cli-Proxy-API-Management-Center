@@ -185,11 +185,13 @@ export function QuotaPage() {
   const [quotaPagination, setQuotaPagination] = useState<QuotaPaginationState>(
     createDefaultQuotaPaginationState
   );
+  const [loadingByType, setLoadingByType] = useState<Partial<Record<ActiveQuotaType, boolean>>>({});
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const fileModelsRef = useRef<Record<string, string[]>>({});
   const filesByTypeRef = useRef<Partial<Record<ActiveQuotaType, AuthFileItem[]>>>({});
   const totalByTypeRef = useRef<Partial<Record<ActiveQuotaType, number>>>({});
+  const quotaPaginationRef = useRef<QuotaPaginationState>(quotaPagination);
 
   useEffect(() => {
     fileModelsRef.current = fileModelsByName;
@@ -203,6 +205,10 @@ export function QuotaPage() {
     totalByTypeRef.current = totalByType;
   }, [totalByType]);
 
+  useEffect(() => {
+    quotaPaginationRef.current = quotaPagination;
+  }, [quotaPagination]);
+
   const disableControls = connectionStatus !== 'connected';
   const usageStatsReady = usageLastRefreshedAt !== null;
   const serverPaginationEnabled =
@@ -210,6 +216,13 @@ export function QuotaPage() {
     availabilityFilter === 'all' &&
     selectedModel === 'all' &&
     sortMode === 'default';
+  const needsModelCatalog =
+    selectedModel !== 'all' ||
+    deferredSearchQuery.trim().length > 0 ||
+    sortMode === 'model_reset_asc' ||
+    sortMode === 'model_reset_desc' ||
+    sortMode === 'model_recent_usage_asc' ||
+    sortMode === 'model_recent_usage_desc';
 
   const quotaFiles = useMemo(
     () => files.filter((file) => QUOTA_CONFIGS.some((config) => config.filterFn(file))),
@@ -299,19 +312,29 @@ export function QuotaPage() {
     }
   }, [t]);
 
-  const loadFiles = useCallback(async () => {
-    setLoading(true);
+  const loadFiles = useCallback(async (typesToLoadOverride?: ActiveQuotaType[]) => {
+    const partialServerLoad = serverPaginationEnabled && Boolean(typesToLoadOverride?.length);
+    if (!partialServerLoad) {
+      setLoading(true);
+    } else {
+      setLoadingByType((prev) => ({
+        ...prev,
+        ...Object.fromEntries(typesToLoadOverride!.map((type) => [type, true])),
+      }));
+    }
     setError('');
     try {
       if (serverPaginationEnabled) {
         const typesToLoad =
-          activeQuotaFilter === 'all'
+          typesToLoadOverride ??
+          (activeQuotaFilter === 'all'
             ? QUOTA_CONFIGS.map((config) => config.type)
-            : [activeQuotaFilter];
+            : [activeQuotaFilter]);
+        const paginationState = quotaPaginationRef.current;
         const [responses, categoriesData] = await Promise.all([
           Promise.all(
             typesToLoad.map(async (type) => {
-              const pageState = quotaPagination[type];
+              const pageState = paginationState[type];
               const data = await authFilesApi.list({
                 page: pageState.page,
                 pageSize: pageState.pageSize,
@@ -320,7 +343,7 @@ export function QuotaPage() {
               return { type, data };
             })
           ),
-          activeQuotaFilter === 'all'
+          typesToLoadOverride || activeQuotaFilter === 'all'
             ? Promise.resolve(null)
             : authFilesApi.list({ page: 1, pageSize: 1 }).catch(() => null),
         ]);
@@ -361,9 +384,19 @@ export function QuotaPage() {
       const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
       setError(errorMessage);
     } finally {
-      setLoading(false);
+      if (!partialServerLoad) {
+        setLoading(false);
+      } else {
+        setLoadingByType((prev) => {
+          const next = { ...prev };
+          typesToLoadOverride!.forEach((type) => {
+            delete next[type];
+          });
+          return next;
+        });
+      }
     }
-  }, [activeQuotaFilter, quotaPagination, serverPaginationEnabled, t]);
+  }, [activeQuotaFilter, serverPaginationEnabled, t]);
 
   const handleHeaderRefresh = useCallback(async () => {
     setFileModelsByName({});
@@ -419,7 +452,7 @@ export function QuotaPage() {
       return next;
     });
 
-    if (disableControls || missingFiles.length === 0) {
+    if (disableControls || !needsModelCatalog || missingFiles.length === 0) {
       setModelCatalogLoading(false);
       return () => {
         cancelled = true;
@@ -456,7 +489,7 @@ export function QuotaPage() {
     return () => {
       cancelled = true;
     };
-  }, [disableControls, modelReloadKey, quotaFiles]);
+  }, [disableControls, modelReloadKey, needsModelCatalog, quotaFiles]);
 
   useEffect(() => {
     if (selectedModel === 'all') return;
@@ -477,25 +510,41 @@ export function QuotaPage() {
     onFilesChanged: loadFiles,
   };
 
-  const updateQuotaPage = useCallback((type: ActiveQuotaType, page: number) => {
-    setQuotaPagination((prev) => ({
-      ...prev,
-      [type]: {
-        ...prev[type],
-        page: Math.max(1, Math.round(page)),
-      },
-    }));
-  }, []);
+  const updateQuotaPage = useCallback(
+    (type: ActiveQuotaType, page: number) => {
+      const nextPage = Math.max(1, Math.round(page));
+      quotaPaginationRef.current = {
+        ...quotaPaginationRef.current,
+        [type]: {
+          ...quotaPaginationRef.current[type],
+          page: nextPage,
+        },
+      };
+      setQuotaPagination(quotaPaginationRef.current);
+      if (serverPaginationEnabled) {
+        void loadFiles([type]);
+      }
+    },
+    [loadFiles, serverPaginationEnabled]
+  );
 
-  const updateQuotaPageSize = useCallback((type: ActiveQuotaType, pageSize: number) => {
-    setQuotaPagination((prev) => ({
-      ...prev,
-      [type]: {
-        page: 1,
-        pageSize: Math.max(1, Math.round(pageSize)),
-      },
-    }));
-  }, []);
+  const updateQuotaPageSize = useCallback(
+    (type: ActiveQuotaType, pageSize: number) => {
+      const nextPageSize = Math.max(1, Math.round(pageSize));
+      quotaPaginationRef.current = {
+        ...quotaPaginationRef.current,
+        [type]: {
+          page: 1,
+          pageSize: nextPageSize,
+        },
+      };
+      setQuotaPagination(quotaPaginationRef.current);
+      if (serverPaginationEnabled) {
+        void loadFiles([type]);
+      }
+    },
+    [loadFiles, serverPaginationEnabled]
+  );
 
   const getQuotaSectionProps = useCallback(
     (type: ActiveQuotaType) => {
@@ -510,6 +559,7 @@ export function QuotaPage() {
               totalPages: Math.max(1, Math.ceil(total / Math.max(1, pageState.pageSize))),
               currentPage: pageState.page,
               pageSize: pageState.pageSize,
+              loading: loadingByType[type] === true,
               onPageChange: (nextPage: number) => updateQuotaPage(type, nextPage),
               onPageSizeChange: (nextPageSize: number) => updateQuotaPageSize(type, nextPageSize),
             }
@@ -519,6 +569,7 @@ export function QuotaPage() {
     [
       files,
       filesByType,
+      loadingByType,
       quotaPagination,
       serverPaginationEnabled,
       totalByType,

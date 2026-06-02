@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -93,7 +93,7 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
         showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
         return;
       }
-      if (managedResult?.status === 'error' && managedResult.error) {
+      if (managedResult?.status === 'error' && managedResult.error && !managedResult.fallbackable) {
         throw new Error(managedResult.error);
       }
 
@@ -114,17 +114,33 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     }
   }, [disableControls, file, quota?.status, quotaType, showNotification, t, updateQuotaState]);
 
-  const config = getQuotaConfig(quotaType) as unknown as {
+  const config = getQuotaConfig(quotaType) as QuotaConfig<unknown, unknown>;
+  const snapshotQuota = useMemo(
+    () => config.buildSnapshotState?.(file) as QuotaState,
+    [config, file]
+  );
+  useEffect(() => {
+    if (!snapshotQuota || quota?.status === 'loading') return;
+    updateQuotaState((prev: Record<string, unknown>) => ({
+      ...prev,
+      [file.name]: snapshotQuota,
+    }));
+  }, [file.name, quota?.status, snapshotQuota, updateQuotaState]);
+
+  const displayQuota: QuotaState =
+    quota?.status === 'loading' || quota?.status === 'error' ? quota : (quota ?? snapshotQuota);
+
+  const renderConfig = config as unknown as {
     i18nPrefix: string;
     renderQuotaItems: (quota: unknown, t: TFunction, helpers: unknown) => unknown;
   };
 
-  const quotaStatus = quota?.status ?? 'idle';
+  const quotaStatus = displayQuota?.status ?? 'idle';
   const canRefreshQuota = !disableControls && !file.disabled;
   const quotaErrorMessage = resolveQuotaErrorMessage(
     t,
-    quota?.errorStatus,
-    quota?.error || t('common.unknown_error')
+    displayQuota?.errorStatus,
+    displayQuota?.error || t('common.unknown_error')
   );
 
   return (
@@ -146,19 +162,19 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
         </button>
       </div>
       {quotaStatus === 'loading' ? (
-        <div className={styles.quotaMessage}>{t(`${config.i18nPrefix}.loading`)}</div>
+        <div className={styles.quotaMessage}>{t(`${renderConfig.i18nPrefix}.loading`)}</div>
       ) : quotaStatus === 'idle' ? (
-        <div className={styles.quotaMessage}>{t(`${config.i18nPrefix}.idle`)}</div>
+        <div className={styles.quotaMessage}>{t(`${renderConfig.i18nPrefix}.idle`)}</div>
       ) : quotaStatus === 'error' ? (
         <div className={styles.quotaError}>
-          {t(`${config.i18nPrefix}.load_failed`, {
+          {t(`${renderConfig.i18nPrefix}.load_failed`, {
             message: quotaErrorMessage,
           })}
         </div>
-      ) : quota ? (
-        (config.renderQuotaItems(quota, t, { styles, QuotaProgressBar }) as ReactNode)
+      ) : displayQuota ? (
+        (renderConfig.renderQuotaItems(displayQuota, t, { styles, QuotaProgressBar }) as ReactNode)
       ) : (
-        <div className={styles.quotaMessage}>{t(`${config.i18nPrefix}.idle`)}</div>
+        <div className={styles.quotaMessage}>{t(`${renderConfig.i18nPrefix}.idle`)}</div>
       )}
     </div>
   );

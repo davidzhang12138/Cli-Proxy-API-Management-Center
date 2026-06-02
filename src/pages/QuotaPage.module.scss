@@ -1426,6 +1426,13 @@
   font-size: 13px;
 }
 
+.paginationLoading {
+  margin-left: $spacing-sm;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .paginationJump {
   display: flex;
   align-items: center;
