@@ -3,6 +3,7 @@ import {
   buildAntigravityQuotaGroupsFromUsageQuota,
   buildKiroQuotaDataFromUsageQuota,
   parseUsageQuotaSnapshot,
+  toFutureKiroResetIso,
 } from './usageQuota';
 
 const usageQuotaPayload = {
@@ -47,3 +48,31 @@ const acceptsAntigravityGroups: Array<{
 
 void acceptsKiroQuotaNumbers;
 void acceptsAntigravityGroups;
+
+const antigravityResourcesPayload = {
+  known: true,
+  resources: [
+    {
+      resource_type: 'ANTIGRAVITY_AI',
+      remaining: '5000',
+      minimum_credit_amount_for_usage: '50',
+      exhausted: false,
+    },
+  ],
+} satisfies NonNullable<AuthFileItem['usage_quota']>;
+
+const antigravityResourceGroups =
+  buildAntigravityQuotaGroupsFromUsageQuota(antigravityResourcesPayload);
+const acceptsAntigravityResourceGroups: Array<{
+  id: string;
+  label: string;
+  models: string[];
+  remainingFraction: number;
+  remainingAmount?: number;
+  minimumAmount?: number;
+}> = antigravityResourceGroups;
+
+const acceptsKiroFutureReset: string | undefined = toFutureKiroResetIso(Date.now() + 60_000);
+
+void acceptsAntigravityResourceGroups;
+void acceptsKiroFutureReset;

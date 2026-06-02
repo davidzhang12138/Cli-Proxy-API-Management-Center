@@ -89,6 +89,7 @@ import {
   isKiroFile,
   isRuntimeOnlyAuthFile,
   isXaiFile,
+  toFutureKiroResetIso,
 } from '@/utils/quota';
 import { normalizeAuthIndex } from '@/utils/authIndex';
 import type { QuotaRenderHelpers } from './QuotaCard';
@@ -740,11 +741,7 @@ const renderAntigravityItems = (
 ): ReactNode => {
   const { styles: styleMap, QuotaProgressBar } = helpers;
   const { createElement: h } = React;
-  const groups = (quota.groups ?? []).filter((group) =>
-    ['google-one-ai-credits', 'claude-gpt', 'gemini-3-1-pro-series', 'gemini-3-flash'].includes(
-      group.id
-    )
-  );
+  const groups = quota.groups ?? [];
 
   if (groups.length === 0) {
     return h('div', { className: styleMap.quotaMessage }, t('antigravity_quota.empty_models'));
@@ -753,6 +750,12 @@ const renderAntigravityItems = (
   return groups.map((group) => {
     const clamped = Math.max(0, Math.min(1, group.remainingFraction));
     const percent = Math.round(clamped * 100);
+    const remainingAmountLabel =
+      group.remainingAmount === null || group.remainingAmount === undefined
+        ? null
+        : t('gemini_cli_quota.remaining_amount', {
+            count: group.remainingAmount,
+          });
     const resetLabel = formatQuotaResetTime(group.resetTime);
     const expired = isResetTimeExpired(group.resetTime);
     const resetClassName = expired ? styleMap.quotaResetExpired : styleMap.quotaReset;
@@ -768,7 +771,12 @@ const renderAntigravityItems = (
           'div',
           { className: styleMap.quotaMeta },
           h('span', { className: styleMap.quotaPercent }, `${percent}%`),
-          h('span', { className: resetClassName }, resetLabel)
+          remainingAmountLabel
+            ? h('span', { className: styleMap.quotaAmount }, remainingAmountLabel)
+            : null,
+          resetLabel !== '-'
+            ? h('span', { className: resetClassName }, resetLabel)
+            : null
         )
       ),
       h(QuotaProgressBar, {
@@ -1414,10 +1422,7 @@ const normalizeKiroTimestamp = (...values: unknown[]): number | null => {
 };
 
 const toIsoFromKiroTimestamp = (value: number | null): string | undefined => {
-  if (value === null) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return date.toISOString();
+  return toFutureKiroResetIso(value);
 };
 
 const fetchKiroQuota = async (file: AuthFileItem, t: TFunction): Promise<KiroQuotaData> => {

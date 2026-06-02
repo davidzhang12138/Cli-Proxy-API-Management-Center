@@ -89,6 +89,20 @@ export interface UsageQuotaSnapshotPayload {
   checked_at?: string | number | null;
   checkedAt?: string | number | null;
   error?: string | null;
+  resources?: UsageQuotaResourcePayload[];
+}
+
+export interface UsageQuotaResourcePayload {
+  resource_type?: string | null;
+  resourceType?: string | null;
+  total_limit?: number | string | null;
+  totalLimit?: number | string | null;
+  current_usage?: number | string | null;
+  currentUsage?: number | string | null;
+  remaining?: number | string | null;
+  minimum_credit_amount_for_usage?: number | string | null;
+  minimumCreditAmountForUsage?: number | string | null;
+  exhausted?: boolean | string | number | null;
 }
 
 export interface UsageQuotaSnapshot {
@@ -101,6 +115,16 @@ export interface UsageQuotaSnapshot {
   nextReset?: string;
   checkedAt?: string;
   error?: string;
+  resources: UsageQuotaResource[];
+}
+
+export interface UsageQuotaResource {
+  resourceType?: string;
+  totalLimit: number | null;
+  currentUsage: number | null;
+  remaining: number | null;
+  minimumCreditAmountForUsage: number | null;
+  exhausted: boolean;
 }
 
 export interface GeminiCliQuotaGroupDefinition {
@@ -229,6 +253,8 @@ export interface AntigravityQuotaGroup {
   label: string;
   models: string[];
   remainingFraction: number;
+  remainingAmount?: number;
+  minimumAmount?: number;
   resetTime?: string;
 }
 

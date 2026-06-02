@@ -1,15 +1,14 @@
 import type {
   AntigravityQuotaGroup,
   KiroQuotaState,
+  UsageQuotaResource,
+  UsageQuotaResourcePayload,
   UsageQuotaSnapshot,
   UsageQuotaSnapshotPayload,
 } from '@/types';
 import { normalizeNumberValue, normalizeStringValue } from './parsers';
 
 type KiroQuotaData = Omit<KiroQuotaState, 'status' | 'error' | 'errorStatus'>;
-
-const ANTIGRAVITY_USAGE_QUOTA_GROUP_ID = 'google-one-ai-credits';
-const ANTIGRAVITY_USAGE_QUOTA_LABEL = 'Google One AI Credits';
 
 const normalizeBooleanValue = (value: unknown): boolean | null => {
   if (typeof value === 'boolean') return value;
@@ -40,11 +39,65 @@ const normalizeIsoTimestamp = (value: unknown): string | undefined => {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 };
 
+export const toFutureKiroResetIso = (
+  timestampMs: number | null,
+  nowMs = Date.now()
+): string | undefined => {
+  if (timestampMs === null || timestampMs <= nowMs) return undefined;
+  const date = new Date(timestampMs);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
 export const readUsageQuotaSnapshotPayload = (value: unknown): UsageQuotaSnapshotPayload | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null;
   }
   return value as UsageQuotaSnapshotPayload;
+};
+
+const usageQuotaResourceId = (resourceType?: string): string =>
+  (resourceType || 'credit')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'credit';
+
+const usageQuotaResourceLabel = (resourceType?: string): string => {
+  if (!resourceType) return 'Credit';
+  return resourceType
+    .trim()
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+};
+
+const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const payload = value as UsageQuotaResourcePayload;
+  const resourceType =
+    normalizeStringValue(payload.resource_type ?? payload.resourceType) ?? undefined;
+  const totalLimit = normalizeNumberValue(payload.total_limit ?? payload.totalLimit);
+  const currentUsage = normalizeNumberValue(payload.current_usage ?? payload.currentUsage);
+  const remaining = normalizeNumberValue(payload.remaining);
+  const minimumCreditAmountForUsage = normalizeNumberValue(
+    payload.minimum_credit_amount_for_usage ?? payload.minimumCreditAmountForUsage
+  );
+  const exhausted =
+    normalizeBooleanValue(payload.exhausted) ??
+    (remaining !== null && minimumCreditAmountForUsage !== null
+      ? remaining < minimumCreditAmountForUsage
+      : remaining !== null && remaining <= 0) ??
+    false;
+
+  return {
+    resourceType,
+    totalLimit,
+    currentUsage,
+    remaining,
+    minimumCreditAmountForUsage,
+    exhausted,
+  };
 };
 
 export const parseUsageQuotaSnapshot = (value: unknown): UsageQuotaSnapshot | null => {
@@ -62,6 +115,11 @@ export const parseUsageQuotaSnapshot = (value: unknown): UsageQuotaSnapshot | nu
   const nextReset = normalizeIsoTimestamp(payload.next_reset ?? payload.nextReset);
   const checkedAt = normalizeIsoTimestamp(payload.checked_at ?? payload.checkedAt);
   const error = normalizeStringValue(payload.error) ?? undefined;
+  const resources = Array.isArray(payload.resources)
+    ? payload.resources
+        .map(parseUsageQuotaResource)
+        .filter((resource): resource is UsageQuotaResource => Boolean(resource))
+    : [];
 
   return {
     known,
@@ -73,6 +131,7 @@ export const parseUsageQuotaSnapshot = (value: unknown): UsageQuotaSnapshot | nu
     nextReset,
     checkedAt,
     error,
+    resources,
   };
 };
 
@@ -116,7 +175,9 @@ export const buildKiroQuotaDataFromUsageQuota = (value: unknown): KiroQuotaData 
     currentUsage,
     usageLimit: normalizedLimit,
     remainingCredits: normalizedRemaining,
-    nextReset: snapshot.nextReset,
+    nextReset: toFutureKiroResetIso(
+      snapshot.nextReset ? Date.parse(snapshot.nextReset) : null
+    ),
     subscriptionType: snapshot.resourceType,
   };
 };
@@ -126,6 +187,43 @@ export const buildAntigravityQuotaGroupsFromUsageQuota = (
 ): AntigravityQuotaGroup[] => {
   const snapshot = parseUsageQuotaSnapshot(value);
   if (!snapshot || !snapshot.known || snapshot.error) return [];
+
+  if (snapshot.resources.length > 0) {
+    return snapshot.resources
+      .map((resource): AntigravityQuotaGroup | null => {
+        const remaining = resource.remaining ?? (resource.exhausted ? 0 : null);
+        const inferredLimit =
+          resource.totalLimit ??
+          (remaining !== null && resource.currentUsage !== null
+            ? remaining + resource.currentUsage
+            : null);
+        if (remaining === null && inferredLimit === null) return null;
+
+        const remainingFraction =
+          inferredLimit !== null && inferredLimit > 0
+            ? Math.max(0, Math.min(1, (remaining ?? 0) / inferredLimit))
+            : remaining !== null && remaining > 0 && !resource.exhausted
+              ? 1
+              : 0;
+        const resourceType = resource.resourceType;
+
+        const group: AntigravityQuotaGroup = {
+          id: usageQuotaResourceId(resourceType),
+          label: usageQuotaResourceLabel(resourceType),
+          models: resourceType ? [resourceType] : [],
+          remainingFraction,
+          resetTime: snapshot.nextReset,
+        };
+        if (remaining !== null) {
+          group.remainingAmount = remaining;
+        }
+        if (resource.minimumCreditAmountForUsage !== null) {
+          group.minimumAmount = resource.minimumCreditAmountForUsage;
+        }
+        return group;
+      })
+      .filter((group): group is AntigravityQuotaGroup => Boolean(group));
+  }
 
   const totalLimit = snapshot.totalLimit;
   const remaining = snapshot.remaining ?? (snapshot.exhausted ? 0 : null);
@@ -142,13 +240,15 @@ export const buildAntigravityQuotaGroupsFromUsageQuota = (
         ? 1
         : 0;
 
-  return [
-    {
-      id: ANTIGRAVITY_USAGE_QUOTA_GROUP_ID,
-      label: ANTIGRAVITY_USAGE_QUOTA_LABEL,
-      models: [snapshot.resourceType ?? ANTIGRAVITY_USAGE_QUOTA_LABEL],
-      remainingFraction,
-      resetTime: snapshot.nextReset,
-    },
-  ];
+  const group: AntigravityQuotaGroup = {
+    id: usageQuotaResourceId(snapshot.resourceType),
+    label: usageQuotaResourceLabel(snapshot.resourceType),
+    models: snapshot.resourceType ? [snapshot.resourceType] : [],
+    remainingFraction,
+    resetTime: snapshot.nextReset,
+  };
+  if (remaining !== null) {
+    group.remainingAmount = remaining;
+  }
+  return [group];
 };
