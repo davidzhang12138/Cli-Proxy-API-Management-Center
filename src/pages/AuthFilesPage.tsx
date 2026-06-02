@@ -347,16 +347,13 @@ export function AuthFilesPage() {
   useEffect(() => {
     if (!isCurrentLayer || !uiStateHydrated) return;
     loadFiles(effectiveListOptions);
+  }, [effectiveListOptions, isCurrentLayer, loadFiles, uiStateHydrated]);
+
+  useEffect(() => {
+    if (!isCurrentLayer) return;
     loadExcluded();
     loadModelAlias();
-  }, [
-    effectiveListOptions,
-    isCurrentLayer,
-    loadFiles,
-    loadExcluded,
-    loadModelAlias,
-    uiStateHydrated,
-  ]);
+  }, [isCurrentLayer, loadExcluded, loadModelAlias]);
 
   useInterval(
     () => {
