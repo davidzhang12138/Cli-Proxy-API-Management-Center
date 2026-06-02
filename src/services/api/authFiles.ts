@@ -516,6 +516,7 @@ const OAUTH_MODEL_ALIAS_ENDPOINT = '/oauth-model-alias';
 export const authFilesApi = {
   list: async (options?: AuthFilesListOptions) => {
     const params = buildAuthFilesListParams(options);
+    const mergeQuotaSnapshots = Object.keys(params).length === 0;
     const cacheKey = buildAuthFilesListCacheKey(params);
     const inFlight = inFlightAuthFilesListRequests.get(cacheKey);
     if (inFlight) return inFlight;
@@ -525,10 +526,10 @@ export const authFilesApi = {
         apiClient.get<AuthFilesResponse>('/auth-files', {
           params: Object.keys(params).length ? params : undefined,
         }),
-        getAuthQuotasIfAvailable(),
+        mergeQuotaSnapshots ? getAuthQuotasIfAvailable() : Promise.resolve(null),
       ]);
       return mergeAuthQuotaSnapshots(filesPayload, quotasPayload, {
-        includeSynthetic: Object.keys(params).length === 0,
+        includeSynthetic: mergeQuotaSnapshots,
       });
     })().finally(() => {
       if (inFlightAuthFilesListRequests.get(cacheKey) === request) {
