@@ -392,6 +392,18 @@ const getAuthQuotasIfAvailable = async (): Promise<AuthQuotasResponse | null> =>
   }
 };
 
+const inFlightAuthFilesListRequests = new Map<string, Promise<AuthFilesResponse>>();
+
+const buildAuthFilesListCacheKey = (params: Record<string, unknown>): string => {
+  const normalized = Object.keys(params)
+    .sort()
+    .reduce<Record<string, unknown>>((result, key) => {
+      result[key] = params[key];
+      return result;
+    }, {});
+  return JSON.stringify(normalized);
+};
+
 const parseAuthFileJsonObject = (rawText: string): Record<string, unknown> => {
   const trimmed = rawText.trim();
 
@@ -504,15 +516,28 @@ const OAUTH_MODEL_ALIAS_ENDPOINT = '/oauth-model-alias';
 export const authFilesApi = {
   list: async (options?: AuthFilesListOptions) => {
     const params = buildAuthFilesListParams(options);
-    const [filesPayload, quotasPayload] = await Promise.all([
-      apiClient.get<AuthFilesResponse>('/auth-files', {
-        params: Object.keys(params).length ? params : undefined,
-      }),
-      getAuthQuotasIfAvailable(),
-    ]);
-    return mergeAuthQuotaSnapshots(filesPayload, quotasPayload, {
-      includeSynthetic: Object.keys(params).length === 0,
+    const cacheKey = buildAuthFilesListCacheKey(params);
+    const inFlight = inFlightAuthFilesListRequests.get(cacheKey);
+    if (inFlight) return inFlight;
+
+    const request = (async () => {
+      const [filesPayload, quotasPayload] = await Promise.all([
+        apiClient.get<AuthFilesResponse>('/auth-files', {
+          params: Object.keys(params).length ? params : undefined,
+        }),
+        getAuthQuotasIfAvailable(),
+      ]);
+      return mergeAuthQuotaSnapshots(filesPayload, quotasPayload, {
+        includeSynthetic: Object.keys(params).length === 0,
+      });
+    })().finally(() => {
+      if (inFlightAuthFilesListRequests.get(cacheKey) === request) {
+        inFlightAuthFilesListRequests.delete(cacheKey);
+      }
     });
+
+    inFlightAuthFilesListRequests.set(cacheKey, request);
+    return request;
   },
 
   getAuthQuotas: (all = true) =>
@@ -555,9 +580,11 @@ export const authFilesApi = {
       return { status: 'ok', deleted: 0, files: [], failed: [] };
     }
 
-    const payload = await apiClient.delete<AuthFileBatchDeleteResponse>('/auth-files', {
-      data: { names: requestedNames },
-    });
+    const params =
+      requestedNames.length === 1
+        ? { name: requestedNames[0] }
+        : { names: requestedNames.join(',') };
+    const payload = await apiClient.delete<AuthFileBatchDeleteResponse>('/auth-files', { params });
     return normalizeBatchDeleteResponse(payload, requestedNames);
   },
 
@@ -576,34 +603,58 @@ export const authFilesApi = {
     return blob.text();
   },
 
-  async downloadJsonObject(name: string): Promise<Record<string, unknown>> {
+  readJson: async (name: string): Promise<Record<string, unknown>> => {
     const rawText = await authFilesApi.downloadText(name);
     return parseAuthFileJsonObject(rawText);
   },
 
-  saveText: (name: string, text: string) => saveAuthFileText(name, text),
+  saveJson: async (name: string, value: Record<string, unknown>) => {
+    const text = JSON.stringify(value, null, 2);
+    await saveAuthFileText(name, text);
+  },
 
-  saveJsonObject: (name: string, json: Record<string, unknown>) =>
-    saveAuthFileText(name, JSON.stringify(json)),
-
-  // OAuth 排除模型
-  async getOauthExcludedModels(): Promise<Record<string, string[]>> {
-    const data = await apiClient.get('/oauth-excluded-models');
+  getOauthExcludedModels: async () => {
+    const data = await apiClient.get<Record<string, unknown>>('/oauth-excluded-models');
     return normalizeOauthExcludedModels(data);
   },
 
-  saveOauthExcludedModels: (provider: string, models: string[]) =>
-    apiClient.patch('/oauth-excluded-models', { provider, models }),
+  replaceOauthExcludedModels: async (models: Record<string, string[]>) => {
+    await apiClient.put('/oauth-excluded-models', { 'oauth-excluded-models': models });
+  },
 
-  deleteOauthExcludedEntry: (provider: string) =>
-    apiClient.delete(`/oauth-excluded-models?provider=${encodeURIComponent(provider)}`),
+  saveOauthExcludedModels: async (provider: string, models: string[]) => {
+    const normalizedProvider = String(provider ?? '')
+      .trim()
+      .toLowerCase();
+    const normalizedModels = Array.from(
+      new Set(models.map((model) => String(model ?? '').trim()).filter(Boolean))
+    );
+    await apiClient.patch('/oauth-excluded-models', {
+      provider: normalizedProvider,
+      models: normalizedModels,
+    });
+  },
 
-  replaceOauthExcludedModels: (map: Record<string, string[]>) =>
-    apiClient.put('/oauth-excluded-models', normalizeOauthExcludedModels(map)),
+  deleteOauthExcludedEntry: async (provider: string) => {
+    const normalizedProvider = String(provider ?? '')
+      .trim()
+      .toLowerCase();
+    try {
+      await apiClient.patch('/oauth-excluded-models', {
+        provider: normalizedProvider,
+        models: [],
+      });
+    } catch (err: unknown) {
+      const status = getStatusCode(err);
+      if (status !== 405) throw err;
+      await apiClient.delete(
+        `/oauth-excluded-models?provider=${encodeURIComponent(normalizedProvider)}`
+      );
+    }
+  },
 
-  // OAuth 模型别名
-  async getOauthModelAlias(): Promise<Record<string, OAuthModelAliasEntry[]>> {
-    const data = await apiClient.get(OAUTH_MODEL_ALIAS_ENDPOINT);
+  getOauthModelAlias: async () => {
+    const data = await apiClient.get<Record<string, unknown>>(OAUTH_MODEL_ALIAS_ENDPOINT);
     return normalizeOauthModelAlias(data);
   },
 
@@ -645,7 +696,7 @@ export const authFilesApi = {
     const data = await apiClient.get<Record<string, unknown>>(
       `/auth-files/models?name=${encodeURIComponent(name)}`
     );
-    const models = data.models ?? data['models'];
+    const models = data.models ?? data.data ?? data.items;
     return Array.isArray(models)
       ? (models as { id: string; display_name?: string; type?: string; owned_by?: string }[])
       : [];
@@ -662,7 +713,7 @@ export const authFilesApi = {
     const data = await apiClient.get<Record<string, unknown>>(
       `/model-definitions/${encodeURIComponent(normalizedChannel)}`
     );
-    const models = data.models ?? data['models'];
+    const models = data.models ?? data.data ?? data.items;
     return Array.isArray(models)
       ? (models as { id: string; display_name?: string; type?: string; owned_by?: string }[])
       : [];

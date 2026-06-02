@@ -374,7 +374,6 @@ export function QuotaPage() {
       loadUsageStats({
         force: true,
         staleTimeMs: USAGE_STATS_STALE_TIME_MS,
-        queryParams: { all: true },
       }),
     ]);
   }, [loadConfig, loadFiles, loadUsageStats]);
@@ -386,7 +385,6 @@ export function QuotaPage() {
     loadConfig();
     void loadUsageStats({
       staleTimeMs: USAGE_STATS_STALE_TIME_MS,
-      queryParams: { all: true },
     }).catch(() => {});
   }, [loadFiles, loadConfig, loadUsageStats]);
 

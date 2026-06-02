@@ -184,13 +184,6 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
             nextCategories = nextCategories
               ? { ...nextCategories, providers: previousProviders }
               : categoriesRef.current;
-          } else {
-            const categoryData = await authFilesApi.list({ page: 1, pageSize: 1 });
-            if (categoryData.categories?.providers?.length) {
-              nextCategories = nextCategories
-                ? { ...nextCategories, providers: categoryData.categories.providers }
-                : categoryData.categories;
-            }
           }
         }
         setFiles(data?.files || []);
