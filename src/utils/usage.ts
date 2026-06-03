@@ -830,8 +830,10 @@ export function calculateCost(
   );
   const promptTokens = Math.max(inputTokens - cachedTokens, 0);
 
-  const promptCost = (promptTokens / TOKENS_PER_PRICE_UNIT) * (Number(price.prompt) || 0);
-  const cachedCost = (cachedTokens / TOKENS_PER_PRICE_UNIT) * (Number(price.cache) || 0);
+  const promptPrice = Number(price.prompt) || 0;
+  const cachePrice = Number(price.cache) || 0;
+  const promptCost = (promptTokens / TOKENS_PER_PRICE_UNIT) * promptPrice;
+  const cachedCost = (cachedTokens / TOKENS_PER_PRICE_UNIT) * cachePrice;
   const completionCost =
     (completionTokens / TOKENS_PER_PRICE_UNIT) * (Number(price.completion) || 0);
   const total = promptCost + cachedCost + completionCost;

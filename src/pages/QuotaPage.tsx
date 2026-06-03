@@ -210,7 +210,9 @@ export function QuotaPage() {
   }, [quotaPagination]);
 
   const disableControls = connectionStatus !== 'connected';
-  const usageStatsReady = usageLastRefreshedAt !== null;
+  const recentUsageSortEnabled =
+    sortMode === 'model_recent_usage_asc' || sortMode === 'model_recent_usage_desc';
+  const usageStatsReady = recentUsageSortEnabled && usageLastRefreshedAt !== null;
   const serverQuotaSortMode =
     sortMode === 'quota_desc' || sortMode === 'quota_asc' ? sortMode : undefined;
   const serverPaginationEnabled =
@@ -222,8 +224,7 @@ export function QuotaPage() {
     deferredSearchQuery.trim().length > 0 ||
     sortMode === 'model_reset_asc' ||
     sortMode === 'model_reset_desc' ||
-    sortMode === 'model_recent_usage_asc' ||
-    sortMode === 'model_recent_usage_desc';
+    recentUsageSortEnabled;
 
   const quotaFiles = useMemo(
     () => files.filter((file) => QUOTA_CONFIGS.some((config) => config.filterFn(file))),
@@ -414,22 +415,28 @@ export function QuotaPage() {
     await Promise.all([
       loadConfig(),
       loadFiles(),
-      loadUsageStats({
-        force: true,
-        staleTimeMs: USAGE_STATS_STALE_TIME_MS,
-      }),
+      recentUsageSortEnabled
+        ? loadUsageStats({
+            force: true,
+            staleTimeMs: USAGE_STATS_STALE_TIME_MS,
+          })
+        : Promise.resolve(),
     ]);
-  }, [loadConfig, loadFiles, loadUsageStats]);
+  }, [loadConfig, loadFiles, loadUsageStats, recentUsageSortEnabled]);
 
   useHeaderRefresh(handleHeaderRefresh);
 
   useEffect(() => {
     loadFiles();
     loadConfig();
+  }, [loadFiles, loadConfig]);
+
+  useEffect(() => {
+    if (!recentUsageSortEnabled) return;
     void loadUsageStats({
       staleTimeMs: USAGE_STATS_STALE_TIME_MS,
     }).catch(() => {});
-  }, [loadFiles, loadConfig, loadUsageStats]);
+  }, [loadUsageStats, recentUsageSortEnabled]);
 
   useEffect(() => {
     let cancelled = false;

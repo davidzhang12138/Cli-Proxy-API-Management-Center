@@ -7,10 +7,12 @@ import { useTranslation } from 'react-i18next';
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
+import type { AuthUsageResponse } from '@/services/api';
 import { IconRefreshCw } from '@/components/ui/icons';
 import { SelectionCheckbox } from '@/components/ui/SelectionCheckbox';
 import { TYPE_COLORS } from '@/utils/quota';
-import { formatCompactNumber } from '@/utils/usage';
+import { maskApiKey } from '@/utils/format';
+import { calculateCost, formatCompactNumber, type ModelPrice } from '@/utils/usage';
 import { Modal } from '@/components/ui/Modal';
 import styles from '@/pages/QuotaPage.module.scss';
 
@@ -65,6 +67,7 @@ export interface QuotaUsageModelSummary {
   model: string;
   totalTokens: number;
   totalCost: number;
+  totalRequests?: number;
   quotaUsageRatio?: number | null;
   latestUsedAtMs?: number | null;
 }
@@ -91,6 +94,68 @@ const formatUsageShare = (value: number | null): string => {
   return `${value.toFixed(1)}%`;
 };
 
+const toAuthUsageModelCost = (
+  model: string,
+  summary: AuthUsageResponse['models'][string],
+  modelPrices: Record<string, ModelPrice>,
+  fallbackTokens?: AuthUsageResponse['summary']
+): number => {
+  const hasGroupedCachedTokens = typeof summary.cached_tokens === 'number';
+  const hasGroupedReasoningTokens = typeof summary.reasoning_tokens === 'number';
+  const details = Array.isArray(summary.details) ? summary.details : [];
+
+  if (!hasGroupedCachedTokens && details.length > 0) {
+    return details.reduce((sum, detail) => (
+      sum + calculateCost(
+        {
+          timestamp: detail.timestamp,
+          source: detail.source,
+          auth_index: detail.auth_index,
+          latency_ms: detail.latency_ms,
+          tokens: {
+            input_tokens: detail.tokens.input_tokens,
+            output_tokens: detail.tokens.output_tokens,
+            reasoning_tokens: detail.tokens.reasoning_tokens,
+            cached_tokens: detail.tokens.cached_tokens,
+            total_tokens: detail.tokens.total_tokens,
+          },
+          failed: detail.failed,
+          __modelName: detail.model || model,
+        },
+        modelPrices
+      )
+    ), 0);
+  }
+
+  const tokens = fallbackTokens && !hasGroupedCachedTokens
+    ? fallbackTokens
+    : {
+        input_tokens: summary.input_tokens,
+        output_tokens: summary.output_tokens,
+        reasoning_tokens: hasGroupedReasoningTokens ? summary.reasoning_tokens ?? 0 : 0,
+        cached_tokens: hasGroupedCachedTokens ? summary.cached_tokens ?? 0 : 0,
+        total_tokens: summary.total_tokens,
+      };
+
+  return calculateCost(
+    {
+      timestamp: '',
+      source: '',
+      auth_index: null,
+      tokens: {
+        input_tokens: tokens.input_tokens,
+        output_tokens: tokens.output_tokens,
+        reasoning_tokens: tokens.reasoning_tokens,
+        cached_tokens: tokens.cached_tokens,
+        total_tokens: tokens.total_tokens,
+      },
+      failed: false,
+      __modelName: model,
+    },
+    modelPrices
+  );
+};
+
 interface QuotaCardProps<TState extends QuotaStatusState> {
   item: AuthFileItem;
   quota?: TState;
@@ -101,6 +166,7 @@ interface QuotaCardProps<TState extends QuotaStatusState> {
   cachedTokens?: number | null;
   reasoningTokens?: number | null;
   topModels?: QuotaUsageModelSummary[];
+  modelPrices?: Record<string, ModelPrice>;
   resolvedTheme: ResolvedTheme;
   i18nPrefix: string;
   cardIdleMessageKey?: string;
@@ -109,6 +175,7 @@ interface QuotaCardProps<TState extends QuotaStatusState> {
   detailsContent?: ReactNode;
   canRefresh?: boolean;
   onRefresh?: () => void;
+  loadAuthUsage?: (item: AuthFileItem) => Promise<AuthUsageResponse>;
   selectionMode?: boolean;
   selected?: boolean;
   onSelectionChange?: () => void;
@@ -125,6 +192,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
   cachedTokens = null,
   reasoningTokens = null,
   topModels = [],
+  modelPrices = {},
   resolvedTheme,
   i18nPrefix,
   cardIdleMessageKey,
@@ -133,6 +201,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
   detailsContent,
   canRefresh = false,
   onRefresh,
+  loadAuthUsage,
   selectionMode = false,
   selected = false,
   onSelectionChange,
@@ -140,6 +209,9 @@ export function QuotaCard<TState extends QuotaStatusState>({
 }: QuotaCardProps<TState>) {
   const { t, i18n } = useTranslation();
   const [modelsModalOpen, setModelsModalOpen] = useState(false);
+  const [authUsage, setAuthUsage] = useState<AuthUsageResponse | null>(null);
+  const [authUsageLoading, setAuthUsageLoading] = useState(false);
+  const [authUsageError, setAuthUsageError] = useState<string | null>(null);
 
   const displayType = item.type || item.provider || defaultType;
   const typeColorSet = TYPE_COLORS[displayType] || TYPE_COLORS.unknown;
@@ -152,34 +224,97 @@ export function QuotaCard<TState extends QuotaStatusState>({
     quota?.errorStatus,
     quota?.error || t('common.unknown_error')
   );
+  const authUsageWindowStartMs = authUsage ? Date.parse(authUsage.window_start) : Number.NaN;
+  const authUsageWindowEndMs = authUsage ? Date.parse(authUsage.window_end) : Number.NaN;
+  const effectiveUsageStartedAtMs =
+    authUsage && Number.isFinite(authUsageWindowStartMs) ? authUsageWindowStartMs : usageStartedAtMs;
+  const authUsageWindowEnd =
+    authUsage && Number.isFinite(authUsageWindowEndMs)
+      ? new Intl.DateTimeFormat(i18n.resolvedLanguage, USAGE_DATE_FORMAT_OPTIONS).format(
+          authUsageWindowEndMs
+        )
+      : null;
+  const effectiveUsedTokens = authUsage?.summary.total_tokens ?? usedTokens;
+  const effectiveInputTokens = authUsage?.summary.input_tokens ?? inputTokens;
+  const effectiveOutputTokens = authUsage?.summary.output_tokens ?? outputTokens;
+  const effectiveCachedTokens = authUsage?.summary.cached_tokens ?? cachedTokens;
+  const effectiveReasoningTokens = authUsage?.summary.reasoning_tokens ?? reasoningTokens;
+  const authUsageModelEntries = authUsage ? Object.entries(authUsage.models) : [];
+  const authUsageModels = authUsage
+    ? authUsageModelEntries
+        .map(([model, summary]) => ({
+          model,
+          totalTokens: summary.total_tokens,
+          totalCost: toAuthUsageModelCost(
+            model,
+            summary,
+            modelPrices,
+            authUsageModelEntries.length === 1 ? authUsage.summary : undefined
+          ),
+          totalRequests: summary.total_requests,
+          quotaUsageRatio: null,
+          latestUsedAtMs: null,
+        }))
+        .sort((left, right) => {
+          const tokenDiff = right.totalTokens - left.totalTokens;
+          if (tokenDiff !== 0) return tokenDiff;
+          return left.model.localeCompare(right.model, undefined, { sensitivity: 'base' });
+        })
+    : topModels;
+  const authUsageApiKeys = authUsage
+    ? Object.entries(authUsage.api_keys)
+        .map(([apiKey, summary]) => ({ apiKey, summary }))
+        .sort((left, right) => {
+          const tokenDiff = right.summary.total_tokens - left.summary.total_tokens;
+          if (tokenDiff !== 0) return tokenDiff;
+          return left.apiKey.localeCompare(right.apiKey, undefined, { sensitivity: 'base' });
+        })
+    : [];
   const usageStartedAt =
-    usageStartedAtMs === null
+    effectiveUsageStartedAtMs === null
       ? null
       : new Intl.DateTimeFormat(i18n.resolvedLanguage, USAGE_DATE_FORMAT_OPTIONS).format(
-          usageStartedAtMs
+          effectiveUsageStartedAtMs
         );
   const usageMetaText = usageStartedAt
     ? t('quota_management.usage_since', { time: usageStartedAt })
-    : usedTokens === 0
+    : effectiveUsedTokens === 0
       ? t('quota_management.usage_no_data')
       : t('system_info.not_loaded');
   const idleMessageKey = cardIdleMessageKey ?? `${i18nPrefix}.idle`;
   const usageBreakdownItems = [
-    { key: 'input', label: t('usage_stats.input_tokens'), value: inputTokens },
-    { key: 'output', label: t('usage_stats.output_tokens'), value: outputTokens },
-    { key: 'cached', label: t('usage_stats.cached_tokens'), value: cachedTokens },
-    { key: 'reasoning', label: t('usage_stats.reasoning_tokens'), value: reasoningTokens }
+    { key: 'input', label: t('usage_stats.input_tokens'), value: effectiveInputTokens },
+    { key: 'output', label: t('usage_stats.output_tokens'), value: effectiveOutputTokens },
+    { key: 'cached', label: t('usage_stats.cached_tokens'), value: effectiveCachedTokens },
+    { key: 'reasoning', label: t('usage_stats.reasoning_tokens'), value: effectiveReasoningTokens }
   ];
-  const hasUsageModels = topModels.length > 0;
-  const totalUsageCost = topModels.reduce((sum, model) => sum + model.totalCost, 0);
+  const hasUsageModels = authUsageModels.length > 0;
+  const totalUsageCost = authUsageModels.reduce((sum, model) => sum + model.totalCost, 0);
   const hasUsageData =
-    usedTokens !== null ||
+    effectiveUsedTokens !== null ||
     usageStartedAt !== null ||
-    inputTokens !== null ||
-    outputTokens !== null ||
-    cachedTokens !== null ||
-    reasoningTokens !== null ||
+    effectiveInputTokens !== null ||
+    effectiveOutputTokens !== null ||
+    effectiveCachedTokens !== null ||
+    effectiveReasoningTokens !== null ||
     hasUsageModels;
+
+  const refreshAuthUsage = () => {
+    if (!loadAuthUsage) return;
+    setAuthUsageLoading(true);
+    setAuthUsageError(null);
+    void loadAuthUsage(item)
+      .then((response) => {
+        setAuthUsage(response);
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error || '');
+        setAuthUsageError(message || t('common.unknown_error'));
+      })
+      .finally(() => {
+        setAuthUsageLoading(false);
+      });
+  };
 
   const openModelsModal = () => {
     if (selectionMode) {
@@ -187,6 +322,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
       return;
     }
     setModelsModalOpen(true);
+    refreshAuthUsage();
   };
 
   const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -197,6 +333,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
       return;
     }
     setModelsModalOpen(true);
+    refreshAuthUsage();
   };
 
   const getTypeLabel = (type: string): string => {
@@ -272,7 +409,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
       <div className={styles.cardUsageHint}>
         <span className={styles.cardUsageModelsLabel}>{t('quota_management.top_models')}</span>
         <span className={styles.cardUsageHintText}>
-          {hasUsageModels
+          {topModels.length > 0
             ? t('quota_management.top_models_click_hint', { count: topModels.length })
             : t('quota_management.usage_details_click_hint')}
         </span>
@@ -307,19 +444,47 @@ export function QuotaCard<TState extends QuotaStatusState>({
         <div className={styles.quotaUsageModalSummaryGrid}>
           <div className={styles.quotaUsageModalSummary}>
             <span className={styles.cardUsageModelsLabel}>{t('quota_management.used_tokens')}</span>
-            <strong>{usedTokens === null ? '--' : `${formatCompactNumber(usedTokens)} Tokens`}</strong>
+            <strong>
+              {effectiveUsedTokens === null
+                ? '--'
+                : `${formatCompactNumber(effectiveUsedTokens)} Tokens`}
+            </strong>
           </div>
           <div className={styles.quotaUsageModalSummary}>
             <span className={styles.cardUsageModelsLabel}>{t('usage_stats.total_cost')}</span>
             <strong>{formatUsageCost(totalUsageCost)}</strong>
           </div>
         </div>
+        {authUsageLoading && (
+          <div className={styles.quotaUsageModalStatus}>{t('common.loading')}</div>
+        )}
+        {authUsageError && (
+          <div className={styles.quotaUsageModalError}>
+            <span>{authUsageError}</span>
+            <button type="button" onClick={refreshAuthUsage}>
+              {t('common.refresh')}
+            </button>
+          </div>
+        )}
         <div className={styles.cardUsageMeta}>
           <span className={styles.cardUsageLabel}>{t('quota_management.used_tokens')}</span>
           <span className={styles.cardUsageSubtext} title={usageStartedAt ?? undefined}>
             {usageMetaText}
           </span>
         </div>
+        {authUsage && (
+          <div className={styles.quotaUsageModalWindow}>
+            <span>
+              {t('quota_management.usage_window')}: {usageStartedAt ?? '--'}
+              {authUsageWindowEnd ? ` - ${authUsageWindowEnd}` : ''}
+            </span>
+            <span>
+              {t(`quota_management.usage_window_source_${authUsage.window_source}`, {
+                defaultValue: authUsage.window_source,
+              })}
+            </span>
+          </div>
+        )}
         <div className={styles.cardUsageBreakdown}>
           {usageBreakdownItems.map((item) => (
             <div key={item.key} className={styles.cardUsageStat}>
@@ -335,25 +500,47 @@ export function QuotaCard<TState extends QuotaStatusState>({
         </div>
         {hasUsageModels ? (
           <div className={styles.quotaUsageModalList}>
-            {topModels.map((model) => {
-              const usageLine = t('quota_management.top_models_usage_value', {
-                tokens: `${formatCompactNumber(model.totalTokens)} Tokens`,
-                share: formatUsageShare(
-                  model.quotaUsageRatio === null || model.quotaUsageRatio === undefined
-                    ? null
-                    : model.quotaUsageRatio * 100
-                ),
-                cost: formatUsageCost(model.totalCost)
-              });
-              const usageLineTitle = t('quota_management.top_models_usage_value', {
-                tokens: `${model.totalTokens.toLocaleString()} Tokens`,
-                share: formatUsageShare(
-                  model.quotaUsageRatio === null || model.quotaUsageRatio === undefined
-                    ? null
-                    : model.quotaUsageRatio * 100
-                ),
-                cost: formatUsageCost(model.totalCost)
-              });
+            {authUsageModels.map((model) => {
+              const requestText =
+                typeof model.totalRequests === 'number'
+                  ? t('quota_management.usage_requests', {
+                      count: model.totalRequests.toLocaleString(),
+                    })
+                  : null;
+              const usageLine = authUsage
+                ? [
+                    `${formatCompactNumber(model.totalTokens)} Tokens`,
+                    requestText,
+                    formatUsageCost(model.totalCost),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+                : t('quota_management.top_models_usage_value', {
+                    tokens: `${formatCompactNumber(model.totalTokens)} Tokens`,
+                    share: formatUsageShare(
+                      model.quotaUsageRatio === null || model.quotaUsageRatio === undefined
+                        ? null
+                        : model.quotaUsageRatio * 100
+                    ),
+                    cost: formatUsageCost(model.totalCost),
+                  });
+              const usageLineTitle = authUsage
+                ? [
+                    `${model.totalTokens.toLocaleString()} Tokens`,
+                    requestText,
+                    formatUsageCost(model.totalCost),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+                : t('quota_management.top_models_usage_value', {
+                    tokens: `${model.totalTokens.toLocaleString()} Tokens`,
+                    share: formatUsageShare(
+                      model.quotaUsageRatio === null || model.quotaUsageRatio === undefined
+                        ? null
+                        : model.quotaUsageRatio * 100
+                    ),
+                    cost: formatUsageCost(model.totalCost),
+                  });
 
               return (
                 <div key={model.model} className={styles.quotaUsageModalItem}>
@@ -370,6 +557,28 @@ export function QuotaCard<TState extends QuotaStatusState>({
         ) : !hasUsageData && !detailsContent ? (
           <div className={styles.quotaMessage}>{t('quota_management.usage_no_data')}</div>
         ) : null}
+        {authUsageApiKeys.length > 0 && (
+          <div className={styles.quotaUsageModalSection}>
+            <div className={styles.quotaUsageModalSectionTitle}>
+              {t('quota_management.usage_api_keys')}
+            </div>
+            <div className={styles.quotaUsageModalList}>
+              {authUsageApiKeys.map(({ apiKey, summary }) => (
+                <div key={apiKey} className={styles.quotaUsageModalItem}>
+                  <span className={styles.quotaUsageModalModel} title={apiKey}>
+                    {maskApiKey(apiKey)}
+                  </span>
+                  <span
+                    className={styles.quotaUsageModalValue}
+                    title={`${summary.total_tokens.toLocaleString()} Tokens`}
+                  >
+                    {`${formatCompactNumber(summary.total_tokens)} Tokens · ${t('quota_management.usage_requests', { count: summary.total_requests.toLocaleString() })}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {detailsContent}
       </div>
     </Modal>

@@ -3,7 +3,7 @@
  */
 
 import { apiClient } from './client';
-import { computeKeyStats, KeyStats, type UsageTimeRange } from '@/utils/usage';
+import { computeKeyStats, KeyStats, type ModelPrice, type UsageTimeRange } from '@/utils/usage';
 
 const USAGE_TIMEOUT_MS = 60 * 1000;
 
@@ -23,6 +23,88 @@ export type UsageQueryParams = {
   range?: 'all' | string;
 };
 
+export type AuthUsageQueryParams = {
+  account?: string;
+  email?: string;
+  source?: string;
+  auth_index?: string;
+  authIndex?: string;
+  id?: string;
+  name?: string;
+  file?: string;
+  filename?: string;
+  since?: string;
+  start?: string;
+  start_date?: string;
+  from?: string;
+  until?: string;
+  end?: string;
+  end_date?: string;
+  to?: string;
+  include_details?: boolean;
+};
+
+export interface AuthUsageTokenStats {
+  input_tokens: number;
+  output_tokens: number;
+  reasoning_tokens: number;
+  cached_tokens: number;
+  total_tokens: number;
+}
+
+export interface AuthUsageDetail {
+  timestamp: string;
+  latency_ms: number;
+  source: string;
+  auth_index: string;
+  tokens: AuthUsageTokenStats;
+  failed: boolean;
+  api_key: string;
+  model: string;
+}
+
+export interface AuthUsageSummary extends AuthUsageTokenStats {
+  total_requests: number;
+  success_count: number;
+  failure_count: number;
+}
+
+export interface AuthUsageGroupSummary {
+  total_requests: number;
+  success_count: number;
+  failure_count: number;
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+  reasoning_tokens?: number;
+  cached_tokens?: number;
+  failed?: number;
+  details?: AuthUsageDetail[];
+}
+
+export interface AuthUsageResponse {
+  auth: {
+    id: string;
+    name: string;
+    auth_index: string;
+    provider: string;
+    account_type: string;
+    account: string;
+  };
+  window_start: string;
+  window_end: string;
+  window_source: string;
+  summary: AuthUsageSummary;
+  models: Record<string, AuthUsageGroupSummary>;
+  api_keys: Record<string, AuthUsageGroupSummary>;
+}
+
+export interface ModelPricesResponse {
+  'model-prices'?: Record<string, ModelPrice>;
+  model_prices?: Record<string, ModelPrice>;
+  prices?: Record<string, ModelPrice>;
+}
+
 export interface UsageExportPayload {
   version?: number;
   exported_at?: string;
@@ -37,6 +119,49 @@ export interface UsageImportResponse {
   failed_requests?: number;
   [key: string]: unknown;
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+export const normalizeModelPricesResponse = (response: unknown): Record<string, ModelPrice> => {
+  const payload = isRecord(response)
+    ? response.model_prices ?? response.prices ?? response['model-prices'] ?? response
+    : null;
+  if (!isRecord(payload)) {
+    return {};
+  }
+
+  const normalized: Record<string, ModelPrice> = {};
+  Object.entries(payload).forEach(([model, price]) => {
+    if (!model || !isRecord(price)) {
+      return;
+    }
+
+    const prompt = Number(price.prompt);
+    const completion = Number(price.completion);
+    const cache = Number(price.cache);
+    if (
+      !Number.isFinite(prompt) &&
+      !Number.isFinite(completion) &&
+      !Number.isFinite(cache)
+    ) {
+      return;
+    }
+
+    normalized[model] = {
+      prompt: Number.isFinite(prompt) && prompt >= 0 ? prompt : 0,
+      completion: Number.isFinite(completion) && completion >= 0 ? completion : 0,
+      cache:
+        Number.isFinite(cache) && cache >= 0
+          ? cache
+          : Number.isFinite(prompt) && prompt >= 0
+            ? prompt
+            : 0,
+    };
+  });
+
+  return normalized;
+};
 
 export const buildUsageQueryParams = (
   range: UsageTimeRange,
@@ -64,6 +189,33 @@ export const usageApi = {
     apiClient.get<Record<string, unknown>>('/usage', {
       timeout: USAGE_TIMEOUT_MS,
       params,
+    }),
+
+  /**
+   * 获取单个认证账号在当前配额窗口内的用量
+   */
+  getAuthUsage: (params: AuthUsageQueryParams) =>
+    apiClient.get<AuthUsageResponse>('/auth-usage', {
+      timeout: USAGE_TIMEOUT_MS,
+      params,
+    }),
+
+  /**
+   * 获取后端保存的模型价格配置
+   */
+  getModelPrices: () =>
+    apiClient.get<ModelPricesResponse>('/model-prices', {
+      timeout: USAGE_TIMEOUT_MS,
+    }),
+
+  /**
+   * 替换后端模型价格配置
+   */
+  replaceModelPrices: (prices: Record<string, ModelPrice>) =>
+    apiClient.put<ModelPricesResponse>('/model-prices', {
+      model_prices: prices,
+    }, {
+      timeout: USAGE_TIMEOUT_MS,
     }),
 
   /**

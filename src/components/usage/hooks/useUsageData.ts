@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { USAGE_STATS_STALE_TIME_MS, useNotificationStore, useUsageStatsStore } from '@/stores';
-import { buildUsageQueryParams, usageApi } from '@/services/api/usage';
+import { buildUsageQueryParams, normalizeModelPricesResponse, usageApi } from '@/services/api/usage';
 import { downloadBlob } from '@/utils/download';
 import { loadModelPrices, saveModelPrices, type ModelPrice, type UsageTimeRange } from '@/utils/usage';
 
@@ -59,6 +59,32 @@ export function useUsageData(timeRange: UsageTimeRange = 'all'): UseUsageDataRet
     }).catch(() => {});
     setModelPrices(loadModelPrices());
   }, [loadUsageStats, timeRange]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cachedPrices = loadModelPrices();
+
+    usageApi
+      .getModelPrices()
+      .then((response) => {
+        if (cancelled) return;
+        const prices = normalizeModelPricesResponse(response);
+        if (Object.keys(prices).length === 0 && Object.keys(cachedPrices).length > 0) {
+          setModelPrices(cachedPrices);
+          void usageApi.replaceModelPrices(cachedPrices).catch(() => {});
+          return;
+        }
+        setModelPrices(prices);
+        saveModelPrices(prices);
+      })
+      .catch(() => {
+        // Keep the local cache for older backends or transient network failures.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleExport = async () => {
     setExporting(true);
@@ -143,7 +169,22 @@ export function useUsageData(timeRange: UsageTimeRange = 'all'): UseUsageDataRet
   const handleSetModelPrices = useCallback((prices: Record<string, ModelPrice>) => {
     setModelPrices(prices);
     saveModelPrices(prices);
-  }, []);
+    usageApi
+      .replaceModelPrices(prices)
+      .then((response) => {
+        const savedPrices = normalizeModelPricesResponse(response);
+        setModelPrices(savedPrices);
+        saveModelPrices(savedPrices);
+        showNotification(t('usage_stats.model_price_saved'), 'success');
+      })
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : '';
+        showNotification(
+          `${t('notification.update_failed')}${message ? `: ${message}` : ''}`,
+          'error'
+        );
+      });
+  }, [showNotification, t]);
 
   const usage = usageSnapshot as UsagePayload | null;
   const error = storeError || '';

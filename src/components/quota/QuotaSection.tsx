@@ -8,7 +8,12 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { authFilesApi } from '@/services/api';
+import {
+  authFilesApi,
+  normalizeModelPricesResponse,
+  usageApi,
+  type AuthUsageQueryParams,
+} from '@/services/api';
 import { useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
 import type {
   AntigravityQuotaState,
@@ -26,8 +31,10 @@ import { formatQuotaResetTime, getStatusFromError } from '@/utils/quota';
 import {
   calculateCost,
   loadModelPrices,
+  saveModelPrices,
   normalizeAuthIndex,
   normalizeUsageSourceId,
+  type ModelPrice,
   type UsageDetail,
 } from '@/utils/usage';
 import { QuotaCard } from './QuotaCard';
@@ -122,6 +129,29 @@ const addUsageSourceCandidate = (candidates: Set<string>, value: unknown) => {
   const raw = String(value).trim();
   if (!raw) return;
   candidates.add(normalizeUsageSourceId(raw));
+};
+
+const readAuthFileText = (item: AuthFileItem, key: string): string => {
+  const value = item[key];
+  return typeof value === 'string' ? value.trim() : '';
+};
+
+const buildAuthUsageQueryParams = (item: AuthFileItem): AuthUsageQueryParams => {
+  const authIndex = normalizeAuthIndex(item.auth_index ?? item.authIndex);
+  const account =
+    readAuthFileText(item, 'account') ||
+    readAuthFileText(item, 'email') ||
+    readAuthFileText(item, 'label') ||
+    readAuthFileText(item, 'source');
+  const id = readAuthFileText(item, 'id');
+
+  return {
+    ...(authIndex ? { auth_index: authIndex } : {}),
+    ...(item.name ? { name: item.name, filename: item.name } : {}),
+    ...(id ? { id } : {}),
+    ...(account ? { account } : {}),
+    include_details: true,
+  };
 };
 
 const toUsageTimestampMs = (detail: UsageDetail): number | null => {
@@ -820,7 +850,35 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     return () => clearInterval(timer);
   }, [purgeStaleEntries]);
 
-  const modelPrices = useMemo(() => loadModelPrices(), []);
+  const [modelPrices, setModelPrices] = useState<Record<string, ModelPrice>>(() => loadModelPrices());
+
+  useEffect(() => {
+    let cancelled = false;
+    const cachedPrices = loadModelPrices();
+
+    usageApi
+      .getModelPrices()
+      .then((response) => {
+        if (cancelled) return;
+        const prices = normalizeModelPricesResponse(response);
+        if (Object.keys(prices).length === 0 && Object.keys(cachedPrices).length > 0) {
+          setModelPrices(cachedPrices);
+          void usageApi.replaceModelPrices(cachedPrices).catch(() => {});
+          return;
+        }
+        setModelPrices(prices);
+        saveModelPrices(prices);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setModelPrices(cachedPrices);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const usageDetailsIndex = useMemo(() => {
     const byAuthIndex = new Map<string, UsageDetail[]>();
     const bySource = new Map<string, UsageDetail[]>();
@@ -1657,10 +1715,11 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   usageStartedAtMs={usageSummary.startedAtMs}
                   inputTokens={usageSummary.inputTokens}
                   outputTokens={usageSummary.outputTokens}
-                  cachedTokens={usageSummary.cachedTokens}
-                  reasoningTokens={usageSummary.reasoningTokens}
-                  topModels={enrichedTopModels}
-                  resolvedTheme={resolvedTheme}
+	                  cachedTokens={usageSummary.cachedTokens}
+	                  reasoningTokens={usageSummary.reasoningTokens}
+	                  topModels={enrichedTopModels}
+	                  modelPrices={modelPrices}
+	                  resolvedTheme={resolvedTheme}
                   i18nPrefix={config.i18nPrefix}
                   cardIdleMessageKey={config.cardIdleMessageKey}
                   cardClassName={config.cardClassName}
@@ -1668,6 +1727,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                   detailsContent={detailsContent}
                   canRefresh={!disabled && !item.disabled}
                   onRefresh={() => void refreshQuotaForFile(item)}
+                  loadAuthUsage={(target) => usageApi.getAuthUsage(buildAuthUsageQueryParams(target))}
                   renderQuotaItems={config.renderQuotaItems}
                   selectionMode={selectionMode}
                   selected={selectedKeys.has(item.name)}

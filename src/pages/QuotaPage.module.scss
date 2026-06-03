@@ -1323,6 +1323,51 @@
   }
 }
 
+.quotaUsageModalStatus,
+.quotaUsageModalError,
+.quotaUsageModalWindow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-sm;
+  padding: 8px 10px;
+  border-radius: $radius-sm;
+  font-size: 12px;
+}
+
+.quotaUsageModalStatus {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-secondary) 64%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--border-color) 80%, transparent);
+}
+
+.quotaUsageModalError {
+  color: var(--danger-color);
+  background: color-mix(in srgb, var(--danger-color) 8%, var(--bg-secondary));
+  border: 1px solid color-mix(in srgb, var(--danger-color) 24%, var(--border-color));
+
+  button {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+}
+
+.quotaUsageModalWindow {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-secondary) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+
+  @include mobile {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 .quotaUsageModalList {
   display: flex;
   flex-direction: column;
