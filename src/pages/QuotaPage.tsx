@@ -298,6 +298,8 @@ export function QuotaPage() {
 
     return Array.from(models.values()).sort(compareModelNames);
   }, [fileModelsByName, scopedQuotaFiles, usageDetails]);
+  const shouldLoadModelCatalog =
+    scopedQuotaFiles.length > 0 && (needsModelCatalog || modelOptions.length === 0);
 
   useEffect(() => {
     if (activeQuotaFilter === 'all') return;
@@ -469,7 +471,7 @@ export function QuotaPage() {
       return next;
     });
 
-    if (disableControls || !needsModelCatalog || missingFiles.length === 0) {
+    if (disableControls || !shouldLoadModelCatalog || missingFiles.length === 0) {
       setModelCatalogLoading(false);
       return () => {
         cancelled = true;
@@ -506,7 +508,7 @@ export function QuotaPage() {
     return () => {
       cancelled = true;
     };
-  }, [disableControls, modelReloadKey, needsModelCatalog, quotaFiles]);
+  }, [disableControls, modelReloadKey, quotaFiles, shouldLoadModelCatalog]);
 
   useEffect(() => {
     if (selectedModel === 'all') return;
