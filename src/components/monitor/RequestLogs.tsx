@@ -2,11 +2,10 @@ import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Card } from '@/components/ui/Card';
-import { usageApi, authFilesApi } from '@/services/api';
+import { usageApi } from '@/services/api';
 import { useDisableModel } from '@/hooks';
 import {
   normalizeUsageSourceId,
-  normalizeAuthIndex,
   calculateCost,
   formatCompactNumber,
   formatUsd,
@@ -133,9 +132,9 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
   const [logLoading, setLogLoading] = useState(false);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
-  // 认证文件映射（优先使用 prop，否则自行加载）
+  // 认证文件映射（优先使用 prop；Monitor 页传空 Map 时也不再自行全量加载）
   const [localAuthFileMap, setLocalAuthFileMap] = useState<Map<string, CredentialInfo>>(new Map());
-  const authFileMap = propAuthFileMap?.size ? propAuthFileMap : localAuthFileMap;
+  const authFileMap = propAuthFileMap ?? localAuthFileMap;
 
   // 使用禁用模型 Hook
   const {
@@ -169,29 +168,14 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
 
   // 加载认证文件映射（用于 resolveSourceDisplay）
   const loadAuthFileMap = useCallback(async () => {
-    try {
-      const response = await authFilesApi.list();
-      const files = response?.files || [];
-      const credMap = new Map<string, CredentialInfo>();
-      files.forEach((file) => {
-        const credKey = normalizeAuthIndex((file as Record<string, unknown>)['auth_index'] ?? file.authIndex);
-        if (credKey) {
-          credMap.set(credKey, {
-            name: file.name || credKey,
-            type: ((file as Record<string, unknown>).type || (file as Record<string, unknown>).provider || '').toString()
-          });
-        }
-      });
-      setLocalAuthFileMap(credMap);
-    } catch (err) {
-      console.warn('Failed to load auth files for index mapping:', err);
-    }
+    setLocalAuthFileMap(new Map());
   }, []);
 
   // 初始加载认证文件映射
   useEffect(() => {
+    if (propAuthFileMap !== undefined) return;
     loadAuthFileMap();
-  }, [loadAuthFileMap]);
+  }, [loadAuthFileMap, propAuthFileMap]);
 
   // 独立获取日志数据
   const fetchLogData = useCallback(async () => {

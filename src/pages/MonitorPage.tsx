@@ -74,6 +74,193 @@ export interface UsageData {
   }>;
 }
 
+type MonitorProviderContext = {
+  providerMap: Record<string, string>;
+  providerTypeMap: Record<string, string>;
+  sourceInfoMap: SourceInfoMap;
+};
+type MonitorAuthLookupEntry = [string, CredentialInfo];
+
+let inFlightProviderContext: Promise<MonitorProviderContext> | null = null;
+const MONITOR_AUTH_LOOKUP_PAGE_SIZE = 20;
+const MONITOR_AUTH_LOOKUP_MAX_TERMS = 120;
+const monitorAuthLookupCache = new Map<string, MonitorAuthLookupEntry[]>();
+const inFlightMonitorAuthLookups = new Map<string, Promise<MonitorAuthLookupEntry[]>>();
+
+const loadMonitorProviderContext = async (): Promise<MonitorProviderContext> => {
+  if (inFlightProviderContext) return inFlightProviderContext;
+
+  inFlightProviderContext = (async () => {
+    const map: Record<string, string> = {};
+    const typeMap: Record<string, string> = {};
+
+    const [openaiProviders, geminiKeys, claudeConfigs, codexConfigs, vertexConfigs] =
+      await Promise.all([
+        providersApi.getOpenAIProviders().catch(() => []),
+        providersApi.getGeminiKeys().catch(() => []),
+        providersApi.getClaudeConfigs().catch(() => []),
+        providersApi.getCodexConfigs().catch(() => []),
+        providersApi.getVertexConfigs().catch(() => []),
+      ]);
+
+    openaiProviders.forEach((provider) => {
+      const providerName = provider.headers?.['X-Provider'] || provider.name || 'unknown';
+      const apiKeyEntries = provider.apiKeyEntries || [];
+      apiKeyEntries.forEach((entry) => {
+        const apiKey = entry.apiKey;
+        if (apiKey) {
+          map[apiKey] = providerName;
+          typeMap[apiKey] = 'OpenAI';
+        }
+      });
+      if (provider.name) {
+        map[provider.name] = providerName;
+        typeMap[provider.name] = 'OpenAI';
+      }
+    });
+
+    geminiKeys.forEach((config) => {
+      const apiKey = config.apiKey;
+      if (apiKey) {
+        const providerName = config.prefix?.trim() || 'Gemini';
+        map[apiKey] = providerName;
+        typeMap[apiKey] = 'Gemini';
+      }
+    });
+
+    claudeConfigs.forEach((config) => {
+      const apiKey = config.apiKey;
+      if (apiKey) {
+        const providerName = config.prefix?.trim() || 'Claude';
+        map[apiKey] = providerName;
+        typeMap[apiKey] = 'Claude';
+      }
+    });
+
+    codexConfigs.forEach((config) => {
+      const apiKey = config.apiKey;
+      if (apiKey) {
+        const providerName = config.prefix?.trim() || 'Codex';
+        map[apiKey] = providerName;
+        typeMap[apiKey] = 'Codex';
+      }
+    });
+
+    vertexConfigs.forEach((config) => {
+      const apiKey = config.apiKey;
+      if (apiKey) {
+        const providerName = config.prefix?.trim() || 'Vertex';
+        map[apiKey] = providerName;
+        typeMap[apiKey] = 'Vertex';
+      }
+    });
+
+    return {
+      providerMap: map,
+      providerTypeMap: typeMap,
+      sourceInfoMap: buildSourceInfoMap({
+        geminiApiKeys: geminiKeys,
+        claudeApiKeys: claudeConfigs,
+        codexApiKeys: codexConfigs,
+        vertexApiKeys: vertexConfigs,
+        openaiCompatibility: openaiProviders,
+      }),
+    };
+  })().finally(() => {
+    inFlightProviderContext = null;
+  });
+
+  return inFlightProviderContext;
+};
+
+const normalizeUsageSourceForAuthLookup = (value: unknown): string => {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  return raw.startsWith('t:') ? raw.slice(2).trim() : raw;
+};
+
+const collectMonitorAuthLookupTerms = (data: UsageData | null): string[] => {
+  if (!data?.apis) return [];
+
+  const terms = new Set<string>();
+  Object.values(data.apis).forEach((api) => {
+    Object.values(api.models || {}).forEach((model) => {
+      (model.details || []).forEach((detail) => {
+        const authIndex = normalizeAuthIndex(detail.auth_index);
+        if (authIndex) terms.add(authIndex);
+
+        const source = normalizeUsageSourceForAuthLookup(detail.source);
+        if (source.includes('@') || source.endsWith('.json')) terms.add(source);
+      });
+    });
+  });
+
+  return Array.from(terms).slice(0, MONITOR_AUTH_LOOKUP_MAX_TERMS);
+};
+
+const credentialInfoFromAuthFile = (file: unknown): MonitorAuthLookupEntry | null => {
+  if (!file || typeof file !== 'object') return null;
+  const entry = file as Record<string, unknown>;
+  const authIndex = normalizeAuthIndex(entry.auth_index ?? entry.authIndex);
+  if (!authIndex) return null;
+  return [
+    authIndex,
+    {
+      name: String(entry.name || entry.email || entry.account || authIndex),
+      type: String(entry.type || entry.provider || ''),
+    },
+  ];
+};
+
+const fetchMonitorAuthLookupTerm = (term: string): Promise<MonitorAuthLookupEntry[]> => {
+  const key = term.trim().toLowerCase();
+  if (!key) return Promise.resolve([]);
+
+  const cached = monitorAuthLookupCache.get(key);
+  if (cached) return Promise.resolve(cached);
+
+  const inFlight = inFlightMonitorAuthLookups.get(key);
+  if (inFlight) return inFlight;
+
+  const request = authFilesApi
+    .list({
+      search: term,
+      page: 1,
+      pageSize: MONITOR_AUTH_LOOKUP_PAGE_SIZE,
+    })
+    .then((response) => {
+      const results = (response.files || [])
+        .map(credentialInfoFromAuthFile)
+        .filter((entry): entry is MonitorAuthLookupEntry => Boolean(entry));
+      monitorAuthLookupCache.set(key, results);
+      return results;
+    })
+    .catch(() => [])
+    .finally(() => {
+      if (inFlightMonitorAuthLookups.get(key) === request) {
+        inFlightMonitorAuthLookups.delete(key);
+      }
+    });
+
+  inFlightMonitorAuthLookups.set(key, request);
+  return request;
+};
+
+const loadMonitorAuthFileMap = async (data: UsageData | null): Promise<Map<string, CredentialInfo>> => {
+  const terms = collectMonitorAuthLookupTerms(data);
+  const authFileMap = new Map<string, CredentialInfo>();
+
+  for (let index = 0; index < terms.length; index += 8) {
+    const batch = terms.slice(index, index + 8);
+    const results = await Promise.all(batch.map(fetchMonitorAuthLookupTerm));
+    results.flat().forEach(([authIndex, info]) => {
+      authFileMap.set(authIndex, info);
+    });
+  }
+
+  return authFileMap;
+};
+
 function DeferredSection({
   children,
   label,
@@ -144,108 +331,10 @@ export function MonitorPage() {
   // 加载渠道名称映射（支持所有提供商类型）
   const loadProviderMap = useCallback(async () => {
     try {
-      const map: Record<string, string> = {};
-      const typeMap: Record<string, string> = {};
-
-      // 并行加载所有提供商配置和认证文件
-      const [openaiProviders, geminiKeys, claudeConfigs, codexConfigs, vertexConfigs, authFilesResponse] = await Promise.all([
-        providersApi.getOpenAIProviders().catch(() => []),
-        providersApi.getGeminiKeys().catch(() => []),
-        providersApi.getClaudeConfigs().catch(() => []),
-        providersApi.getCodexConfigs().catch(() => []),
-        providersApi.getVertexConfigs().catch(() => []),
-        authFilesApi.list().catch(() => ({ files: [] })),
-      ]);
-
-      // 处理 OpenAI 兼容提供商
-      openaiProviders.forEach((provider) => {
-        const providerName = provider.headers?.['X-Provider'] || provider.name || 'unknown';
-        const modelSet = new Set<string>();
-        (provider.models || []).forEach((m) => {
-          if (m.alias) modelSet.add(m.alias);
-          if (m.name) modelSet.add(m.name);
-        });
-        const apiKeyEntries = provider.apiKeyEntries || [];
-        apiKeyEntries.forEach((entry) => {
-          const apiKey = entry.apiKey;
-          if (apiKey) {
-            map[apiKey] = providerName;
-            typeMap[apiKey] = 'OpenAI';
-          }
-        });
-        if (provider.name) {
-          map[provider.name] = providerName;
-          typeMap[provider.name] = 'OpenAI';
-        }
-      });
-
-      // 处理 Gemini 提供商
-      geminiKeys.forEach((config) => {
-        const apiKey = config.apiKey;
-        if (apiKey) {
-          const providerName = config.prefix?.trim() || 'Gemini';
-          map[apiKey] = providerName;
-          typeMap[apiKey] = 'Gemini';
-        }
-      });
-
-      // 处理 Claude 提供商
-      claudeConfigs.forEach((config) => {
-        const apiKey = config.apiKey;
-        if (apiKey) {
-          const providerName = config.prefix?.trim() || 'Claude';
-          map[apiKey] = providerName;
-          typeMap[apiKey] = 'Claude';
-        }
-      });
-
-      // 处理 Codex 提供商
-      codexConfigs.forEach((config) => {
-        const apiKey = config.apiKey;
-        if (apiKey) {
-          const providerName = config.prefix?.trim() || 'Codex';
-          map[apiKey] = providerName;
-          typeMap[apiKey] = 'Codex';
-        }
-      });
-
-      // 处理 Vertex 提供商
-      vertexConfigs.forEach((config) => {
-        const apiKey = config.apiKey;
-        if (apiKey) {
-          const providerName = config.prefix?.trim() || 'Vertex';
-          map[apiKey] = providerName;
-          typeMap[apiKey] = 'Vertex';
-        }
-      });
-
-      setProviderMap(map);
-      setProviderTypeMap(typeMap);
-
-      // 构建 sourceInfoMap（与请求事件明细相同的解析逻辑）
-      setSourceInfoMap(buildSourceInfoMap({
-        geminiApiKeys: geminiKeys,
-        claudeApiKeys: claudeConfigs,
-        codexApiKeys: codexConfigs,
-        vertexApiKeys: vertexConfigs,
-        openaiCompatibility: openaiProviders,
-      }));
-
-      // 构建 authFileMap（认证文件索引 → 凭证信息）
-      const credMap = new Map<string, CredentialInfo>();
-      const files = (authFilesResponse as { files?: unknown[] })?.files || [];
-      files.forEach((file) => {
-        if (!file || typeof file !== 'object') return;
-        const f = file as Record<string, unknown>;
-        const credKey = normalizeAuthIndex(f['auth_index'] ?? f['authIndex']);
-        if (credKey) {
-          credMap.set(credKey, {
-            name: String(f.name || credKey),
-            type: String(f.type || f.provider || ''),
-          });
-        }
-      });
-      setAuthFileMap(credMap);
+      const context = await loadMonitorProviderContext();
+      setProviderMap(context.providerMap);
+      setProviderTypeMap(context.providerTypeMap);
+      setSourceInfoMap(context.sourceInfoMap);
     } catch (err) {
       console.warn('Monitor: Failed to load provider map:', err);
     }
@@ -262,6 +351,7 @@ export function MonitorPage() {
       // API 返回的数据可能在 response.usage 或直接在 response 中
       const data = response?.usage ?? response;
       setUsageData(data as UsageData);
+      void loadMonitorAuthFileMap(data as UsageData).then(setAuthFileMap);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.unknown_error');
       console.error('Monitor: Error loading data:', err);
