@@ -106,6 +106,24 @@ const toNonNegativeNumber = (value: unknown): number => {
   return Number.isFinite(numeric) ? Math.max(numeric, 0) : 0;
 };
 
+const toUsageDetailTotalTokens = (detail: UsageDetail): number => {
+  const explicitTotal = toNonNegativeNumber(detail.tokens.total_tokens);
+  if (explicitTotal > 0) return explicitTotal;
+
+  return (
+    toNonNegativeNumber(detail.tokens.input_tokens) +
+    toNonNegativeNumber(detail.tokens.output_tokens) +
+    toNonNegativeNumber(detail.tokens.reasoning_tokens)
+  );
+};
+
+const addUsageSourceCandidate = (candidates: Set<string>, value: unknown) => {
+  if (value === null || value === undefined) return;
+  const raw = String(value).trim();
+  if (!raw) return;
+  candidates.add(normalizeUsageSourceId(raw));
+};
+
 const toUsageTimestampMs = (detail: UsageDetail): number | null => {
   if (typeof detail.__timestampMs === 'number' && detail.__timestampMs > 0) {
     return detail.__timestampMs;
@@ -158,64 +176,6 @@ const toDisplayResetTimestamp = (value?: string): number | null => {
   }
 
   return candidate.getTime();
-};
-
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
-
-const pickEarliestTimestamp = (values: Array<number | null>) => {
-  const timestamps = values.filter((value): value is number => value !== null);
-  return timestamps.length ? Math.min(...timestamps) : null;
-};
-
-const resolveWindowStartTimestamp = (resetTimestamp: number | null, durationMs: number | null) => {
-  if (resetTimestamp === null || durationMs === null || durationMs <= 0) {
-    return null;
-  }
-  return resetTimestamp - durationMs;
-};
-
-const getClaudeWindowDurationMs = (windowId: string): number | null => {
-  if (windowId === 'five-hour') return 5 * HOUR_MS;
-  if (windowId.startsWith('seven-day')) return 7 * DAY_MS;
-  return null;
-};
-
-const getCodexWindowDurationMs = (windowId: string): number | null => {
-  if (
-    windowId === 'five-hour' ||
-    windowId.endsWith('-five-hour') ||
-    windowId.includes('-five-hour-')
-  ) {
-    return 5 * HOUR_MS;
-  }
-  if (windowId === 'weekly' || windowId.endsWith('-weekly') || windowId.includes('-weekly-')) {
-    return 7 * DAY_MS;
-  }
-  return null;
-};
-
-const inferAntigravityWindowDurationMs = (resetTimestamp: number | null): number | null => {
-  if (resetTimestamp === null) {
-    return null;
-  }
-  const remainingMs = resetTimestamp - Date.now();
-  if (remainingMs <= 0) {
-    return null;
-  }
-  return remainingMs > 5 * HOUR_MS ? 7 * DAY_MS : 5 * HOUR_MS;
-};
-
-const subtractOneCalendarMonth = (timestamp: number | null): number | null => {
-  if (timestamp === null) {
-    return null;
-  }
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  date.setMonth(date.getMonth() - 1);
-  return date.getTime();
 };
 
 const matchesCodexWindowModel = (
@@ -563,61 +523,6 @@ const getQuotaResetTimestampForModel = (
   }
 };
 
-const getQuotaUsageWindowStartTimestamp = (
-  quotaType: QuotaConfig<QuotaStatusState, unknown>['type'],
-  quotaState: QuotaStatusState | undefined
-): number | null => {
-  if (!quotaState || quotaState.status !== 'success') {
-    return null;
-  }
-
-  switch (quotaType) {
-    case 'antigravity': {
-      const state = quotaState as AntigravityQuotaState;
-      return pickEarliestTimestamp(
-        state.groups.map((group) => {
-          const resetTimestamp = toResetTimestamp(group.resetTime);
-          return resolveWindowStartTimestamp(
-            resetTimestamp,
-            inferAntigravityWindowDurationMs(resetTimestamp)
-          );
-        })
-      );
-    }
-    case 'claude': {
-      const state = quotaState as ClaudeQuotaState;
-      return pickEarliestTimestamp(
-        state.windows.map((window) =>
-          resolveWindowStartTimestamp(
-            toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel),
-            getClaudeWindowDurationMs(window.id)
-          )
-        )
-      );
-    }
-    case 'codex': {
-      const state = quotaState as CodexQuotaState;
-      return pickEarliestTimestamp(
-        getCodexAvailabilityWindows(state).map((window) =>
-          resolveWindowStartTimestamp(
-            toResetTimestamp(window.resetTime) ?? toDisplayResetTimestamp(window.resetLabel),
-            getCodexWindowDurationMs(window.id)
-          )
-        )
-      );
-    }
-    case 'kiro': {
-      const state = getEffectiveKiroQuotaState(quotaState as KiroQuotaState);
-      return pickEarliestTimestamp([
-        subtractOneCalendarMonth(toResetTimestamp(state.nextReset)),
-        subtractOneCalendarMonth(toResetTimestamp(state.bonusNextReset)),
-      ]);
-    }
-    default:
-      return null;
-  }
-};
-
 const matchesClaudeWindowModel = (
   window: ClaudeQuotaWindow,
   normalizedSelectedModel: string
@@ -928,7 +833,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         byAuthIndex.set(authIndexKey, authEntries);
       }
 
-      const sourceId = normalizeUsageSourceId(detail.source);
+      const sourceId = detail.source;
       if (sourceId) {
         const sourceEntries = bySource.get(sourceId) ?? [];
         sourceEntries.push(detail);
@@ -965,7 +870,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         toNonNegativeNumber(detail.tokens.cache_tokens)
       );
       const reasoningTokens = toNonNegativeNumber(detail.tokens.reasoning_tokens);
-      const totalTokens = inputTokens + outputTokens + cachedTokens + reasoningTokens;
+      const totalTokens = toUsageDetailTotalTokens(detail);
       const modelName = String(detail.__modelName ?? '').trim();
       const totalCost = calculateCost(detail, modelPrices);
 
@@ -1020,16 +925,14 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     providerFiles.forEach((file) => {
       const rawAuthIndex = file['auth_index'] ?? file.authIndex;
       const authIndexKey = normalizeAuthIndex(rawAuthIndex);
-      const fileNameId = file.name ? normalizeUsageSourceId(file.name) : '';
+      const candidateSourceIds = new Set<string>();
+      addUsageSourceCandidate(candidateSourceIds, file.name);
+      addUsageSourceCandidate(candidateSourceIds, file.id);
+      addUsageSourceCandidate(candidateSourceIds, file.label);
+      addUsageSourceCandidate(candidateSourceIds, file.email);
+      addUsageSourceCandidate(candidateSourceIds, file.account);
       const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
-      const nameWithoutExtId = nameWithoutExt ? normalizeUsageSourceId(nameWithoutExt) : '';
-      const candidateSourceIds = new Set(
-        [fileNameId, nameWithoutExtId].filter((value): value is string => Boolean(value))
-      );
-      const cutoffTimestamp = getQuotaUsageWindowStartTimestamp(
-        config.type,
-        getQuotaStateForList(file.name)
-      );
+      addUsageSourceCandidate(candidateSourceIds, nameWithoutExt);
       const summary = buildEmptyUsageSummary(usageStatsReady);
       const matchedDetails = new Set<UsageDetail>();
 
@@ -1053,12 +956,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           return;
         }
 
-        const timestampMs = toUsageTimestampMs(detail);
-        if (cutoffTimestamp !== null && (timestampMs === null || timestampMs < cutoffTimestamp)) {
-          return;
-        }
-
-        accumulateDetail(summary, detail, timestampMs);
+        accumulateDetail(summary, detail, toUsageTimestampMs(detail));
       });
 
       summaryByFile.set(file.name, summary);
