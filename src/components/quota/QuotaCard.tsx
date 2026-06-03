@@ -439,6 +439,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
       onClose={() => setModelsModalOpen(false)}
       title={t('quota_management.top_models_modal_title', { name: item.name })}
       width={720}
+      className={styles.quotaUsageModal}
     >
       <div className={styles.quotaUsageModalBody}>
         <div className={styles.quotaUsageModalSummaryGrid}>
@@ -456,7 +457,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
           </div>
         </div>
         {authUsageLoading && (
-          <div className={styles.quotaUsageModalStatus}>{t('common.loading')}</div>
+          <div className={styles.quotaUsageModalLoadingBadge}>{t('common.loading')}</div>
         )}
         {authUsageError && (
           <div className={styles.quotaUsageModalError}>

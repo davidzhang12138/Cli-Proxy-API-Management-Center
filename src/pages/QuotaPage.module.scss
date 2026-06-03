@@ -1182,7 +1182,7 @@
 .cardUsageBreakdown {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
 
   @include tablet {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1197,7 +1197,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 8px 10px;
+  min-height: 58px;
+  padding: 9px 11px;
   border-radius: $radius-md;
   background: color-mix(in srgb, var(--bg-primary) 90%, transparent);
   border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
@@ -1273,10 +1274,19 @@
   }
 }
 
+.quotaUsageModal {
+  :global(.modal-body) {
+    overflow: visible;
+    max-height: none;
+    padding: 18px 20px 20px;
+  }
+}
+
 .quotaUsageModalBody {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-md;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
 }
 
 .quotaUsageModalSection {
@@ -1296,7 +1306,8 @@
   align-items: center;
   justify-content: space-between;
   gap: $spacing-sm;
-  padding: 10px 12px;
+  min-height: 54px;
+  padding: 10px 14px;
   border-radius: $radius-md;
   background: var(--bg-secondary);
   border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
@@ -1316,14 +1327,13 @@
 .quotaUsageModalSummaryGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 
   @include mobile {
     grid-template-columns: 1fr;
   }
 }
 
-.quotaUsageModalStatus,
 .quotaUsageModalError,
 .quotaUsageModalWindow {
   display: flex;
@@ -1335,10 +1345,20 @@
   font-size: 12px;
 }
 
-.quotaUsageModalStatus {
+.quotaUsageModalLoadingBadge {
+  position: absolute;
+  top: -6px;
+  right: 0;
+  z-index: 1;
+  padding: 4px 8px;
+  border-radius: $radius-full;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text-secondary);
-  background: color-mix(in srgb, var(--bg-secondary) 64%, transparent);
-  border: 1px dashed color-mix(in srgb, var(--border-color) 80%, transparent);
+  background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
+  box-shadow: $shadow-sm;
+  pointer-events: none;
 }
 
 .quotaUsageModalError {
@@ -1371,7 +1391,7 @@
 .quotaUsageModalList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
 }
 
 .quotaUsageModalItem {
@@ -1379,7 +1399,8 @@
   align-items: center;
   justify-content: space-between;
   gap: $spacing-md;
-  padding: 10px 12px;
+  min-height: 42px;
+  padding: 9px 12px;
   border-radius: $radius-md;
   background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
   border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
