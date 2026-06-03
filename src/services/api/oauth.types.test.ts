@@ -29,6 +29,10 @@ const authFilesPaginatedListAcceptsFilters = authFilesApi.list({
   pageSize: 50,
   provider: 'kiro',
   status: 'active',
+  search: 'team-a',
+  quotaFilter: 'has',
+  sort: 'quota_desc',
+  problemOnly: true,
 });
 
 void authFilesPaginatedListAcceptsFilters;

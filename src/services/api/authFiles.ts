@@ -101,6 +101,13 @@ const buildAuthFilesListParams = (options?: AuthFilesListOptions): Record<string
   if (source) params.source = source;
   const status = options.status?.trim();
   if (status) params.status = status;
+  const search = options.search?.trim();
+  if (search) params.q = search;
+  const quotaFilter = options.quotaFilter?.trim();
+  if (quotaFilter) params.quota_filter = quotaFilter;
+  const sort = options.sort?.trim();
+  if (sort) params.sort = sort;
+  if (options.problemOnly === true) params.problem_only = true;
   return params;
 };
 

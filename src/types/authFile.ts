@@ -80,6 +80,10 @@ export interface AuthFilesListOptions {
   type?: string;
   source?: string;
   status?: string;
+  search?: string;
+  quotaFilter?: string;
+  sort?: string;
+  problemOnly?: boolean;
 }
 
 export interface AuthQuotaEntry {

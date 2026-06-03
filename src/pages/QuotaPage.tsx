@@ -211,11 +211,12 @@ export function QuotaPage() {
 
   const disableControls = connectionStatus !== 'connected';
   const usageStatsReady = usageLastRefreshedAt !== null;
+  const serverQuotaSortMode =
+    sortMode === 'quota_desc' || sortMode === 'quota_asc' ? sortMode : undefined;
   const serverPaginationEnabled =
     deferredSearchQuery.trim().length === 0 &&
-    availabilityFilter === 'all' &&
     selectedModel === 'all' &&
-    sortMode === 'default';
+    (sortMode === 'default' || Boolean(serverQuotaSortMode));
   const needsModelCatalog =
     selectedModel !== 'all' ||
     deferredSearchQuery.trim().length > 0 ||
@@ -339,13 +340,22 @@ export function QuotaPage() {
                 page: pageState.page,
                 pageSize: pageState.pageSize,
                 provider: type,
+                quotaFilter: availabilityFilter === 'all' ? undefined : availabilityFilter,
+                sort: serverQuotaSortMode,
               });
               return { type, data };
             })
           ),
           typesToLoadOverride || activeQuotaFilter === 'all'
             ? Promise.resolve(null)
-            : authFilesApi.list({ page: 1, pageSize: 1 }).catch(() => null),
+            : authFilesApi
+                .list({
+                  page: 1,
+                  pageSize: 1,
+                  quotaFilter: availabilityFilter === 'all' ? undefined : availabilityFilter,
+                  sort: serverQuotaSortMode,
+                })
+                .catch(() => null),
         ]);
         const nextFilesByType: Partial<Record<ActiveQuotaType, AuthFileItem[]>> = {
           ...filesByTypeRef.current,
@@ -396,7 +406,7 @@ export function QuotaPage() {
         });
       }
     }
-  }, [activeQuotaFilter, serverPaginationEnabled, t]);
+  }, [activeQuotaFilter, availabilityFilter, serverPaginationEnabled, serverQuotaSortMode, t]);
 
   const handleHeaderRefresh = useCallback(async () => {
     setFileModelsByName({});

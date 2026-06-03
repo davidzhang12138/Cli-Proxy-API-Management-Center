@@ -1160,10 +1160,21 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         }
 
         const searchFields = [
+          file.id,
           file.name,
           file.type,
           file.provider,
           String(file['auth_index'] ?? file.authIndex ?? ''),
+          file.label,
+          file.email,
+          file.account_type,
+          file.account,
+          file.project_id,
+          file.source,
+          file.status,
+          file.status_message,
+          file.note,
+          file.path,
           ...supportedModels,
           ...usageModels.map((model) => model.model),
         ]

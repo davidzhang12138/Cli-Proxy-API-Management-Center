@@ -212,12 +212,10 @@ export function AuthFilesPage() {
     : null;
   const pageSize = compactMode ? pageSizeByMode.compact : pageSizeByMode.regular;
   const normalizedSearch = search.trim();
+  const wildcardSearchEnabled = normalizedSearch.includes('*');
   const serverPaginationEnabled =
     uiStateHydrated &&
-    normalizedSearch.length === 0 &&
-    !problemOnly &&
-    sortMode !== 'priority' &&
-    sortMode !== 'created';
+    !wildcardSearchEnabled;
   const serverListOptions = useMemo(
     () =>
       serverPaginationEnabled
@@ -226,9 +224,21 @@ export function AuthFilesPage() {
             pageSize,
             provider: normalizedFilter === 'all' ? undefined : normalizedFilter,
             status: disabledOnly ? 'disabled' : undefined,
+            search: normalizedSearch || undefined,
+            sort: sortMode === 'default' ? undefined : sortMode,
+            problemOnly: problemOnly || undefined,
           }
         : undefined,
-    [disabledOnly, normalizedFilter, page, pageSize, serverPaginationEnabled]
+    [
+      disabledOnly,
+      normalizedFilter,
+      normalizedSearch,
+      page,
+      pageSize,
+      problemOnly,
+      serverPaginationEnabled,
+      sortMode,
+    ]
   );
   const effectiveListOptions = serverPaginationEnabled ? serverListOptions : null;
 
@@ -408,7 +418,7 @@ export function AuthFilesPage() {
   );
 
   const typeCounts = useMemo(() => {
-    if (categories?.providers?.length && !problemOnly && !disabledOnly) {
+    if (categories?.providers?.length) {
       const providerTotal = categories.providers.reduce((sum, item) => sum + item.count, 0);
       const counts: Record<string, number> = { all: providerTotal || pagination?.total || 0 };
       categories.providers.forEach((item) => {
@@ -424,7 +434,7 @@ export function AuthFilesPage() {
       counts[type] = (counts[type] || 0) + 1;
     });
     return counts;
-  }, [categories, disabledOnly, filesMatchingStatusFilters, pagination, problemOnly]);
+  }, [categories, filesMatchingStatusFilters, pagination]);
 
   const wildcardSearch = useMemo(() => buildWildcardSearch(normalizedSearch), [normalizedSearch]);
 
@@ -436,7 +446,24 @@ export function AuthFilesPage() {
       const matchType = normalizedFilter === 'all' || type === normalizedFilter;
       const matchSearch =
         !normalizedSearch ||
-        [item.name, item.type, item.provider].some((value) => {
+        [
+          item.id,
+          item.auth_index,
+          item.authIndex,
+          item.name,
+          item.type,
+          item.provider,
+          item.label,
+          item.email,
+          item.account_type,
+          item.account,
+          item.project_id,
+          item.source,
+          item.status,
+          item.status_message,
+          item.note,
+          item.path,
+        ].some((value) => {
           const content = (value || '').toString();
           return wildcardSearch
             ? wildcardSearch.test(content)

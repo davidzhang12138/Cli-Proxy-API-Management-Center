@@ -334,7 +334,17 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
               setFiles((prev) => prev.filter((file) => isRuntimeOnlyAuthFile(file)));
               deselectAll();
             } else {
-              const filesToDelete = files.filter((file) => {
+              const candidateFiles =
+                lastListOptionsRef.current?.page || lastListOptionsRef.current?.pageSize
+                  ? (
+                      await authFilesApi.list({
+                        provider: isFiltered ? filter : undefined,
+                        status: isDisabledOnly ? 'disabled' : undefined,
+                        problemOnly: isProblemOnly || undefined,
+                      })
+                    ).files
+                  : files;
+              const filesToDelete = candidateFiles.filter((file) => {
                 if (isRuntimeOnlyAuthFile(file)) return false;
                 if (
                   isFiltered &&
