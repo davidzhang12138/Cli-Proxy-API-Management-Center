@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Card } from '@/components/ui/Card';
-import { authFilesApi } from '@/services/api/authFiles';
 import type { GeminiKeyConfig, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
-import type { AuthFileItem } from '@/types/authFile';
 import type { CredentialInfo } from '@/types/sourceInfo';
 import { buildSourceInfoMap, resolveSourceDisplay } from '@/utils/sourceResolver';
-import { collectUsageDetails, formatCompactNumber, normalizeAuthIndex } from '@/utils/usage';
+import { loadUsageAuthFileMap } from '@/utils/usageAuthFileLookup';
+import { collectUsageDetails, formatCompactNumber } from '@/utils/usage';
 import type { UsagePayload } from './hooks/useUsageData';
 import styles from '@/pages/UsagePage.module.scss';
 
@@ -45,32 +44,16 @@ export function CredentialStatsCard({
   useEffect(() => {
     let cancelled = false;
 
-    authFilesApi
-      .list()
-      .then((res) => {
-        if (cancelled) return;
-
-        const files = Array.isArray(res) ? res : (res as { files?: AuthFileItem[] })?.files;
-        if (!Array.isArray(files)) return;
-
-        const map = new Map<string, CredentialInfo>();
-        files.forEach((file) => {
-          const key = normalizeAuthIndex(file['auth_index'] ?? file.authIndex);
-          if (!key) return;
-
-          map.set(key, {
-            name: file.name || key,
-            type: (file.type || file.provider || '').toString(),
-          });
-        });
-        setAuthFileMap(map);
+    loadUsageAuthFileMap(usage)
+      .then((map) => {
+        if (!cancelled) setAuthFileMap(map);
       })
       .catch(() => {});
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [usage]);
 
   const sourceInfoMap = useMemo(
     () =>

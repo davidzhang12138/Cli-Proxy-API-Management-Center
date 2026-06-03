@@ -20,6 +20,7 @@ interface LoadQuotaResult<TData> {
   name: string;
   status: 'success' | 'error';
   data?: TData;
+  file?: AuthFileItem;
   error?: string;
   errorStatus?: number;
 }
@@ -28,6 +29,7 @@ interface LoadQuotaSummary {
   total: number;
   successCount: number;
   errorCount: number;
+  files: AuthFileItem[];
   errors: Array<{
     name: string;
     error: string;
@@ -66,7 +68,7 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
 
       try {
         if (targets.length === 0) {
-          return { total: 0, successCount: 0, errorCount: 0, errors: [] };
+          return { total: 0, successCount: 0, errorCount: 0, files: [], errors: [] };
         }
 
         setQuota((prev) => {
@@ -122,12 +124,14 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
                     name: managedResult.name,
                     status: 'success',
                     data: managedResult.state as TData,
+                    file: managedResult.file,
                   };
                 } else if (managedResult?.status === 'error' && !managedResult.fallbackable) {
                   result = {
                     name: managedResult.name,
                     status: 'error',
                     error: managedResult.error || t('common.unknown_error'),
+                    file: managedResult.file,
                   };
                 } else {
                   try {
@@ -195,6 +199,9 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
           total: results.length,
           successCount,
           errorCount,
+          files: results
+            .map((result) => result.file)
+            .filter((file): file is AuthFileItem => Boolean(file)),
           errors: results
             .filter(
               (

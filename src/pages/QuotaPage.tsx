@@ -428,6 +428,50 @@ export function QuotaPage() {
 
   useHeaderRefresh(handleHeaderRefresh);
 
+  const mergeUpdatedQuotaFiles = useCallback((updatedFiles: AuthFileItem[]) => {
+    if (updatedFiles.length === 0) return;
+
+    const byName = new Map<string, AuthFileItem>();
+    const byId = new Map<string, AuthFileItem>();
+    const byAuthIndex = new Map<string, AuthFileItem>();
+
+    updatedFiles.forEach((file) => {
+      const name = String(file.name ?? '').trim();
+      const id = String(file.id ?? '').trim();
+      const authIndex = String(file.auth_index ?? file.authIndex ?? '').trim();
+      if (name) byName.set(name, file);
+      if (id) byId.set(id, file);
+      if (authIndex) byAuthIndex.set(authIndex, file);
+    });
+
+    const findUpdate = (file: AuthFileItem): AuthFileItem | null => {
+      const name = String(file.name ?? '').trim();
+      const id = String(file.id ?? '').trim();
+      const authIndex = String(file.auth_index ?? file.authIndex ?? '').trim();
+      return (
+        (name ? byName.get(name) : undefined) ??
+        (id ? byId.get(id) : undefined) ??
+        (authIndex ? byAuthIndex.get(authIndex) : undefined) ??
+        null
+      );
+    };
+
+    const mergeFile = (file: AuthFileItem): AuthFileItem => {
+      const updated = findUpdate(file);
+      return updated ? { ...file, ...updated } : file;
+    };
+
+    setFiles((prev) => prev.map(mergeFile));
+    setFilesByType((prev) => {
+      const next: Partial<Record<ActiveQuotaType, AuthFileItem[]>> = {};
+      Object.entries(prev).forEach(([type, typeFiles]) => {
+        next[type as ActiveQuotaType] = (typeFiles ?? []).map(mergeFile);
+      });
+      filesByTypeRef.current = next;
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
     loadFiles();
     loadConfig();
@@ -527,6 +571,7 @@ export function QuotaPage() {
     searchQuery: deferredSearchQuery,
     fileModelsByName,
     onFilesChanged: loadFiles,
+    onFilesUpdated: mergeUpdatedQuotaFiles,
   };
 
   const updateQuotaPage = useCallback(

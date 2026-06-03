@@ -6,6 +6,7 @@ export type ManagedQuotaRefreshResult<TState> = {
   name: string;
   status: 'success' | 'error';
   state?: TState;
+  file?: AuthFileItem;
   error?: string;
   fallbackable?: boolean;
 };
@@ -80,22 +81,24 @@ const buildManagedQuotaResult = <TState, TData>(
     };
   }
 
+  const refreshedFile = buildAuthFileWithQuotaEntry(file, entry);
   const quotaError = readQuotaError(entry);
   if (quotaError) {
-    return { name: file.name, status: 'error', error: quotaError };
+    return { name: file.name, status: 'error', error: quotaError, file: refreshedFile };
   }
 
-  const state = config.buildSnapshotState?.(buildAuthFileWithQuotaEntry(file, entry)) ?? null;
+  const state = config.buildSnapshotState?.(refreshedFile) ?? null;
   if (!state) {
     return {
       name: file.name,
       status: 'error',
       error: 'Quota snapshot is unavailable',
+      file: refreshedFile,
       fallbackable: true,
     };
   }
 
-  return { name: file.name, status: 'success', state };
+  return { name: file.name, status: 'success', state, file: refreshedFile };
 };
 
 export const canUseManagedQuotaRefresh = <TState, TData>(

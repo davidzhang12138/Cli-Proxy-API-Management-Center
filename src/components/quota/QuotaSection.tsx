@@ -88,6 +88,7 @@ interface QuotaRefreshResult {
   total: number;
   successCount: number;
   errorCount: number;
+  files: AuthFileItem[];
   errors: QuotaRefreshFailure[];
 }
 
@@ -728,6 +729,7 @@ interface QuotaSectionProps<TState extends QuotaStatusState, TData> {
   searchQuery: string;
   fileModelsByName: Record<string, string[]>;
   onFilesChanged?: () => void;
+  onFilesUpdated?: (files: AuthFileItem[]) => void;
   serverPagination?: {
     enabled: boolean;
     total: number;
@@ -753,6 +755,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
   searchQuery,
   fileModelsByName,
   onFilesChanged,
+  onFilesUpdated,
   serverPagination,
 }: QuotaSectionProps<TState, TData>) {
   const { t } = useTranslation();
@@ -1362,6 +1365,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
           total: progress.total,
         });
       });
+      if (summary?.files.length) {
+        onFilesUpdated?.(summary.files);
+      }
       if (summary && summary.errorCount === 0) {
         showNotification(t('notification.data_refreshed'), 'success');
         return;
@@ -1395,6 +1401,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     clearQuotaSnapshot,
     formatFailedNames,
     loadQuota,
+    onFilesUpdated,
     pageItems,
     preserveQuotaSnapshot,
     primeQuotaRefreshState,
@@ -1445,6 +1452,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             ...prev,
             [file.name]: managedResult.state as TState,
           }));
+          if (managedResult.file) {
+            onFilesUpdated?.([managedResult.file]);
+          }
           showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
           return;
         }
@@ -1480,6 +1490,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
       preserveQuotaSnapshot,
       quota,
       setQuota,
+      onFilesUpdated,
       showNotification,
       t,
     ]

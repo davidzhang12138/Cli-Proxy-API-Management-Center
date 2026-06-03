@@ -19,10 +19,10 @@ import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useThemeStore } from '@/stores';
-import { usageApi, providersApi, authFilesApi } from '@/services/api';
+import { usageApi, providersApi } from '@/services/api';
 import { buildUsageDateQueryParams, filterDataByApiFilter, filterDataByTimeRange } from '@/utils/monitor';
 import { buildSourceInfoMap, type SourceInfoMap } from '@/utils/sourceResolver';
-import { normalizeAuthIndex } from '@/utils/usage';
+import { loadUsageAuthFileMap } from '@/utils/usageAuthFileLookup';
 import type { CredentialInfo } from '@/types/sourceInfo';
 import { KpiCards } from '@/components/monitor/KpiCards';
 import { ModelDistributionChart } from '@/components/monitor/ModelDistributionChart';
@@ -79,13 +79,8 @@ type MonitorProviderContext = {
   providerTypeMap: Record<string, string>;
   sourceInfoMap: SourceInfoMap;
 };
-type MonitorAuthLookupEntry = [string, CredentialInfo];
 
 let inFlightProviderContext: Promise<MonitorProviderContext> | null = null;
-const MONITOR_AUTH_LOOKUP_PAGE_SIZE = 20;
-const MONITOR_AUTH_LOOKUP_MAX_TERMS = 120;
-const monitorAuthLookupCache = new Map<string, MonitorAuthLookupEntry[]>();
-const inFlightMonitorAuthLookups = new Map<string, Promise<MonitorAuthLookupEntry[]>>();
 
 const loadMonitorProviderContext = async (): Promise<MonitorProviderContext> => {
   if (inFlightProviderContext) return inFlightProviderContext;
@@ -171,94 +166,6 @@ const loadMonitorProviderContext = async (): Promise<MonitorProviderContext> => 
   });
 
   return inFlightProviderContext;
-};
-
-const normalizeUsageSourceForAuthLookup = (value: unknown): string => {
-  const raw = typeof value === 'string' ? value.trim() : '';
-  if (!raw) return '';
-  return raw.startsWith('t:') ? raw.slice(2).trim() : raw;
-};
-
-const collectMonitorAuthLookupTerms = (data: UsageData | null): string[] => {
-  if (!data?.apis) return [];
-
-  const terms = new Set<string>();
-  Object.values(data.apis).forEach((api) => {
-    Object.values(api.models || {}).forEach((model) => {
-      (model.details || []).forEach((detail) => {
-        const authIndex = normalizeAuthIndex(detail.auth_index);
-        if (authIndex) terms.add(authIndex);
-
-        const source = normalizeUsageSourceForAuthLookup(detail.source);
-        if (source.includes('@') || source.endsWith('.json')) terms.add(source);
-      });
-    });
-  });
-
-  return Array.from(terms).slice(0, MONITOR_AUTH_LOOKUP_MAX_TERMS);
-};
-
-const credentialInfoFromAuthFile = (file: unknown): MonitorAuthLookupEntry | null => {
-  if (!file || typeof file !== 'object') return null;
-  const entry = file as Record<string, unknown>;
-  const authIndex = normalizeAuthIndex(entry.auth_index ?? entry.authIndex);
-  if (!authIndex) return null;
-  return [
-    authIndex,
-    {
-      name: String(entry.name || entry.email || entry.account || authIndex),
-      type: String(entry.type || entry.provider || ''),
-    },
-  ];
-};
-
-const fetchMonitorAuthLookupTerm = (term: string): Promise<MonitorAuthLookupEntry[]> => {
-  const key = term.trim().toLowerCase();
-  if (!key) return Promise.resolve([]);
-
-  const cached = monitorAuthLookupCache.get(key);
-  if (cached) return Promise.resolve(cached);
-
-  const inFlight = inFlightMonitorAuthLookups.get(key);
-  if (inFlight) return inFlight;
-
-  const request = authFilesApi
-    .list({
-      search: term,
-      page: 1,
-      pageSize: MONITOR_AUTH_LOOKUP_PAGE_SIZE,
-    })
-    .then((response) => {
-      const results = (response.files || [])
-        .map(credentialInfoFromAuthFile)
-        .filter((entry): entry is MonitorAuthLookupEntry => Boolean(entry));
-      monitorAuthLookupCache.set(key, results);
-      return results;
-    })
-    .catch(() => [])
-    .finally(() => {
-      if (inFlightMonitorAuthLookups.get(key) === request) {
-        inFlightMonitorAuthLookups.delete(key);
-      }
-    });
-
-  inFlightMonitorAuthLookups.set(key, request);
-  return request;
-};
-
-const loadMonitorAuthFileMap = async (data: UsageData | null): Promise<Map<string, CredentialInfo>> => {
-  const terms = collectMonitorAuthLookupTerms(data);
-  const authFileMap = new Map<string, CredentialInfo>();
-
-  for (let index = 0; index < terms.length; index += 8) {
-    const batch = terms.slice(index, index + 8);
-    const results = await Promise.all(batch.map(fetchMonitorAuthLookupTerm));
-    results.flat().forEach(([authIndex, info]) => {
-      authFileMap.set(authIndex, info);
-    });
-  }
-
-  return authFileMap;
 };
 
 function DeferredSection({
@@ -351,7 +258,7 @@ export function MonitorPage() {
       // API 返回的数据可能在 response.usage 或直接在 response 中
       const data = response?.usage ?? response;
       setUsageData(data as UsageData);
-      void loadMonitorAuthFileMap(data as UsageData).then(setAuthFileMap);
+      void loadUsageAuthFileMap(data as UsageData).then(setAuthFileMap);
     } catch (err) {
       const message = err instanceof Error ? err.message : t('common.unknown_error');
       console.error('Monitor: Error loading data:', err);

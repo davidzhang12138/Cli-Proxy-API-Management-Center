@@ -4,19 +4,17 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Select } from '@/components/ui/Select';
-import { authFilesApi } from '@/services/api/authFiles';
 import type { GeminiKeyConfig, ProviderKeyConfig, OpenAIProviderConfig } from '@/types';
-import type { AuthFileItem } from '@/types/authFile';
 import type { CredentialInfo } from '@/types/sourceInfo';
 import { buildSourceInfoMap, resolveSourceDisplay } from '@/utils/sourceResolver';
 import { parseTimestampMs } from '@/utils/timestamp';
+import { loadUsageAuthFileMap } from '@/utils/usageAuthFileLookup';
 import {
   collectUsageDetails,
   extractLatencyMs,
   extractTotalTokens,
   formatDurationMs,
   LATENCY_SOURCE_FIELD,
-  normalizeAuthIndex,
   type UsageThinking,
 } from '@/utils/usage';
 import { downloadBlob } from '@/utils/download';
@@ -123,28 +121,17 @@ export function RequestEventsDetailsCard({
 
   useEffect(() => {
     let cancelled = false;
-    authFilesApi
-      .list()
-      .then((res) => {
-        if (cancelled) return;
-        const files = Array.isArray(res) ? res : (res as { files?: AuthFileItem[] })?.files;
-        if (!Array.isArray(files)) return;
-        const map = new Map<string, CredentialInfo>();
-        files.forEach((file) => {
-          const key = normalizeAuthIndex(file['auth_index'] ?? file.authIndex);
-          if (!key) return;
-          map.set(key, {
-            name: file.name || key,
-            type: (file.type || file.provider || '').toString(),
-          });
-        });
-        setAuthFileMap(map);
+    loadUsageAuthFileMap(usage)
+      .then((map) => {
+        if (!cancelled) {
+          setAuthFileMap(map);
+        }
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [usage]);
 
   const sourceInfoMap = useMemo(
     () =>
