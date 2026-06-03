@@ -56,6 +56,8 @@ const antigravityResourcesPayload = {
       resource_type: 'ANTIGRAVITY_AI',
       remaining: '5000',
       minimum_credit_amount_for_usage: '50',
+      window_seconds: 2678400,
+      reset_at: '2026-07-03T05:08:33Z',
       exhausted: false,
     },
   ],

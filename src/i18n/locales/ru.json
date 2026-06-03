@@ -684,6 +684,7 @@
     "refresh_button": "Обновить квоту",
     "fetch_all": "Получить все",
     "primary_window": "Лимит на 5 часов",
+    "monthly_window": "Месячный лимит",
     "secondary_window": "Недельный лимит",
     "code_review_primary_window": "Лимит code review на 5 часов",
     "code_review_secondary_window": "Недельный лимит code review",

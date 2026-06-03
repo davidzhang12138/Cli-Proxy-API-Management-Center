@@ -86,6 +86,8 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
   const minimumCreditAmountForUsage = normalizeNumberValue(
     payload.minimum_credit_amount_for_usage ?? payload.minimumCreditAmountForUsage
   );
+  const windowSeconds = normalizeNumberValue(payload.window_seconds ?? payload.windowSeconds);
+  const resetAt = normalizeIsoTimestamp(payload.reset_at ?? payload.resetAt);
   const exhausted =
     normalizeBooleanValue(payload.exhausted) ??
     (remaining !== null && minimumCreditAmountForUsage !== null
@@ -99,6 +101,8 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
     currentUsage,
     remaining,
     minimumCreditAmountForUsage,
+    windowSeconds,
+    resetAt,
     exhausted,
   };
 };

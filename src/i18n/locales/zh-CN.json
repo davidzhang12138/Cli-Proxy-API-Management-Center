@@ -689,6 +689,7 @@
     "refresh_button": "刷新额度",
     "fetch_all": "获取全部",
     "primary_window": "5 小时限额",
+    "monthly_window": "月度限额",
     "secondary_window": "周限额",
     "code_review_primary_window": "代码审查 5 小时限额",
     "code_review_secondary_window": "代码审查周限额",

@@ -335,6 +335,7 @@ const fetchAntigravityQuota = async (
 const CODEX_WINDOW_META = {
   codeFiveHour: { id: 'five-hour', labelKey: 'codex_quota.primary_window' },
   codeWeekly: { id: 'weekly', labelKey: 'codex_quota.secondary_window' },
+  codeMonthly: { id: 'monthly', labelKey: 'codex_quota.monthly_window' },
   codeReviewFiveHour: {
     id: 'code-review-five-hour',
     labelKey: 'codex_quota.code_review_primary_window',
@@ -344,6 +345,8 @@ const CODEX_WINDOW_META = {
     labelKey: 'codex_quota.code_review_secondary_window',
   },
 } as const;
+
+export const CODEX_FREE_PRIMARY_WINDOW_LABEL_KEY = CODEX_WINDOW_META.codeMonthly.labelKey;
 
 const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): CodexQuotaWindow[] => {
   const FIVE_HOUR_SECONDS = 18000;
@@ -534,10 +537,14 @@ const codexSnapshotAdditionalName = (value: string): string => {
 };
 
 const codexSnapshotResourceMeta = (
-  resourceType?: string
+  resourceType?: string,
+  options?: { isFreePlan?: boolean }
 ): Pick<CodexQuotaWindow, 'id' | 'label' | 'labelKey' | 'labelParams'> => {
   const normalized = (resourceType ?? '').trim().toLowerCase();
   if (normalized === 'primary_window') {
+    if (options?.isFreePlan) {
+      return { ...CODEX_WINDOW_META.codeMonthly, label: '' };
+    }
     return { ...CODEX_WINDOW_META.codeFiveHour, label: '' };
   }
   if (normalized === 'secondary_window') {
@@ -580,13 +587,16 @@ const buildCodexQuotaStateFromUsageQuota = (
 ): Pick<CodexQuotaState, 'windows' | 'planType'> | null => {
   const snapshot = parseUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota);
   if (!snapshot || !snapshot.known || snapshot.error) return null;
+  const planType = normalizePlanType(snapshot.resourceType) ?? resolveCodexPlanType(file);
+  const isFreePlan = planType === 'free';
 
   const toWindow = (
     resourceType: string | undefined,
     totalLimit: number | null,
     currentUsage: number | null,
     remaining: number | null,
-    exhausted: boolean
+    exhausted: boolean,
+    resetTime?: string
   ): CodexQuotaWindow | null => {
     const usage = computeSnapshotUsage(totalLimit, currentUsage, remaining, exhausted);
 
@@ -597,14 +607,15 @@ const buildCodexQuotaStateFromUsageQuota = (
     ) {
       return null;
     }
-    const resetLabel = formatQuotaResetTime(snapshot.nextReset);
-    const meta = codexSnapshotResourceMeta(resourceType);
+    const effectiveResetTime = resetTime ?? snapshot.nextReset;
+    const resetLabel = formatQuotaResetTime(effectiveResetTime);
+    const meta = codexSnapshotResourceMeta(resourceType, { isFreePlan });
 
     return {
       ...meta,
       usedPercent: usage.usedPercent,
       resetLabel,
-      resetTime: snapshot.nextReset,
+      resetTime: effectiveResetTime,
     };
   };
 
@@ -617,7 +628,8 @@ const buildCodexQuotaStateFromUsageQuota = (
               resource.totalLimit,
               resource.currentUsage,
               resource.remaining,
-              resource.exhausted
+              resource.exhausted,
+              resource.resetAt
             )
           )
           .filter((window): window is CodexQuotaWindow => Boolean(window))
@@ -627,7 +639,8 @@ const buildCodexQuotaStateFromUsageQuota = (
             snapshot.totalLimit,
             snapshot.currentUsage,
             snapshot.remaining,
-            snapshot.exhausted
+            snapshot.exhausted,
+            snapshot.nextReset
           ),
         ].filter((window): window is CodexQuotaWindow => Boolean(window));
 
@@ -635,7 +648,7 @@ const buildCodexQuotaStateFromUsageQuota = (
 
   return {
     windows,
-    planType: normalizePlanType(snapshot.resourceType) ?? resolveCodexPlanType(file),
+    planType,
   };
 };
 

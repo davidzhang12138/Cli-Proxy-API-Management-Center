@@ -689,6 +689,7 @@
     "refresh_button": "Refresh Quota",
     "fetch_all": "Fetch All",
     "primary_window": "5-hour limit",
+    "monthly_window": "Monthly limit",
     "secondary_window": "Weekly limit",
     "code_review_primary_window": "Code review 5-hour limit",
     "code_review_secondary_window": "Code review weekly limit",

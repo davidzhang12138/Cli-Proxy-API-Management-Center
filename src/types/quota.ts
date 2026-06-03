@@ -102,6 +102,10 @@ export interface UsageQuotaResourcePayload {
   remaining?: number | string | null;
   minimum_credit_amount_for_usage?: number | string | null;
   minimumCreditAmountForUsage?: number | string | null;
+  window_seconds?: number | string | null;
+  windowSeconds?: number | string | null;
+  reset_at?: string | number | null;
+  resetAt?: string | number | null;
   exhausted?: boolean | string | number | null;
 }
 
@@ -124,6 +128,8 @@ export interface UsageQuotaResource {
   currentUsage: number | null;
   remaining: number | null;
   minimumCreditAmountForUsage: number | null;
+  windowSeconds: number | null;
+  resetAt?: string;
   exhausted: boolean;
 }
 

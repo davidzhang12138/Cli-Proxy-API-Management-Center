@@ -685,6 +685,7 @@
     "refresh_button": "重新整理配額",
     "fetch_all": "取得全部",
     "primary_window": "5 小時限額",
+    "monthly_window": "月度限額",
     "secondary_window": "週限額",
     "code_review_primary_window": "程式碼審查 5 小時限額",
     "code_review_secondary_window": "程式碼審查週限額",
