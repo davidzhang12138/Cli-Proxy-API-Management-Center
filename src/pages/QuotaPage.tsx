@@ -13,6 +13,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { IconFilterAll } from '@/components/ui/icons';
 import {
   getAuthFileIcon,
@@ -38,6 +39,11 @@ import {
   KIMI_CONFIG,
   XAI_CONFIG,
 } from '@/components/quota';
+import {
+  normalizeProviderScope,
+  readBrowserProviderScope,
+  resolveProviderUiFilterValue,
+} from '@/features/authFiles/providerScope';
 import type { AuthFileItem } from '@/types';
 import styles from './QuotaPage.module.scss';
 
@@ -65,6 +71,13 @@ type ActiveQuotaFilter = 'all' | ActiveQuotaType;
 type QuotaPaginationState = Record<ActiveQuotaType, { page: number; pageSize: number }>;
 
 const DEFAULT_QUOTA_PAGE_SIZE = 6;
+const toActiveQuotaFilter = (value: unknown): ActiveQuotaFilter => {
+  const normalized = normalizeProviderScope(value);
+  return QUOTA_CONFIGS.some((config) => config.type === normalized)
+    ? (normalized as ActiveQuotaType)
+    : 'all';
+};
+
 const createDefaultQuotaPaginationState = (): QuotaPaginationState =>
   QUOTA_CONFIGS.reduce((result, config) => {
     result[config.type] = { page: 1, pageSize: DEFAULT_QUOTA_PAGE_SIZE };
@@ -161,6 +174,8 @@ const extractInlineModels = (file: AuthFileItem): string[] => {
 
 export function QuotaPage() {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const providerScope = readBrowserProviderScope(searchParams.get('provider'));
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
   const usageDetails = useUsageStatsStore((state) => state.usageDetails);
@@ -219,6 +234,9 @@ export function QuotaPage() {
     deferredSearchQuery.trim().length === 0 &&
     selectedModel === 'all' &&
     (sortMode === 'default' || Boolean(serverQuotaSortMode));
+  const scopedQuotaFilter = toActiveQuotaFilter(providerScope);
+  const effectiveQuotaFilter =
+    scopedQuotaFilter === 'all' ? activeQuotaFilter : scopedQuotaFilter;
   const needsModelCatalog =
     selectedModel !== 'all' ||
     deferredSearchQuery.trim().length > 0 ||
@@ -243,30 +261,46 @@ export function QuotaPage() {
       ),
     [quotaFiles, serverPaginationEnabled, totalByType]
   );
+  const filterTagCounts = useMemo(() => {
+    const hasKnownTotals = QUOTA_CONFIGS.some((config) => (totalByType[config.type] ?? 0) > 0);
+    if (effectiveQuotaFilter === 'all' || !hasKnownTotals) {
+      return quotaTypeCounts;
+    }
+    return QUOTA_CONFIGS.reduce<Record<ActiveQuotaType, number>>(
+      (result, config) => {
+        result[config.type] = totalByType[config.type] ?? quotaTypeCounts[config.type] ?? 0;
+        return result;
+      },
+      {} as Record<ActiveQuotaType, number>
+    );
+  }, [effectiveQuotaFilter, quotaTypeCounts, totalByType]);
   const totalQuotaFileCount = useMemo(
     () =>
-      serverPaginationEnabled
-        ? QUOTA_CONFIGS.reduce((sum, config) => sum + (quotaTypeCounts[config.type] ?? 0), 0)
-        : quotaFiles.length,
-    [quotaFiles.length, quotaTypeCounts, serverPaginationEnabled]
+      QUOTA_CONFIGS.reduce((sum, config) => sum + (filterTagCounts[config.type] ?? 0), 0),
+    [filterTagCounts]
   );
   const availableQuotaConfigs = useMemo(
-    () => QUOTA_CONFIGS.filter((config) => (quotaTypeCounts[config.type] ?? 0) > 0),
-    [quotaTypeCounts]
+    () =>
+      QUOTA_CONFIGS.filter(
+        (config) =>
+          (filterTagCounts[config.type] ?? 0) > 0 ||
+          (effectiveQuotaFilter !== 'all' && config.type === effectiveQuotaFilter)
+      ),
+    [effectiveQuotaFilter, filterTagCounts]
   );
   const selectedQuotaConfigs = useMemo(() => {
-    if (activeQuotaFilter === 'all') {
+    if (effectiveQuotaFilter === 'all') {
       return availableQuotaConfigs;
     }
-    return availableQuotaConfigs.filter((config) => config.type === activeQuotaFilter);
-  }, [activeQuotaFilter, availableQuotaConfigs]);
+    return QUOTA_CONFIGS.filter((config) => config.type === effectiveQuotaFilter);
+  }, [effectiveQuotaFilter, availableQuotaConfigs]);
   const scopedQuotaFiles = useMemo(() => {
-    if (activeQuotaFilter === 'all') {
+    if (effectiveQuotaFilter === 'all') {
       return quotaFiles;
     }
-    const selectedConfig = QUOTA_CONFIGS.find((config) => config.type === activeQuotaFilter);
+    const selectedConfig = QUOTA_CONFIGS.find((config) => config.type === effectiveQuotaFilter);
     return selectedConfig ? quotaFiles.filter((file) => selectedConfig.filterFn(file)) : [];
-  }, [activeQuotaFilter, quotaFiles]);
+  }, [effectiveQuotaFilter, quotaFiles]);
 
   const modelOptions = useMemo(() => {
     const models = new Map<string, string>();
@@ -301,12 +335,6 @@ export function QuotaPage() {
   const shouldLoadModelCatalog =
     scopedQuotaFiles.length > 0 && (needsModelCatalog || modelOptions.length === 0);
 
-  useEffect(() => {
-    if (activeQuotaFilter === 'all') return;
-    if (availableQuotaConfigs.some((config) => config.type === activeQuotaFilter)) return;
-    setActiveQuotaFilter('all');
-  }, [activeQuotaFilter, availableQuotaConfigs]);
-
   const loadConfig = useCallback(async () => {
     try {
       await configFileApi.fetchConfigYaml();
@@ -316,27 +344,27 @@ export function QuotaPage() {
     }
   }, [t]);
 
-  const loadFiles = useCallback(async (typesToLoadOverride?: ActiveQuotaType[]) => {
-    const partialServerLoad = serverPaginationEnabled && Boolean(typesToLoadOverride?.length);
-    if (!partialServerLoad) {
-      setLoading(true);
-    } else {
-      setLoadingByType((prev) => ({
-        ...prev,
-        ...Object.fromEntries(typesToLoadOverride!.map((type) => [type, true])),
-      }));
-    }
-    setError('');
-    try {
-      if (serverPaginationEnabled) {
-        const typesToLoad =
-          typesToLoadOverride ??
-          (activeQuotaFilter === 'all'
-            ? QUOTA_CONFIGS.map((config) => config.type)
-            : [activeQuotaFilter]);
-        const paginationState = quotaPaginationRef.current;
-        const [responses, categoriesData] = await Promise.all([
-          Promise.all(
+  const loadFiles = useCallback(
+    async (typesToLoadOverride?: ActiveQuotaType[]) => {
+      const partialServerLoad = serverPaginationEnabled && Boolean(typesToLoadOverride?.length);
+      if (!partialServerLoad) {
+        setLoading(true);
+      } else {
+        setLoadingByType((prev) => ({
+          ...prev,
+          ...Object.fromEntries(typesToLoadOverride!.map((type) => [type, true])),
+        }));
+      }
+      setError('');
+      try {
+        if (serverPaginationEnabled) {
+          const typesToLoad =
+            typesToLoadOverride ??
+            (effectiveQuotaFilter === 'all'
+              ? QUOTA_CONFIGS.map((config) => config.type)
+              : [effectiveQuotaFilter]);
+          const paginationState = quotaPaginationRef.current;
+          const responses = await Promise.all(
             typesToLoad.map(async (type) => {
               const pageState = paginationState[type];
               const data = await authFilesApi.list({
@@ -348,68 +376,63 @@ export function QuotaPage() {
               });
               return { type, data };
             })
-          ),
-          typesToLoadOverride || activeQuotaFilter === 'all'
-            ? Promise.resolve(null)
-            : authFilesApi
-                .list({
-                  page: 1,
-                  pageSize: 1,
-                  quotaFilter: availabilityFilter === 'all' ? undefined : availabilityFilter,
-                  sort: serverQuotaSortMode,
-                })
-                .catch(() => null),
-        ]);
-        const nextFilesByType: Partial<Record<ActiveQuotaType, AuthFileItem[]>> = {
-          ...filesByTypeRef.current,
-        };
-        const nextTotalByType: Partial<Record<ActiveQuotaType, number>> = {
-          ...totalByTypeRef.current,
-        };
-        categoriesData?.categories?.providers?.forEach((item) => {
-          const matched = QUOTA_CONFIGS.find((config) => config.type === item.name);
-          if (matched) {
-            nextTotalByType[matched.type] = item.count;
-          }
-        });
-        responses.forEach(({ type, data }) => {
-          nextFilesByType[type] = data?.files ?? [];
-          nextTotalByType[type] =
-            data?.pagination?.total ?? data?.total ?? data?.files?.length ?? 0;
-        });
-        const mergedFiles = QUOTA_CONFIGS.flatMap((config) => nextFilesByType[config.type] ?? []);
-        setFilesByType(nextFilesByType);
-        setTotalByType(nextTotalByType);
-        setFiles(mergedFiles);
-      } else {
-        const data = await authFilesApi.list();
-        const nextFiles = data?.files || [];
-        setFiles(nextFiles);
-        setFilesByType({});
-        setTotalByType(
-          QUOTA_CONFIGS.reduce<Partial<Record<ActiveQuotaType, number>>>((result, config) => {
-            result[config.type] = nextFiles.filter((file) => config.filterFn(file)).length;
-            return result;
-          }, {})
-        );
-      }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
-      setError(errorMessage);
-    } finally {
-      if (!partialServerLoad) {
-        setLoading(false);
-      } else {
-        setLoadingByType((prev) => {
-          const next = { ...prev };
-          typesToLoadOverride!.forEach((type) => {
-            delete next[type];
+          );
+          const nextFilesByType: Partial<Record<ActiveQuotaType, AuthFileItem[]>> = {
+            ...filesByTypeRef.current,
+          };
+          const nextTotalByType: Partial<Record<ActiveQuotaType, number>> = {
+            ...totalByTypeRef.current,
+          };
+          responses.forEach(({ type, data }) => {
+            nextFilesByType[type] = data?.files ?? [];
+            nextTotalByType[type] =
+              data?.pagination?.total ?? data?.total ?? data?.files?.length ?? 0;
           });
-          return next;
-        });
+          const mergedFiles = QUOTA_CONFIGS.flatMap((config) => nextFilesByType[config.type] ?? []);
+          setFilesByType(nextFilesByType);
+          setTotalByType(nextTotalByType);
+          setFiles(mergedFiles);
+        } else {
+          const scopedProvider = effectiveQuotaFilter === 'all' ? undefined : effectiveQuotaFilter;
+          const data = await authFilesApi.list(
+            scopedProvider ? { provider: scopedProvider } : undefined
+          );
+          const nextFiles = data?.files || [];
+          setFiles(nextFiles);
+          setFilesByType({});
+          setTotalByType((prev) => {
+            const base = scopedProvider ? { ...prev } : {};
+            return QUOTA_CONFIGS.reduce<Partial<Record<ActiveQuotaType, number>>>(
+              (result, config) => {
+                if (scopedProvider && config.type !== scopedProvider) {
+                  return result;
+                }
+                result[config.type] = nextFiles.filter((file) => config.filterFn(file)).length;
+                return result;
+              },
+              base
+            );
+          });
+        }
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : t('notification.refresh_failed');
+        setError(errorMessage);
+      } finally {
+        if (!partialServerLoad) {
+          setLoading(false);
+        } else {
+          setLoadingByType((prev) => {
+            const next = { ...prev };
+            typesToLoadOverride!.forEach((type) => {
+              delete next[type];
+            });
+            return next;
+          });
+        }
       }
-    }
-  }, [activeQuotaFilter, availabilityFilter, serverPaginationEnabled, serverQuotaSortMode, t]);
+    },
+    [availabilityFilter, effectiveQuotaFilter, serverPaginationEnabled, serverQuotaSortMode, t]
+  );
 
   const handleHeaderRefresh = useCallback(async () => {
     setFileModelsByName({});
@@ -714,11 +737,11 @@ export function QuotaPage() {
                 { type: 'all' as const, count: totalQuotaFileCount },
                 ...availableQuotaConfigs.map((config) => ({
                   type: config.type,
-                  count: quotaTypeCounts[config.type] ?? 0,
+                  count: filterTagCounts[config.type] ?? 0,
                 })),
               ] as Array<{ type: ActiveQuotaFilter; count: number }>
             ).map(({ type, count }) => {
-              const isActive = activeQuotaFilter === type;
+              const isActive = effectiveQuotaFilter === type;
               const iconSrc = type === 'all' ? null : getAuthFileIcon(type, resolvedTheme);
               const color =
                 type === 'all'
@@ -738,9 +761,12 @@ export function QuotaPage() {
                   style={buttonStyle}
                   onClick={() => {
                     startTransition(() => {
-                      setActiveQuotaFilter(type);
-                      if (type !== 'all') {
-                        updateQuotaPage(type, 1);
+                      const nextFilter = toActiveQuotaFilter(
+                        resolveProviderUiFilterValue(type, providerScope)
+                      );
+                      setActiveQuotaFilter(nextFilter);
+                      if (nextFilter !== 'all') {
+                        updateQuotaPage(nextFilter, 1);
                       }
                     });
                   }}

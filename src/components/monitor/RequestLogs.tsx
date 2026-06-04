@@ -12,6 +12,7 @@ import {
   loadModelPrices,
 } from '@/utils/usage';
 import { resolveSourceDisplay, type SourceInfoMap } from '@/utils/sourceResolver';
+import { loadUsageAuthFileMap } from '@/utils/usageAuthFileLookup';
 import type { CredentialInfo } from '@/types/sourceInfo';
 import { TimeRangeSelector, formatTimeRangeCaption, type TimeRange } from './TimeRangeSelector';
 import { DisableModelModal } from './DisableModelModal';
@@ -132,9 +133,15 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
   const [logLoading, setLogLoading] = useState(false);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
 
-  // 认证文件映射（优先使用 prop；Monitor 页传空 Map 时也不再自行全量加载）
+  // 认证文件映射：父级首屏提供基础数据，日志独立刷新时再补齐新增 auth_index。
   const [localAuthFileMap, setLocalAuthFileMap] = useState<Map<string, CredentialInfo>>(new Map());
-  const authFileMap = propAuthFileMap ?? localAuthFileMap;
+  const authFileMap = useMemo(() => {
+    const merged = new Map<string, CredentialInfo>(propAuthFileMap ?? []);
+    localAuthFileMap.forEach((info, authIndex) => {
+      merged.set(authIndex, info);
+    });
+    return merged;
+  }, [localAuthFileMap, propAuthFileMap]);
 
   // 使用禁用模型 Hook
   const {
@@ -167,15 +174,20 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
   }, [parentLoading, data]);
 
   // 加载认证文件映射（用于 resolveSourceDisplay）
-  const loadAuthFileMap = useCallback(async () => {
-    setLocalAuthFileMap(new Map());
+  const loadAuthFileMap = useCallback(async (usage: UsageData | null) => {
+    if (!usage) {
+      setLocalAuthFileMap(new Map());
+      return;
+    }
+    const nextMap = await loadUsageAuthFileMap(usage);
+    setLocalAuthFileMap(nextMap);
   }, []);
 
   // 初始加载认证文件映射
   useEffect(() => {
     if (propAuthFileMap !== undefined) return;
-    loadAuthFileMap();
-  }, [loadAuthFileMap, propAuthFileMap]);
+    void loadAuthFileMap(data);
+  }, [data, loadAuthFileMap, propAuthFileMap]);
 
   // 独立获取日志数据
   const fetchLogData = useCallback(async () => {
@@ -184,12 +196,13 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
       const response = await usageApi.getUsage(buildUsageDateQueryParams(timeRange, customRange));
       const usageData = (response?.usage ?? response) as UsageData;
       setLogData(filterDataByTimeRange(usageData, timeRange, customRange, apiFilter));
+      void loadAuthFileMap(usageData);
     } catch (err) {
       console.error('日志刷新失败：', err);
     } finally {
       setLogLoading(false);
     }
-  }, [timeRange, customRange, apiFilter]);
+  }, [timeRange, customRange, apiFilter, loadAuthFileMap]);
 
   // 同步 fetchLogData 到 ref，确保定时器始终调用最新版本
   useEffect(() => {

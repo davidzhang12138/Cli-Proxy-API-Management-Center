@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { animate } from 'motion/mini';
 import type { AnimationPlaybackControlsWithThen } from 'motion-dom';
 import { useInterval } from '@/hooks/useInterval';
@@ -54,6 +54,11 @@ import {
   writePersistedAuthFilesCompactMode,
   type AuthFilesSortMode,
 } from '@/features/authFiles/uiState';
+import {
+  readBrowserProviderScope,
+  resolveProviderFilterValue,
+  resolveProviderUiFilterValue,
+} from '@/features/authFiles/providerScope';
 import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
 import styles from './AuthFilesPage.module.scss';
 
@@ -108,8 +113,10 @@ export function AuthFilesPage() {
   const pageTransitionLayer = usePageTransitionLayer();
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const providerScope = readBrowserProviderScope(searchParams.get('provider'));
 
-  const [filter, setFilter] = useState<'all' | string>('all');
+  const [filter, setFilter] = useState<'all' | string>(() => providerScope ?? 'all');
   const [problemOnly, setProblemOnly] = useState(false);
   const [disabledOnly, setDisabledOnly] = useState(false);
   const [compactMode, setCompactMode] = useState(false);
@@ -205,24 +212,24 @@ export function AuthFilesPage() {
 
   const disableControls = connectionStatus !== 'connected';
   const normalizedFilter = normalizeProviderKey(String(filter));
+  const effectiveProviderFilter = resolveProviderFilterValue(normalizedFilter, providerScope);
+  const activeProviderFilter = effectiveProviderFilter ?? 'all';
   const quotaFilterType: QuotaProviderType | null = QUOTA_PROVIDER_TYPES.has(
-    normalizedFilter as QuotaProviderType
+    activeProviderFilter as QuotaProviderType
   )
-    ? (normalizedFilter as QuotaProviderType)
+    ? (activeProviderFilter as QuotaProviderType)
     : null;
   const pageSize = compactMode ? pageSizeByMode.compact : pageSizeByMode.regular;
   const normalizedSearch = search.trim();
   const wildcardSearchEnabled = normalizedSearch.includes('*');
-  const serverPaginationEnabled =
-    uiStateHydrated &&
-    !wildcardSearchEnabled;
+  const serverPaginationEnabled = uiStateHydrated && !wildcardSearchEnabled;
   const serverListOptions = useMemo(
     () =>
       serverPaginationEnabled
         ? {
             page,
             pageSize,
-            provider: normalizedFilter === 'all' ? undefined : normalizedFilter,
+            provider: effectiveProviderFilter,
             status: disabledOnly ? 'disabled' : undefined,
             search: normalizedSearch || undefined,
             sort: sortMode === 'default' ? undefined : sortMode,
@@ -231,7 +238,7 @@ export function AuthFilesPage() {
         : undefined,
     [
       disabledOnly,
-      normalizedFilter,
+      effectiveProviderFilter,
       normalizedSearch,
       page,
       pageSize,
@@ -240,7 +247,17 @@ export function AuthFilesPage() {
       sortMode,
     ]
   );
-  const effectiveListOptions = serverPaginationEnabled ? serverListOptions : null;
+  const localListOptions = useMemo(() => {
+    const hasLocalScope = Boolean(effectiveProviderFilter) || disabledOnly || problemOnly;
+    return hasLocalScope
+      ? {
+          provider: effectiveProviderFilter,
+          status: disabledOnly ? 'disabled' : undefined,
+          problemOnly: problemOnly || undefined,
+        }
+      : null;
+  }, [disabledOnly, effectiveProviderFilter, problemOnly]);
+  const effectiveListOptions = serverPaginationEnabled ? serverListOptions : localListOptions;
 
   useEffect(() => {
     const persistedCompactMode = readPersistedAuthFilesCompactMode();
@@ -293,7 +310,7 @@ export function AuthFilesPage() {
     if (!uiStateHydrated) return;
 
     writeAuthFilesUiState({
-      filter: 'all',
+      filter: activeProviderFilter,
       problemOnly,
       disabledOnly,
       compactMode,
@@ -306,9 +323,9 @@ export function AuthFilesPage() {
     });
     writePersistedAuthFilesCompactMode(compactMode);
   }, [
+    activeProviderFilter,
     compactMode,
     disabledOnly,
-    filter,
     page,
     pageSize,
     pageSizeByMode,
@@ -356,13 +373,13 @@ export function AuthFilesPage() {
     if (!isCurrentLayer || !uiStateHydrated) return;
     const returnedFromAnotherPage = !wasCurrentLayerRef.current;
     wasCurrentLayerRef.current = true;
-    if (returnedFromAnotherPage && filter !== 'all') {
+    if (returnedFromAnotherPage && !providerScope && filter !== 'all') {
       setFilter('all');
       setPage(1);
       return;
     }
     loadFiles(effectiveListOptions);
-  }, [effectiveListOptions, filter, isCurrentLayer, loadFiles, uiStateHydrated]);
+  }, [effectiveListOptions, filter, isCurrentLayer, loadFiles, providerScope, uiStateHydrated]);
 
   useEffect(() => {
     if (isCurrentLayer) return;
@@ -394,8 +411,11 @@ export function AuthFilesPage() {
         if (type) types.add(type);
       });
     }
+    if (activeProviderFilter !== 'all') {
+      types.add(activeProviderFilter);
+    }
     return Array.from(types);
-  }, [categories, files]);
+  }, [activeProviderFilter, categories, files]);
 
   const filesMatchingStatusFilters = useMemo(
     () =>
@@ -425,6 +445,9 @@ export function AuthFilesPage() {
         const type = normalizeProviderKey(item.name);
         if (type) counts[type] = item.count;
       });
+      if (activeProviderFilter !== 'all' && counts[activeProviderFilter] === undefined) {
+        counts[activeProviderFilter] = pagination?.total ?? 0;
+      }
       return counts;
     }
     const counts: Record<string, number> = { all: filesMatchingStatusFilters.length };
@@ -434,7 +457,7 @@ export function AuthFilesPage() {
       counts[type] = (counts[type] || 0) + 1;
     });
     return counts;
-  }, [categories, filesMatchingStatusFilters, pagination]);
+  }, [activeProviderFilter, categories, filesMatchingStatusFilters, pagination]);
 
   const wildcardSearch = useMemo(() => buildWildcardSearch(normalizedSearch), [normalizedSearch]);
 
@@ -443,7 +466,7 @@ export function AuthFilesPage() {
 
     return filesMatchingStatusFilters.filter((item) => {
       const type = normalizeProviderKey(String(item.type ?? item.provider ?? ''));
-      const matchType = normalizedFilter === 'all' || type === normalizedFilter;
+      const matchType = activeProviderFilter === 'all' || type === activeProviderFilter;
       const matchSearch =
         !normalizedSearch ||
         [
@@ -471,7 +494,7 @@ export function AuthFilesPage() {
         });
       return matchType && matchSearch;
     });
-  }, [filesMatchingStatusFilters, normalizedFilter, normalizedSearch, wildcardSearch]);
+  }, [activeProviderFilter, filesMatchingStatusFilters, normalizedSearch, wildcardSearch]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -550,7 +573,7 @@ export function AuthFilesPage() {
 
   const openExcludedEditor = useCallback(
     (provider?: string) => {
-      const providerValue = (provider || (filter !== 'all' ? String(filter) : '')).trim();
+      const providerValue = (provider || effectiveProviderFilter || '').trim();
       const params = new URLSearchParams();
       if (providerValue) {
         params.set('provider', providerValue);
@@ -560,12 +583,12 @@ export function AuthFilesPage() {
         state: { fromAuthFiles: true },
       });
     },
-    [filter, navigate]
+    [effectiveProviderFilter, navigate]
   );
 
   const openModelAliasEditor = useCallback(
     (provider?: string) => {
-      const providerValue = (provider || (filter !== 'all' ? String(filter) : '')).trim();
+      const providerValue = (provider || effectiveProviderFilter || '').trim();
       const params = new URLSearchParams();
       if (providerValue) {
         params.set('provider', providerValue);
@@ -575,7 +598,7 @@ export function AuthFilesPage() {
         state: { fromAuthFiles: true },
       });
     },
-    [filter, navigate]
+    [effectiveProviderFilter, navigate]
   );
 
   useLayoutEffect(() => {
@@ -672,7 +695,7 @@ export function AuthFilesPage() {
     <div className={styles.filterRail}>
       <div className={styles.filterTags}>
         {existingTypes.map((type) => {
-          const isActive = normalizedFilter === type;
+          const isActive = activeProviderFilter === type;
           const iconSrc = getAuthFileIcon(type, resolvedTheme);
           const color =
             type === 'all'
@@ -690,7 +713,7 @@ export function AuthFilesPage() {
               className={`${styles.filterTag} ${isActive ? styles.filterTagActive : ''}`}
               style={buttonStyle}
               onClick={() => {
-                setFilter(type);
+                setFilter(resolveProviderUiFilterValue(type, providerScope));
                 setPage(1);
               }}
             >
@@ -732,15 +755,15 @@ export function AuthFilesPage() {
       return t('auth_files.delete_filtered_result_button');
     }
     if (problemOnly) {
-      return normalizedFilter === 'all'
+      return activeProviderFilter === 'all'
         ? t('auth_files.delete_problem_button')
         : t('auth_files.delete_problem_button_with_type', {
-            type: getTypeLabel(t, normalizedFilter),
+            type: getTypeLabel(t, activeProviderFilter),
           });
     }
-    return normalizedFilter === 'all'
+    return activeProviderFilter === 'all'
       ? t('auth_files.delete_all_button')
-      : `${t('common.delete')} ${getTypeLabel(t, normalizedFilter)}`;
+      : `${t('common.delete')} ${getTypeLabel(t, activeProviderFilter)}`;
   })();
 
   return (
@@ -770,10 +793,10 @@ export function AuthFilesPage() {
               size="sm"
               onClick={() =>
                 handleDeleteAll({
-                  filter,
+                  filter: activeProviderFilter,
                   problemOnly,
                   disabledOnly,
-                  onResetFilterToAll: () => setFilter('all'),
+                  onResetFilterToAll: () => setFilter(providerScope ?? 'all'),
                   onResetProblemOnly: () => setProblemOnly(false),
                   onResetDisabledOnly: () => setDisabledOnly(false),
                 })
