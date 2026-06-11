@@ -1275,10 +1275,38 @@
 }
 
 .quotaUsageModal {
+  max-height: min(90vh, 860px);
+
   :global(.modal-body) {
-    overflow: visible;
-    max-height: none;
+    overflow-y: auto;
+    max-height: calc(90vh - 76px);
     padding: 18px 20px 20px;
+    overscroll-behavior: contain;
+  }
+
+  @supports (height: 100dvh) {
+    max-height: min(90dvh, 860px);
+
+    :global(.modal-body) {
+      max-height: calc(90dvh - 76px);
+    }
+  }
+
+  @include mobile {
+    max-height: calc(100vh - 32px);
+
+    :global(.modal-body) {
+      max-height: calc(100vh - 112px);
+      padding: 16px;
+    }
+
+    @supports (height: 100dvh) {
+      max-height: calc(100dvh - 32px);
+
+      :global(.modal-body) {
+        max-height: calc(100dvh - 112px);
+      }
+    }
   }
 }
 

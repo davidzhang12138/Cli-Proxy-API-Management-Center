@@ -71,6 +71,7 @@ type ActiveQuotaFilter = 'all' | ActiveQuotaType;
 type QuotaPaginationState = Record<ActiveQuotaType, { page: number; pageSize: number }>;
 
 const DEFAULT_QUOTA_PAGE_SIZE = 6;
+const SEARCH_DEBOUNCE_MS = 300;
 const toActiveQuotaFilter = (value: unknown): ActiveQuotaFilter => {
   const normalized = normalizeProviderScope(value);
   return QUOTA_CONFIGS.some((config) => config.type === normalized)
@@ -193,6 +194,7 @@ export function QuotaPage() {
   const [selectedModel, setSelectedModel] = useState('all');
   const [sortMode, setSortMode] = useState<QuotaSortMode>('default');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [activeQuotaFilter, setActiveQuotaFilter] = useState<ActiveQuotaFilter>('all');
   const [fileModelsByName, setFileModelsByName] = useState<Record<string, string[]>>({});
   const [modelCatalogLoading, setModelCatalogLoading] = useState(false);
@@ -201,7 +203,8 @@ export function QuotaPage() {
     createDefaultQuotaPaginationState
   );
   const [loadingByType, setLoadingByType] = useState<Partial<Record<ActiveQuotaType, boolean>>>({});
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const deferredSearchQuery = useDeferredValue(debouncedSearchQuery);
+  const normalizedDeferredSearchQuery = deferredSearchQuery.trim();
 
   const fileModelsRef = useRef<Record<string, string[]>>({});
   const filesByTypeRef = useRef<Partial<Record<ActiveQuotaType, AuthFileItem[]>>>({});
@@ -224,6 +227,20 @@ export function QuotaPage() {
     quotaPaginationRef.current = quotaPagination;
   }, [quotaPagination]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  const resetQuotaPagination = useCallback(() => {
+    const next = createDefaultQuotaPaginationState();
+    quotaPaginationRef.current = next;
+    setQuotaPagination(next);
+  }, []);
+
   const disableControls = connectionStatus !== 'connected';
   const recentUsageSortEnabled =
     sortMode === 'model_recent_usage_asc' || sortMode === 'model_recent_usage_desc';
@@ -231,15 +248,13 @@ export function QuotaPage() {
   const serverQuotaSortMode =
     sortMode === 'quota_desc' || sortMode === 'quota_asc' ? sortMode : undefined;
   const serverPaginationEnabled =
-    deferredSearchQuery.trim().length === 0 &&
+    normalizedDeferredSearchQuery.length === 0 &&
     selectedModel === 'all' &&
     (sortMode === 'default' || Boolean(serverQuotaSortMode));
   const scopedQuotaFilter = toActiveQuotaFilter(providerScope);
-  const effectiveQuotaFilter =
-    scopedQuotaFilter === 'all' ? activeQuotaFilter : scopedQuotaFilter;
+  const effectiveQuotaFilter = scopedQuotaFilter === 'all' ? activeQuotaFilter : scopedQuotaFilter;
   const needsModelCatalog =
     selectedModel !== 'all' ||
-    deferredSearchQuery.trim().length > 0 ||
     sortMode === 'model_reset_asc' ||
     sortMode === 'model_reset_desc' ||
     recentUsageSortEnabled;
@@ -275,8 +290,7 @@ export function QuotaPage() {
     );
   }, [effectiveQuotaFilter, quotaTypeCounts, totalByType]);
   const totalQuotaFileCount = useMemo(
-    () =>
-      QUOTA_CONFIGS.reduce((sum, config) => sum + (filterTagCounts[config.type] ?? 0), 0),
+    () => QUOTA_CONFIGS.reduce((sum, config) => sum + (filterTagCounts[config.type] ?? 0), 0),
     [filterTagCounts]
   );
   const availableQuotaConfigs = useMemo(
@@ -333,7 +347,7 @@ export function QuotaPage() {
     return Array.from(models.values()).sort(compareModelNames);
   }, [fileModelsByName, scopedQuotaFiles, usageDetails]);
   const shouldLoadModelCatalog =
-    scopedQuotaFiles.length > 0 && (needsModelCatalog || modelOptions.length === 0);
+    scopedQuotaFiles.length > 0 && needsModelCatalog;
 
   const loadConfig = useCallback(async () => {
     try {
@@ -371,6 +385,7 @@ export function QuotaPage() {
                 page: pageState.page,
                 pageSize: pageState.pageSize,
                 provider: type,
+                search: normalizedDeferredSearchQuery || undefined,
                 quotaFilter: availabilityFilter === 'all' ? undefined : availabilityFilter,
                 sort: serverQuotaSortMode,
               });
@@ -394,9 +409,19 @@ export function QuotaPage() {
           setFiles(mergedFiles);
         } else {
           const scopedProvider = effectiveQuotaFilter === 'all' ? undefined : effectiveQuotaFilter;
-          const data = await authFilesApi.list(
-            scopedProvider ? { provider: scopedProvider } : undefined
-          );
+          const listOptions =
+            scopedProvider ||
+            normalizedDeferredSearchQuery ||
+            availabilityFilter !== 'all' ||
+            serverQuotaSortMode
+              ? {
+                  provider: scopedProvider,
+                  search: normalizedDeferredSearchQuery || undefined,
+                  quotaFilter: availabilityFilter === 'all' ? undefined : availabilityFilter,
+                  sort: serverQuotaSortMode,
+                }
+              : undefined;
+          const data = await authFilesApi.list(listOptions);
           const nextFiles = data?.files || [];
           setFiles(nextFiles);
           setFilesByType({});
@@ -431,7 +456,14 @@ export function QuotaPage() {
         }
       }
     },
-    [availabilityFilter, effectiveQuotaFilter, serverPaginationEnabled, serverQuotaSortMode, t]
+    [
+      availabilityFilter,
+      effectiveQuotaFilter,
+      normalizedDeferredSearchQuery,
+      serverPaginationEnabled,
+      serverQuotaSortMode,
+      t,
+    ]
   );
 
   const handleHeaderRefresh = useCallback(async () => {
@@ -765,9 +797,7 @@ export function QuotaPage() {
                         resolveProviderUiFilterValue(type, providerScope)
                       );
                       setActiveQuotaFilter(nextFilter);
-                      if (nextFilter !== 'all') {
-                        updateQuotaPage(nextFilter, 1);
-                      }
+                      resetQuotaPagination();
                     });
                   }}
                 >
@@ -807,7 +837,10 @@ export function QuotaPage() {
                 type="search"
                 className={styles.searchInput}
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  resetQuotaPagination();
+                }}
                 placeholder={t('quota_management.search_placeholder')}
                 spellCheck={false}
               />
@@ -821,9 +854,10 @@ export function QuotaPage() {
                 id="quota-availability-filter"
                 className={styles.pageSizeSelect}
                 value={availabilityFilter}
-                onChange={(event) =>
-                  setAvailabilityFilter(event.target.value as QuotaAvailabilityFilter)
-                }
+                onChange={(event) => {
+                  setAvailabilityFilter(event.target.value as QuotaAvailabilityFilter);
+                  resetQuotaPagination();
+                }}
               >
                 <option value="all">{t('quota_management.quota_filter_all')}</option>
                 <option value="has">{t('quota_management.quota_filter_has')}</option>
@@ -839,7 +873,10 @@ export function QuotaPage() {
                 id="quota-model-filter"
                 className={styles.pageSizeSelect}
                 value={selectedModel}
-                onChange={(event) => setSelectedModel(event.target.value)}
+                onChange={(event) => {
+                  setSelectedModel(event.target.value);
+                  resetQuotaPagination();
+                }}
                 disabled={modelCatalogLoading && modelOptions.length === 0}
               >
                 <option value="all">{t('quota_management.model_filter_all')}</option>
@@ -857,7 +894,10 @@ export function QuotaPage() {
                 id="quota-sort-mode"
                 className={styles.pageSizeSelect}
                 value={sortMode}
-                onChange={(event) => setSortMode(event.target.value as QuotaSortMode)}
+                onChange={(event) => {
+                  setSortMode(event.target.value as QuotaSortMode);
+                  resetQuotaPagination();
+                }}
               >
                 <option value="default">{t('quota_management.sort_default')}</option>
                 <option value="quota_desc">{t('quota_management.sort_quota_desc')}</option>
