@@ -70,6 +70,7 @@ import {
   resolveCodexChatgptAccountId,
   resolveCodexPlanType,
   resolveGeminiCliProjectId,
+  resolveCodexQuotaWindowMeta,
   formatCodexResetLabel,
   formatQuotaResetTime,
   formatKimiResetHint,
@@ -78,9 +79,11 @@ import {
   buildGeminiCliQuotaBuckets,
   buildKiroQuotaDataFromUsageQuota,
   buildKimiQuotaRows,
+  CODEX_WINDOW_META,
   createStatusError,
   getStatusFromError,
   hasKnownUsageQuotaSnapshot,
+  inferCodexQuotaWindowPeriod,
   isAntigravityFile,
   isClaudeFile,
   isCodexFile,
@@ -332,26 +335,7 @@ const fetchAntigravityQuota = async (
   throw createStatusError(lastError || t('common.unknown_error'), priorityStatus ?? lastStatus);
 };
 
-const CODEX_WINDOW_META = {
-  codeFiveHour: { id: 'five-hour', labelKey: 'codex_quota.primary_window' },
-  codeWeekly: { id: 'weekly', labelKey: 'codex_quota.secondary_window' },
-  codeMonthly: { id: 'monthly', labelKey: 'codex_quota.monthly_window' },
-  codeReviewFiveHour: {
-    id: 'code-review-five-hour',
-    labelKey: 'codex_quota.code_review_primary_window',
-  },
-  codeReviewWeekly: {
-    id: 'code-review-weekly',
-    labelKey: 'codex_quota.code_review_secondary_window',
-  },
-} as const;
-
-export const CODEX_FREE_PRIMARY_WINDOW_LABEL_KEY = CODEX_WINDOW_META.codeMonthly.labelKey;
-
 const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): CodexQuotaWindow[] => {
-  const FIVE_HOUR_SECONDS = 18000;
-  const WEEK_SECONDS = 604800;
-
   const rateLimit = payload.rate_limit ?? payload.rateLimit ?? undefined;
   const codeReviewLimit =
     payload.code_review_rate_limit ?? payload.codeReviewRateLimit ?? undefined;
@@ -402,7 +386,11 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
   const pickClassifiedWindows = (
     limitInfo?: CodexRateLimitInfo | null,
     options?: { allowOrderFallback?: boolean }
-  ): { fiveHourWindow: CodexUsageWindow | null; weeklyWindow: CodexUsageWindow | null } => {
+  ): {
+    fiveHourWindow: CodexUsageWindow | null;
+    weeklyWindow: CodexUsageWindow | null;
+    monthlyWindow: CodexUsageWindow | null;
+  } => {
     const allowOrderFallback = options?.allowOrderFallback ?? true;
     const primaryWindow = limitInfo?.primary_window ?? limitInfo?.primaryWindow ?? null;
     const secondaryWindow = limitInfo?.secondary_window ?? limitInfo?.secondaryWindow ?? null;
@@ -410,29 +398,37 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
 
     let fiveHourWindow: CodexUsageWindow | null = null;
     let weeklyWindow: CodexUsageWindow | null = null;
+    let monthlyWindow: CodexUsageWindow | null = null;
 
     for (const window of rawWindows) {
       if (!window) continue;
-      const seconds = getWindowSeconds(window);
-      if (seconds === FIVE_HOUR_SECONDS && !fiveHourWindow) {
+      const period = inferCodexQuotaWindowPeriod(getWindowSeconds(window));
+      if (period === 'five-hour' && !fiveHourWindow) {
         fiveHourWindow = window;
-      } else if (seconds === WEEK_SECONDS && !weeklyWindow) {
+      } else if (period === 'weekly' && !weeklyWindow) {
         weeklyWindow = window;
+      } else if (period === 'monthly' && !monthlyWindow) {
+        monthlyWindow = window;
       }
     }
 
     // For legacy payloads without window duration, fallback to primary/secondary ordering.
     if (allowOrderFallback) {
       if (!fiveHourWindow) {
-        fiveHourWindow = primaryWindow && primaryWindow !== weeklyWindow ? primaryWindow : null;
+        fiveHourWindow =
+          primaryWindow && primaryWindow !== weeklyWindow && primaryWindow !== monthlyWindow
+            ? primaryWindow
+            : null;
       }
       if (!weeklyWindow) {
         weeklyWindow =
-          secondaryWindow && secondaryWindow !== fiveHourWindow ? secondaryWindow : null;
+          secondaryWindow && secondaryWindow !== fiveHourWindow && secondaryWindow !== monthlyWindow
+            ? secondaryWindow
+            : null;
       }
     }
 
-    return { fiveHourWindow, weeklyWindow };
+    return { fiveHourWindow, weeklyWindow, monthlyWindow };
   };
 
   const rateWindows = pickClassifiedWindows(rateLimit);
@@ -451,6 +447,15 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
     CODEX_WINDOW_META.codeWeekly.labelKey,
     undefined,
     rateWindows.weeklyWindow,
+    rawLimitReached,
+    rawAllowed
+  );
+  addWindow(
+    CODEX_WINDOW_META.codeMonthly.id,
+    t(CODEX_WINDOW_META.codeMonthly.labelKey),
+    CODEX_WINDOW_META.codeMonthly.labelKey,
+    undefined,
+    rateWindows.monthlyWindow,
     rawLimitReached,
     rawAllowed
   );
@@ -500,21 +505,37 @@ const buildCodexQuotaWindows = (payload: CodexUsagePayload, t: TFunction): Codex
         rateInfo.secondary_window ?? rateInfo.secondaryWindow ?? null;
       const additionalLimitReached = rateInfo.limit_reached ?? rateInfo.limitReached;
       const additionalAllowed = rateInfo.allowed;
+      const additionalPrimaryMeta = resolveCodexQuotaWindowMeta({
+        resourceType: 'primary_window',
+        windowSeconds: getWindowSeconds(additionalPrimaryWindow),
+        additionalName: limitName,
+        additionalIdPrefix: idPrefix,
+      });
+      const additionalSecondaryMeta = resolveCodexQuotaWindowMeta({
+        resourceType: 'secondary_window',
+        windowSeconds: getWindowSeconds(additionalSecondaryWindow),
+        additionalName: limitName,
+        additionalIdPrefix: idPrefix,
+      });
 
       addWindow(
-        `${idPrefix}-five-hour-${index}`,
-        t('codex_quota.additional_primary_window', { name: limitName }),
-        'codex_quota.additional_primary_window',
-        { name: limitName },
+        `${additionalPrimaryMeta.id || `${idPrefix}-primary`}-${index}`,
+        additionalPrimaryMeta.labelKey
+          ? t(additionalPrimaryMeta.labelKey, additionalPrimaryMeta.labelParams)
+          : limitName,
+        additionalPrimaryMeta.labelKey,
+        additionalPrimaryMeta.labelParams,
         additionalPrimaryWindow,
         additionalLimitReached,
         additionalAllowed
       );
       addWindow(
-        `${idPrefix}-weekly-${index}`,
-        t('codex_quota.additional_secondary_window', { name: limitName }),
-        'codex_quota.additional_secondary_window',
-        { name: limitName },
+        `${additionalSecondaryMeta.id || `${idPrefix}-secondary`}-${index}`,
+        additionalSecondaryMeta.labelKey
+          ? t(additionalSecondaryMeta.labelKey, additionalSecondaryMeta.labelParams)
+          : limitName,
+        additionalSecondaryMeta.labelKey,
+        additionalSecondaryMeta.labelParams,
         additionalSecondaryWindow,
         additionalLimitReached,
         additionalAllowed
@@ -538,41 +559,44 @@ const codexSnapshotAdditionalName = (value: string): string => {
 
 const codexSnapshotResourceMeta = (
   resourceType?: string,
-  options?: { isFreePlan?: boolean }
+  options?: { isFreePlan?: boolean; windowSeconds?: number | null }
 ): Pick<CodexQuotaWindow, 'id' | 'label' | 'labelKey' | 'labelParams'> => {
   const normalized = (resourceType ?? '').trim().toLowerCase();
-  if (normalized === 'primary_window') {
-    if (options?.isFreePlan) {
-      return { ...CODEX_WINDOW_META.codeMonthly, label: '' };
-    }
-    return { ...CODEX_WINDOW_META.codeFiveHour, label: '' };
-  }
-  if (normalized === 'secondary_window') {
-    return { ...CODEX_WINDOW_META.codeWeekly, label: '' };
-  }
-  if (normalized === 'code_review_primary_window') {
-    return { ...CODEX_WINDOW_META.codeReviewFiveHour, label: '' };
-  }
-  if (normalized === 'code_review_secondary_window') {
-    return { ...CODEX_WINDOW_META.codeReviewWeekly, label: '' };
+  const directMeta = resolveCodexQuotaWindowMeta({
+    resourceType,
+    windowSeconds: options?.windowSeconds,
+    isFreePlan: options?.isFreePlan,
+  });
+  if (directMeta.id) {
+    return { ...directMeta, id: directMeta.id, label: '' };
   }
 
   if (normalized.endsWith('_primary_window')) {
     const name = codexSnapshotAdditionalName(normalized.slice(0, -'_primary_window'.length));
+    const meta = resolveCodexQuotaWindowMeta({
+      resourceType,
+      windowSeconds: options?.windowSeconds,
+      additionalName: name,
+      additionalIdPrefix: snapshotResourceId(name, 'additional'),
+    });
     return {
-      id: `${snapshotResourceId(name, 'additional')}-five-hour`,
+      ...meta,
+      id: meta.id ?? `${snapshotResourceId(name, 'additional')}-primary`,
       label: '',
-      labelKey: 'codex_quota.additional_primary_window',
-      labelParams: { name },
     };
   }
   if (normalized.endsWith('_secondary_window')) {
     const name = codexSnapshotAdditionalName(normalized.slice(0, -'_secondary_window'.length));
+    const meta = resolveCodexQuotaWindowMeta({
+      resourceType,
+      windowSeconds: options?.windowSeconds,
+      additionalName: name,
+      additionalIdPrefix: snapshotResourceId(name, 'additional'),
+    });
     return {
-      id: `${snapshotResourceId(name, 'additional')}-weekly`,
+      ...meta,
+      id: meta.id ?? `${snapshotResourceId(name, 'additional')}-secondary`,
       label: '',
-      labelKey: 'codex_quota.additional_secondary_window',
-      labelParams: { name },
     };
   }
 
@@ -596,7 +620,8 @@ const buildCodexQuotaStateFromUsageQuota = (
     currentUsage: number | null,
     remaining: number | null,
     exhausted: boolean,
-    resetTime?: string
+    resetTime?: string,
+    windowSeconds?: number | null
   ): CodexQuotaWindow | null => {
     const usage = computeSnapshotUsage(totalLimit, currentUsage, remaining, exhausted);
 
@@ -609,7 +634,7 @@ const buildCodexQuotaStateFromUsageQuota = (
     }
     const effectiveResetTime = resetTime ?? snapshot.nextReset;
     const resetLabel = formatQuotaResetTime(effectiveResetTime);
-    const meta = codexSnapshotResourceMeta(resourceType, { isFreePlan });
+    const meta = codexSnapshotResourceMeta(resourceType, { isFreePlan, windowSeconds });
 
     return {
       ...meta,
@@ -629,7 +654,8 @@ const buildCodexQuotaStateFromUsageQuota = (
               resource.currentUsage,
               resource.remaining,
               resource.exhausted,
-              resource.resetAt
+              resource.resetAt,
+              resource.windowSeconds
             )
           )
           .filter((window): window is CodexQuotaWindow => Boolean(window))

@@ -1,6 +1,9 @@
-import { CODEX_FREE_PRIMARY_WINDOW_LABEL_KEY } from './quotaConfigs';
+import { resolveCodexQuotaWindowMeta } from '@/utils/quota';
 
-const codexFreePrimaryWindowLabelKey: 'codex_quota.monthly_window' =
-  CODEX_FREE_PRIMARY_WINDOW_LABEL_KEY;
+const codexWeeklyWindowLabelKey: string | undefined = resolveCodexQuotaWindowMeta({
+  resourceType: 'primary_window',
+  windowSeconds: 604800,
+  isFreePlan: true,
+}).labelKey;
 
-void codexFreePrimaryWindowLabelKey;
+void codexWeeklyWindowLabelKey;
