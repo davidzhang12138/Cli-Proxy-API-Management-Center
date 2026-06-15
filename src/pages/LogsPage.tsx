@@ -28,7 +28,6 @@ import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useAuthStore, useConfigStore, useNotificationStore } from '@/stores';
 import { logsApi, type LogsQuery } from '@/services/api/logs';
-import { versionApi } from '@/services/api/version';
 import { copyToClipboard } from '@/utils/clipboard';
 import { getErrorMessage } from '@/utils/helpers';
 import { downloadBlob } from '@/utils/download';
@@ -126,7 +125,6 @@ export function LogsPage() {
   const { showNotification, showConfirmation } = useNotificationStore();
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const serverRuntimeKind = useAuthStore((state) => state.serverRuntimeKind);
-  const updateServerRuntimeKind = useAuthStore((state) => state.updateServerRuntimeKind);
   const config = useConfigStore((state) => state.config);
   const requestLogEnabled = config?.requestLog ?? false;
   const loggingToFileEnabled = config?.loggingToFile ?? false;
@@ -436,21 +434,6 @@ export function LogsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionStatus, loggingToFileEnabled]);
-
-  useEffect(() => {
-    if (connectionStatus !== 'connected' || serverRuntimeKind !== 'unknown') return;
-    let cancelled = false;
-    const detectRuntime = async () => {
-      const runtimeKind = await versionApi.detectRuntimeKind();
-      if (!cancelled && (runtimeKind === 'cpa' || runtimeKind === 'home')) {
-        updateServerRuntimeKind(runtimeKind);
-      }
-    };
-    void detectRuntime();
-    return () => {
-      cancelled = true;
-    };
-  }, [connectionStatus, serverRuntimeKind, updateServerRuntimeKind]);
 
   useEffect(() => {
     if (activeTab !== 'errors') return;
