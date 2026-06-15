@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
-import { Button } from '@/components/ui/Button';
 import { IconRefreshCw } from '@/components/ui/icons';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import type { AuthUsageResponse } from '@/services/api';
@@ -437,24 +436,9 @@ export function QuotaCard<TState extends QuotaStatusState>({
         )}
       </div>
 
-      {(resetQuotaAction || (onRefresh && quotaStatus !== 'idle')) && (
+      {resetQuotaAction && (
         <div className={styles.quotaCardActions} onClick={(event) => event.stopPropagation()}>
           {resetQuotaAction}
-          {onRefresh && quotaStatus !== 'idle' && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className={styles.quotaRefreshButton}
-              onClick={onRefresh}
-              disabled={!canRefresh || quotaLoading}
-              loading={quotaLoading}
-              title={t('auth_files.quota_refresh_hint')}
-            >
-              {!quotaLoading && <IconRefreshCw size={14} />}
-              {t('auth_files.quota_refresh_single')}
-            </Button>
-          )}
         </div>
       )}
     </div>
