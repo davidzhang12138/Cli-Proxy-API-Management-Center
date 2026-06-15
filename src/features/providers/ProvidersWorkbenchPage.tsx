@@ -5,19 +5,26 @@ import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore, useNotificationStore } from '@/stores';
 import { useProviderRecentRequests } from '@/components/providers/hooks/useProviderRecentRequests';
-import { getOpenAIProviderRecentWindowStats } from '@/components/providers/utils';
+import {
+  getOpenAIProviderRecentWindowStats,
+  getProviderRecentWindowStats,
+  type ProviderRecentUsageMap,
+} from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
 import { ProviderHeaderCard } from './components/ProviderHeaderCard';
 import { ProviderCategoryList } from './components/ProviderCategoryList';
 import { ProviderResourcePanel } from './components/ProviderResourcePanel';
-import type { OpenAIPanelControls } from './components/ProviderResourcePanel';
-import type {
-  OpenAISortBy,
-  SortDir,
-} from './components/OpenAIBrandToolbar';
+import type { ProviderPanelControls } from './components/ProviderResourcePanel';
 import { ProviderSheet, type ProviderSheetHandle } from './sheets/ProviderSheet';
 import { useProviderWorkbench } from './useProviderWorkbench';
-import type { ProviderBrand, ProviderResource } from './types';
+import {
+  getProviderFilterState,
+  readProvidersWorkbenchUiState,
+  writeProvidersWorkbenchUiState,
+  type ProviderFilterState,
+  type ProvidersWorkbenchUiState,
+} from './uiState';
+import type { ProviderBrand, ProviderResource, ProviderSortBy, SortDir } from './types';
 import styles from './ProvidersWorkbenchPage.module.scss';
 
 type SheetMode = 'detail' | 'create' | 'edit';
@@ -59,6 +66,27 @@ const matchesFilter = (r: ProviderResource, normalized: string): boolean => {
   return haystack.some((v) => v.includes(normalized));
 };
 
+const getResourceSortName = (resource: ProviderResource): string =>
+  (resource.name ?? resource.identifier ?? resource.apiKeyPreview ?? '').toLowerCase();
+
+const getResourceRecentSuccess = (
+  resource: ProviderResource,
+  usageByProvider: ProviderRecentUsageMap
+): number => {
+  if (resource.brand === 'openaiCompatibility') {
+    return getOpenAIProviderRecentWindowStats(
+      resource.raw as OpenAIProviderConfig,
+      usageByProvider
+    ).success;
+  }
+  return getProviderRecentWindowStats(
+    usageByProvider,
+    resource.brand,
+    resource.apiKey ?? undefined,
+    resource.baseUrl ?? undefined
+  ).success;
+};
+
 export function ProvidersWorkbenchPage() {
   const { t, i18n } = useTranslation();
   const connectionStatus = useAuthStore((s) => s.connectionStatus);
@@ -68,12 +96,8 @@ export function ProvidersWorkbenchPage() {
   const isCurrentLayer = pageTransitionLayer ? pageTransitionLayer.status === 'current' : true;
 
   const workbench = useProviderWorkbench();
-  const [activeBrand, setActiveBrand] = useState<ProviderBrand>('gemini');
-  const [filter, setFilter] = useState('');
-  const [openaiSortBy, setOpenaiSortBy] = useState<OpenAISortBy>('name');
-  const [openaiSortDir, setOpenaiSortDir] = useState<SortDir>('asc');
-  const [openaiSelectedModels, setOpenaiSelectedModels] = useState<Set<string>>(
-    () => new Set()
+  const [uiState, setUiState] = useState<ProvidersWorkbenchUiState>(
+    readProvidersWorkbenchUiState
   );
   const [sheetState, setSheetState] = useState<SheetState>({
     open: false,
@@ -99,7 +123,52 @@ export function ProvidersWorkbenchPage() {
 
   const disableMutations = connectionStatus !== 'connected' || workbench.mutating;
 
+  const persistUiState = useCallback(
+    (updater: (prev: ProvidersWorkbenchUiState) => ProvidersWorkbenchUiState) => {
+      setUiState((prev) => {
+        const next = updater(prev);
+        writeProvidersWorkbenchUiState(next);
+        return next;
+      });
+    },
+    []
+  );
+
+  const setActiveBrand = useCallback(
+    (brand: ProviderBrand) => {
+      persistUiState((prev) =>
+        prev.activeBrand === brand ? prev : { ...prev, activeBrand: brand }
+      );
+    },
+    [persistUiState]
+  );
+
+  const updateActiveFilterState = useCallback(
+    (patch: Partial<ProviderFilterState>) => {
+      persistUiState((prev) => {
+        const brand = prev.activeBrand;
+        const current = getProviderFilterState(prev, brand);
+        return {
+          ...prev,
+          filtersByBrand: {
+            ...prev.filtersByBrand,
+            [brand]: {
+              ...current,
+              ...patch,
+            },
+          },
+        };
+      });
+    },
+    [persistUiState]
+  );
+
   const groups = useMemo(() => workbench.snapshot?.groups ?? [], [workbench.snapshot]);
+  const activeBrand = uiState.activeBrand;
+  const activeFilterState = getProviderFilterState(uiState, activeBrand);
+  const filter = activeFilterState.filter;
+  const providerSortBy = activeFilterState.sortBy;
+  const providerSortDir = activeFilterState.sortDir;
   const activeGroup =
     groups.find((g) => g.id === activeBrand) ?? groups[0] ?? null;
 
@@ -109,85 +178,76 @@ export function ProvidersWorkbenchPage() {
     return activeGroup.resources.filter((r) => matchesFilter(r, normalized));
   }, [activeGroup, filter]);
 
-  const isOpenAI = activeGroup?.id === 'openaiCompatibility';
-
-  const availableOpenaiModels = useMemo(() => {
-    if (!isOpenAI || !activeGroup) return [];
+  const availableModels = useMemo(() => {
+    if (!activeGroup) return [];
     const seen = new Set<string>();
     activeGroup.resources.forEach((r) => {
-      const cfg = r.raw as OpenAIProviderConfig;
-      cfg.models?.forEach((m) => {
-        const name = (m.name ?? '').trim();
-        if (name) seen.add(name);
-      });
+      r.models.forEach((name) => seen.add(name));
     });
     return Array.from(seen).sort();
-  }, [activeGroup, isOpenAI]);
+  }, [activeGroup]);
+
+  const selectedModels = useMemo(() => {
+    if (availableModels.length === 0) return new Set<string>();
+    const availableModelSet = new Set(availableModels);
+    return new Set(
+      activeFilterState.selectedModels.filter((name) => availableModelSet.has(name))
+    );
+  }, [activeFilterState.selectedModels, availableModels]);
 
   const visibleResources = useMemo(() => {
-    if (!isOpenAI) return filteredResources;
-
     let arr = filteredResources;
-    if (openaiSelectedModels.size > 0) {
-      arr = arr.filter((r) => {
-        const cfg = r.raw as OpenAIProviderConfig;
-        return Boolean(
-          cfg.models?.some((m) => openaiSelectedModels.has((m.name ?? '').trim()))
-        );
-      });
+    if (selectedModels.size > 0) {
+      arr = arr.filter((r) => r.models.some((name) => selectedModels.has(name)));
     }
 
     const sorted = [...arr].sort((a, b) => {
       let diff = 0;
-      if (openaiSortBy === 'name') {
-        const an = (a.name ?? a.identifier ?? '').toLowerCase();
-        const bn = (b.name ?? b.identifier ?? '').toLowerCase();
-        diff = an.localeCompare(bn);
-      } else if (openaiSortBy === 'priority') {
-        const ap = (a.raw as OpenAIProviderConfig).priority ?? 0;
-        const bp = (b.raw as OpenAIProviderConfig).priority ?? 0;
-        diff = ap - bp;
+      if (providerSortBy === 'name') {
+        diff = getResourceSortName(a).localeCompare(getResourceSortName(b));
+      } else if (providerSortBy === 'priority') {
+        diff = a.priority - b.priority;
       } else {
-        const aStats = getOpenAIProviderRecentWindowStats(
-          a.raw as OpenAIProviderConfig,
-          usageByProvider
-        );
-        const bStats = getOpenAIProviderRecentWindowStats(
-          b.raw as OpenAIProviderConfig,
-          usageByProvider
-        );
-        diff = aStats.success - bStats.success;
+        diff =
+          getResourceRecentSuccess(a, usageByProvider) -
+          getResourceRecentSuccess(b, usageByProvider);
       }
-      return openaiSortDir === 'asc' ? diff : -diff;
+      if (diff === 0) {
+        diff = a.originalIndex - b.originalIndex;
+      }
+      return providerSortDir === 'asc' ? diff : -diff;
     });
 
     return sorted;
   }, [
     filteredResources,
-    isOpenAI,
-    openaiSelectedModels,
-    openaiSortBy,
-    openaiSortDir,
+    providerSortBy,
+    providerSortDir,
+    selectedModels,
     usageByProvider,
   ]);
 
-  const openaiControls = useMemo<OpenAIPanelControls | undefined>(() => {
-    if (!isOpenAI) return undefined;
+  const toolbarControls = useMemo<ProviderPanelControls | undefined>(() => {
+    if (!activeGroup) return undefined;
     return {
-      sortBy: openaiSortBy,
-      sortDir: openaiSortDir,
-      onSortBy: setOpenaiSortBy,
-      onSortDir: setOpenaiSortDir,
-      availableModels: availableOpenaiModels,
-      selectedModels: openaiSelectedModels,
-      onSelectedModelsChange: setOpenaiSelectedModels,
+      sortBy: providerSortBy,
+      sortDir: providerSortDir,
+      onSortBy: (value: ProviderSortBy) => updateActiveFilterState({ sortBy: value }),
+      onSortDir: (value: SortDir) => updateActiveFilterState({ sortDir: value }),
+      availableModels,
+      selectedModels,
+      onSelectedModelsChange: (next) =>
+        updateActiveFilterState({
+          selectedModels: Array.from(next).sort((a, b) => a.localeCompare(b)),
+        }),
     };
   }, [
-    availableOpenaiModels,
-    isOpenAI,
-    openaiSelectedModels,
-    openaiSortBy,
-    openaiSortDir,
+    activeGroup,
+    availableModels,
+    providerSortBy,
+    providerSortDir,
+    selectedModels,
+    updateActiveFilterState,
   ]);
 
   const totalResources = useMemo(
@@ -224,15 +284,8 @@ export function ProvidersWorkbenchPage() {
 
   const openCreate = useCallback(() => {
     const brand = activeBrand;
-    if (brand === 'ampcode') {
-      // ampcode 走单例编辑
-      const r =
-        groups.find((g) => g.id === 'ampcode')?.resources[0] ?? null;
-      setSheetState({ open: true, brand: 'ampcode', mode: 'edit', resource: r });
-    } else {
-      setSheetState({ open: true, brand, mode: 'create', resource: null });
-    }
-  }, [activeBrand, groups]);
+    setSheetState({ open: true, brand, mode: 'create', resource: null });
+  }, [activeBrand]);
 
   const openView = useCallback((resource: ProviderResource) => {
     setSheetState({
@@ -258,20 +311,13 @@ export function ProvidersWorkbenchPage() {
 
   const handleDelete = useCallback(
     (resource: ProviderResource) => {
-      const isAmpcode = resource.brand === 'ampcode';
       const name =
         resource.name ?? resource.apiKeyPreview ?? resource.identifier ?? '';
       showConfirmation({
-        title: isAmpcode
-          ? t('providersPage.delete.ampcodeTitle')
-          : t('providersPage.delete.title'),
-        message: isAmpcode
-          ? t('providersPage.delete.ampcodeConfirm')
-          : t('providersPage.delete.confirm', { name }),
+        title: t('providersPage.delete.title'),
+        message: t('providersPage.delete.confirm', { name }),
         variant: 'danger',
-        confirmText: isAmpcode
-          ? t('providersPage.actions.clear')
-          : t('providersPage.actions.delete'),
+        confirmText: t('providersPage.actions.delete'),
         onConfirm: async () => {
           try {
             await workbench.deleteProvider(resource);
@@ -347,8 +393,6 @@ export function ProvidersWorkbenchPage() {
     );
   }
 
-  const ampcodeBrandActive = activeBrand === 'ampcode';
-
   return (
     <div className={styles.page}>
       <ProviderHeaderCard
@@ -356,14 +400,9 @@ export function ProvidersWorkbenchPage() {
         totalResources={totalResources}
         providerFamilies={providerFamilies}
         updatedAtLabel={updatedAtLabel}
-        issueCount={workbench.snapshot?.issues.length ?? 0}
         isFetching={workbench.isFetching}
-        isNewDisabled={disableMutations && !ampcodeBrandActive}
-        newLabel={
-          ampcodeBrandActive
-            ? t('providersPage.actions.edit')
-            : t('providersPage.actions.new')
-        }
+        isNewDisabled={disableMutations}
+        newLabel={t('providersPage.actions.new')}
         onRefresh={() => void handleRefresh()}
         onNew={openCreate}
       />
@@ -380,8 +419,6 @@ export function ProvidersWorkbenchPage() {
             void proceed.then((ok) => {
               if (!ok) return;
               setActiveBrand(brand);
-              setFilter('');
-              setOpenaiSelectedModels(new Set());
               if (isSwitching) {
                 closeSheet();
               }
@@ -391,12 +428,12 @@ export function ProvidersWorkbenchPage() {
         <ProviderResourcePanel
           group={activeGroup}
           filter={filter}
-          onFilterChange={setFilter}
+          onFilterChange={(value) => updateActiveFilterState({ filter: value })}
           filteredResources={visibleResources}
           selectedId={sheetState.open ? sheetState.resource?.id ?? null : null}
           disableMutations={disableMutations}
           usageByProvider={usageByProvider}
-          openaiControls={openaiControls}
+          toolbarControls={toolbarControls}
           onView={openView}
           onEdit={openEdit}
           onDelete={handleDelete}

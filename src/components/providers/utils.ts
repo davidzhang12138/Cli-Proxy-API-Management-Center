@@ -10,6 +10,7 @@ import {
 } from '@/utils/recentRequests';
 
 const DISABLE_ALL_MODELS_RULE = '*';
+const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com';
 
 export const hasDisableAllModelsRule = (models?: string[]) =>
   Array.isArray(models) &&
@@ -28,9 +29,9 @@ export const withDisableAllModelsRule = (models?: string[]) => {
 export const withoutDisableAllModelsRule = (models?: string[]) =>
   stripDisableAllModelsRule(models);
 
-const normalizeOpenAIBaseUrl = (baseUrl: string): string => {
+const normalizeUpstreamBaseUrl = (baseUrl: string, fallback = ''): string => {
   let trimmed = String(baseUrl || '').trim();
-  if (!trimmed) return '';
+  if (!trimmed) return fallback;
   trimmed = trimmed.replace(/\/?v0\/management\/?$/i, '');
   trimmed = trimmed.replace(/\/+$/g, '');
   if (!/^https?:\/\//i.test(trimmed)) {
@@ -39,21 +40,22 @@ const normalizeOpenAIBaseUrl = (baseUrl: string): string => {
   return trimmed;
 };
 
-const normalizeClaudeBaseUrl = (baseUrl: string): string => {
-  let trimmed = String(baseUrl || '').trim();
-  if (!trimmed) {
-    return 'https://api.anthropic.com';
+const buildGeminiModelResource = (model: string): string => {
+  const trimmed = String(model || '')
+    .trim()
+    .replace(/^\/+/g, '')
+    .replace(/:generateContent$/i, '');
+  if (!trimmed) return '';
+
+  if (/^(models|tunedModels)\//i.test(trimmed)) {
+    return trimmed.split('/').map(encodeURIComponent).join('/');
   }
-  trimmed = trimmed.replace(/\/?v0\/management\/?$/i, '');
-  trimmed = trimmed.replace(/\/+$/g, '');
-  if (!/^https?:\/\//i.test(trimmed)) {
-    trimmed = `http://${trimmed}`;
-  }
-  return trimmed;
+
+  return `models/${encodeURIComponent(trimmed)}`;
 };
 
 export const buildOpenAIChatCompletionsEndpoint = (baseUrl: string): string => {
-  const trimmed = normalizeOpenAIBaseUrl(baseUrl);
+  const trimmed = normalizeUpstreamBaseUrl(baseUrl);
   if (!trimmed) return '';
   if (trimmed.endsWith('/chat/completions')) {
     return trimmed;
@@ -61,8 +63,23 @@ export const buildOpenAIChatCompletionsEndpoint = (baseUrl: string): string => {
   return `${trimmed}/chat/completions`;
 };
 
+export const buildCodexResponsesEndpoint = (baseUrl: string): string => {
+  const trimmed = normalizeUpstreamBaseUrl(baseUrl);
+  if (!trimmed) return '';
+  if (/\/v1\/responses$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (/\/v1\/models$/i.test(trimmed)) {
+    return trimmed.replace(/\/models$/i, '/responses');
+  }
+  if (/\/v1$/i.test(trimmed)) {
+    return `${trimmed}/responses`;
+  }
+  return `${trimmed}/v1/responses`;
+};
+
 export const buildClaudeMessagesEndpoint = (baseUrl: string): string => {
-  const trimmed = normalizeClaudeBaseUrl(baseUrl);
+  const trimmed = normalizeUpstreamBaseUrl(baseUrl, 'https://api.anthropic.com');
   if (!trimmed) return '';
   if (trimmed.endsWith('/v1/messages')) {
     return trimmed;
@@ -71,6 +88,30 @@ export const buildClaudeMessagesEndpoint = (baseUrl: string): string => {
     return `${trimmed}/messages`;
   }
   return `${trimmed}/v1/messages`;
+};
+
+export const buildGeminiGenerateContentEndpoint = (
+  baseUrl: string,
+  model: string
+): string => {
+  const resource = buildGeminiModelResource(model);
+  if (!resource) return '';
+
+  const trimmed = normalizeUpstreamBaseUrl(baseUrl, DEFAULT_GEMINI_BASE_URL);
+  if (!trimmed) return '';
+  if (/:generateContent$/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  let root = trimmed.replace(/\/+$/g, '');
+  if (/\/v1beta\/models$/i.test(root)) {
+    root = root.replace(/\/models$/i, '');
+  } else if (!/\/v1beta$/i.test(root)) {
+    root = root.replace(/\/v1beta(?:\/.*)?$/i, '');
+    root = `${root}/v1beta`;
+  }
+
+  return `${root}/${resource}:generateContent`;
 };
 
 export type ProviderRecentUsageMap = Map<string, Map<string, RecentRequestUsageEntry>>;
@@ -126,6 +167,15 @@ export function getProviderTotalStats(
 ): { success: number; failure: number } {
   const entry = getProviderRecentUsageEntry(usageByProvider, provider, apiKey, baseUrl);
   return { success: entry.success, failure: entry.failed };
+}
+
+export function getProviderRecentWindowStats(
+  usageByProvider: ProviderRecentUsageMap,
+  provider: string,
+  apiKey?: string,
+  baseUrl?: string
+): { success: number; failure: number } {
+  return sumRecentRequests(getProviderRecentBuckets(usageByProvider, provider, apiKey, baseUrl));
 }
 
 const collectOpenAIProviderRecentBuckets = (

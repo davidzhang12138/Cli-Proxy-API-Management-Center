@@ -4,19 +4,17 @@ import type {
   GeminiKeyConfig,
   ModelAlias,
   OpenAIProviderConfig,
-  ProviderKeyConfig,
-  AmpcodeConfig,
-  AmpcodeModelMapping,
-  AmpcodeUpstreamApiKeyMapping
+  ProviderKeyConfig
 } from '@/types';
 import type { Config } from '@/types/config';
 import { buildHeaderObject } from '@/utils/headers';
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
+import { isRecord } from '@/utils/helpers';
 
 const normalizeBoolean = (value: unknown): boolean | undefined =>
   typeof value === 'boolean' ? value : undefined;
+
+const normalizeRecord = (value: unknown): Record<string, unknown> | undefined =>
+  isRecord(value) ? value : undefined;
 
 const normalizeModelAliases = (models: unknown): ModelAlias[] => {
   if (!Array.isArray(models)) return [];
@@ -34,6 +32,8 @@ const normalizeModelAliases = (models: unknown): ModelAlias[] => {
       const alias = item.alias;
       const priority = item.priority;
       const testModel = item['test-model'];
+      const image = normalizeBoolean(item.image);
+      const thinking = normalizeRecord(item.thinking);
       const entry: ModelAlias = { name: String(name) };
       if (alias && alias !== name) {
         entry.alias = String(alias);
@@ -46,6 +46,12 @@ const normalizeModelAliases = (models: unknown): ModelAlias[] => {
       }
       if (testModel) {
         entry.testModel = String(testModel);
+      }
+      if (image !== undefined) {
+        entry.image = image;
+      }
+      if (thinking) {
+        entry.thinking = thinking;
       }
       return entry;
     })
@@ -132,6 +138,8 @@ const normalizeProviderKeyConfig = (item: unknown): ProviderKeyConfig | null => 
   const websockets = normalizeBoolean(record?.websockets);
   if (websockets !== undefined) config.websockets = websockets;
   if (proxyUrl) config.proxyUrl = String(proxyUrl);
+  const disableCooling = normalizeBoolean(record?.['disable-cooling']);
+  if (disableCooling !== undefined) config.disableCooling = disableCooling;
   const headers = normalizeHeaders(record?.headers);
   if (headers) config.headers = headers;
   const models = normalizeModelAliases(record?.models);
@@ -156,9 +164,17 @@ const normalizeProviderKeyConfig = (item: unknown): ProviderKeyConfig | null => 
     if (sensitiveWords.length) {
       cloak.sensitiveWords = sensitiveWords;
     }
+    const cacheUserId = normalizeBoolean(cloakRaw['cache-user-id']);
+    if (cacheUserId !== undefined) {
+      cloak.cacheUserId = cacheUserId;
+    }
     if (Object.keys(cloak).length) {
       config.cloak = cloak;
     }
+  }
+  const experimentalCchSigning = normalizeBoolean(record?.['experimental-cch-signing']);
+  if (experimentalCchSigning !== undefined) {
+    config.experimentalCchSigning = experimentalCchSigning;
   }
 
   return config;
@@ -188,6 +204,8 @@ const normalizeGeminiKeyConfig = (item: unknown): GeminiKeyConfig | null => {
   if (baseUrl) config.baseUrl = String(baseUrl);
   const proxyUrl = record?.['proxy-url'];
   if (proxyUrl) config.proxyUrl = String(proxyUrl);
+  const disableCooling = normalizeBoolean(record?.['disable-cooling']);
+  if (disableCooling !== undefined) config.disableCooling = disableCooling;
   const models = normalizeModelAliases(record?.models);
   if (models.length) config.models = models;
   const headers = normalizeHeaders(record?.headers);
@@ -224,6 +242,8 @@ const normalizeOpenAIProvider = (provider: unknown): OpenAIProviderConfig | null
 
   const disabled = normalizeBoolean(provider.disabled);
   if (disabled !== undefined) result.disabled = disabled;
+  const disableCooling = normalizeBoolean(provider['disable-cooling']);
+  if (disableCooling !== undefined) result.disableCooling = disableCooling;
   const prefix = normalizePrefix(provider.prefix);
   if (prefix) result.prefix = prefix;
   if (headers) result.headers = headers;
@@ -247,79 +267,6 @@ const normalizeOauthExcluded = (payload: unknown): Record<string, string[]> | un
     map[key.toLowerCase()] = normalized;
   });
   return map;
-};
-
-const normalizeAmpcodeModelMappings = (input: unknown): AmpcodeModelMapping[] => {
-  if (!Array.isArray(input)) return [];
-  const seen = new Set<string>();
-  const mappings: AmpcodeModelMapping[] = [];
-
-  input.forEach((entry) => {
-    if (!isRecord(entry)) return;
-    const from = String(entry.from ?? '').trim();
-    const to = String(entry.to ?? '').trim();
-    if (!from || !to) return;
-    const key = from.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    mappings.push({ from, to });
-  });
-
-  return mappings;
-};
-
-const normalizeAmpcodeUpstreamApiKeys = (input: unknown): AmpcodeUpstreamApiKeyMapping[] => {
-  if (!Array.isArray(input)) return [];
-
-  const seen = new Set<string>();
-  const mappings: AmpcodeUpstreamApiKeyMapping[] = [];
-
-  input.forEach((entry) => {
-    if (!isRecord(entry)) return;
-
-    const upstreamApiKey = String(entry['upstream-api-key'] ?? '').trim();
-    if (!upstreamApiKey || seen.has(upstreamApiKey)) return;
-
-    const rawApiKeys = entry['api-keys'] ?? [];
-    const apiKeys = Array.isArray(rawApiKeys)
-      ? Array.from(new Set(rawApiKeys.map((item) => String(item ?? '').trim()).filter(Boolean)))
-      : [];
-    if (!apiKeys.length) return;
-
-    seen.add(upstreamApiKey);
-    mappings.push({ upstreamApiKey, apiKeys });
-  });
-
-  return mappings;
-};
-
-const normalizeAmpcodeConfig = (payload: unknown): AmpcodeConfig | undefined => {
-  const sourceRaw = isRecord(payload) ? (payload.ampcode ?? payload) : payload;
-  if (!isRecord(sourceRaw)) return undefined;
-  const source = sourceRaw;
-
-  const config: AmpcodeConfig = {};
-  const upstreamUrl = source['upstream-url'];
-  if (upstreamUrl) config.upstreamUrl = String(upstreamUrl);
-  const upstreamApiKey = source['upstream-api-key'];
-  if (upstreamApiKey) config.upstreamApiKey = String(upstreamApiKey);
-
-  const upstreamApiKeys = normalizeAmpcodeUpstreamApiKeys(source['upstream-api-keys']);
-  if (upstreamApiKeys.length) {
-    config.upstreamApiKeys = upstreamApiKeys;
-  }
-
-  const forceModelMappings = normalizeBoolean(source['force-model-mappings']);
-  if (forceModelMappings !== undefined) {
-    config.forceModelMappings = forceModelMappings;
-  }
-
-  const modelMappings = normalizeAmpcodeModelMappings(source['model-mappings']);
-  if (modelMappings.length) {
-    config.modelMappings = modelMappings;
-  }
-
-  return config;
 };
 
 /**
@@ -412,11 +359,6 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
       .filter(Boolean) as OpenAIProviderConfig[];
   }
 
-  const ampcode = normalizeAmpcodeConfig(raw.ampcode);
-  if (ampcode) {
-    config.ampcode = ampcode;
-  }
-
   const oauthExcluded = normalizeOauthExcluded(raw['oauth-excluded-models']);
   if (oauthExcluded) {
     config.oauthExcludedModels = oauthExcluded;
@@ -432,8 +374,5 @@ export {
   normalizeOpenAIProvider,
   normalizeProviderKeyConfig,
   normalizeHeaders,
-  normalizeExcludedModels,
-  normalizeAmpcodeConfig,
-  normalizeAmpcodeModelMappings,
-  normalizeAmpcodeUpstreamApiKeys
+  normalizeExcludedModels
 };

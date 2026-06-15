@@ -713,6 +713,26 @@
   }
 }
 
+.quotaResetCreditButton:global(.btn.btn-sm) {
+  border-radius: 999px;
+  padding-inline: 12px;
+
+  > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+}
+
+.quotaCardActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: $spacing-xs;
+  flex-wrap: wrap;
+  padding-top: $spacing-xs;
+}
+
 .quotaError {
   font-size: 12px;
   color: var(--danger-color);
@@ -747,6 +767,12 @@
   font-weight: 600;
   color: var(--text-primary);
   text-transform: capitalize;
+}
+
+.codexPlanSeparator {
+  width: 1px;
+  height: 12px;
+  background-color: var(--border-color);
 }
 
 .premiumPlanValue {

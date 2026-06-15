@@ -529,8 +529,7 @@ export function QuotaPage() {
 
   useEffect(() => {
     loadFiles();
-    loadConfig();
-  }, [loadFiles, loadConfig]);
+  }, [loadFiles]);
 
   useEffect(() => {
     if (!recentUsageSortEnabled) return;

@@ -37,7 +37,7 @@ export interface BaseProviderFormHandle {
 }
 
 interface BaseProviderFormProps {
-  brand: Exclude<ProviderBrand, 'ampcode'>;
+  brand: ProviderBrand;
   resource: ProviderResource | null;
   mode: 'create' | 'edit';
   mutating: boolean;
@@ -56,8 +56,13 @@ const emptyApiKeyEntry = (): ApiKeyEntryInput => ({
 const stripDisableAllRule = (list?: string[]): string[] =>
   (list ?? []).filter((s) => s.trim() !== '*');
 
+const formatJsonObject = (value?: Record<string, unknown>): string => {
+  if (!value || Object.keys(value).length === 0) return '';
+  return JSON.stringify(value, null, 2);
+};
+
 function buildInitialForm(
-  brand: Exclude<ProviderBrand, 'ampcode'>,
+  brand: ProviderBrand,
   resource: ProviderResource | null,
   mode: 'create' | 'edit'
 ): ProviderEntryFormInput {
@@ -69,14 +74,24 @@ function buildInitialForm(
       proxyUrl: '',
       prefix: '',
       disabled: false,
+      disableCooling: false,
       priority: undefined,
       models: [emptyModel()],
       headers: [emptyHeader()],
       excludedModelsText: '',
       websockets: brand === 'codex' ? false : undefined,
       cloak:
-        brand === 'claude' ? { mode: '', strictMode: false, sensitiveWordsText: '' } : undefined,
-      testModel: brand === 'openaiCompatibility' || brand === 'claude' ? '' : undefined,
+        brand === 'claude'
+          ? { mode: '', strictMode: false, sensitiveWordsText: '', cacheUserId: false }
+          : undefined,
+      experimentalCchSigning: brand === 'claude' ? false : undefined,
+      testModel:
+        brand === 'openaiCompatibility' ||
+        brand === 'codex' ||
+        brand === 'claude' ||
+        brand === 'gemini'
+          ? ''
+          : undefined,
       apiKeyEntries: brand === 'openaiCompatibility' ? [emptyApiKeyEntry()] : undefined,
     };
   }
@@ -91,6 +106,7 @@ function buildInitialForm(
       proxyUrl: '',
       prefix: cfg.prefix ?? '',
       disabled: cfg.disabled === true,
+      disableCooling: cfg.disableCooling === true,
       priority: cfg.priority,
       models: cfg.models?.length
         ? cfg.models.map((m) => ({
@@ -98,6 +114,8 @@ function buildInitialForm(
             alias: m.alias ?? '',
             priority: m.priority,
             testModel: m.testModel,
+            image: m.image === true,
+            thinkingJson: formatJsonObject(m.thinking),
           }))
         : [emptyModel()],
       headers: cfg.headers
@@ -130,6 +148,7 @@ function buildInitialForm(
     proxyUrl: cfg.proxyUrl ?? '',
     prefix: cfg.prefix ?? '',
     disabled,
+    disableCooling: cfg.disableCooling === true,
     priority: cfg.priority,
     models: cfg.models?.length
       ? cfg.models.map((m) => ({
@@ -150,9 +169,14 @@ function buildInitialForm(
             mode: (cfg as ProviderKeyConfig).cloak?.mode ?? '',
             strictMode: (cfg as ProviderKeyConfig).cloak?.strictMode === true,
             sensitiveWordsText: (cfg as ProviderKeyConfig).cloak?.sensitiveWords?.join('\n') ?? '',
+            cacheUserId: (cfg as ProviderKeyConfig).cloak?.cacheUserId === true,
           }
         : undefined,
-    testModel: brand === 'claude' ? '' : undefined,
+    experimentalCchSigning:
+      brand === 'claude'
+        ? (cfg as ProviderKeyConfig).experimentalCchSigning === true
+        : undefined,
+    testModel: brand === 'codex' || brand === 'claude' || brand === 'gemini' ? '' : undefined,
   };
 }
 
@@ -365,7 +389,12 @@ export function BaseProviderForm({
     setForm((prev) => ({
       ...prev,
       cloak: {
-        ...(prev.cloak ?? { mode: '', strictMode: false, sensitiveWordsText: '' }),
+        ...(prev.cloak ?? {
+          mode: '',
+          strictMode: false,
+          sensitiveWordsText: '',
+          cacheUserId: false,
+        }),
         [key]: value,
       },
     }));
@@ -380,13 +409,6 @@ export function BaseProviderForm({
     }
     if (descriptor.baseUrlRequired && !form.baseUrl.trim()) {
       return t('providersPage.form.validation.baseUrlRequired');
-    }
-    if (
-      brand === 'openaiCompatibility' &&
-      mode === 'create' &&
-      !form.apiKeyEntries?.some((e) => e.apiKey.trim())
-    ) {
-      return t('providersPage.form.validation.apiKeyRequired');
     }
     return null;
   };
@@ -421,6 +443,21 @@ export function BaseProviderForm({
       form.apiKeyEntries && form.apiKeyEntries.length ? form.apiKeyEntries : [emptyApiKeyEntry()],
     [form.apiKeyEntries]
   );
+  const actualApiKeyEntries = form.apiKeyEntries ?? [];
+  const supportsDisableCooling =
+    brand === 'gemini' ||
+    brand === 'codex' ||
+    brand === 'claude' ||
+    brand === 'openaiCompatibility';
+  const supportsOpenAIModelOptions = brand === 'openaiCompatibility';
+  const singleConnectivity =
+    brand === 'codex'
+      ? { status: connectivity.codexStatus, run: connectivity.runCodex }
+      : brand === 'gemini'
+      ? { status: connectivity.geminiStatus, run: connectivity.runGemini }
+      : brand === 'claude'
+        ? { status: connectivity.claudeStatus, run: connectivity.runClaude }
+        : null;
 
   const removeApiKeyEntry = (removeIdx: number) => {
     setShowPasswords((prev) => {
@@ -437,7 +474,21 @@ export function BaseProviderForm({
     });
     updateField(
       'apiKeyEntries',
-      apiKeyEntries.filter((_, i) => i !== removeIdx)
+      actualApiKeyEntries.filter((_, i) => i !== removeIdx)
+    );
+  };
+
+  const updateModelEntry = (idx: number, patch: Partial<ModelEntryInput>) => {
+    updateField(
+      'models',
+      modelsList.map((it, i) => (i === idx ? { ...it, ...patch } : it))
+    );
+  };
+
+  const removeModelEntry = (idx: number) => {
+    updateField(
+      'models',
+      modelsList.filter((_, i) => i !== idx)
     );
   };
 
@@ -584,7 +635,7 @@ export function BaseProviderForm({
           <div className={styles.field}>
             <label className={styles.label} htmlFor={`${fid}-testModel`}>
               {t('providersPage.form.testModel')}
-              {brand === 'claude' ? (
+              {brand === 'codex' || brand === 'claude' || brand === 'gemini' ? (
                 <span className={styles.labelHint}>
                   {' '}
                   · {t('providersPage.form.testModelClaudeHint')}
@@ -599,31 +650,31 @@ export function BaseProviderForm({
               disabled={mutating}
               ariaLabel={t('providersPage.form.testModel')}
             />
-            {brand === 'claude' ? (
+            {singleConnectivity ? (
               <div className={styles.connectivityRow}>
                 <button
                   type="button"
                   className={styles.connectivityBtn}
                   disabled={mutating || connectivity.isTestingAny}
-                  onClick={() => void connectivity.runClaude()}
+                  onClick={() => void singleConnectivity.run()}
                 >
-                  {connectivity.claudeStatus.state === 'loading' ? (
+                  {singleConnectivity.status.state === 'loading' ? (
                     <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
                       <IconLoader2 size={14} />
                     </span>
                   ) : null}
                   <span>{t('providersPage.connectivity.test')}</span>
                 </button>
-                <ConnectivityStatusIcon state={connectivity.claudeStatus.state} />
-                {connectivity.claudeStatus.state === 'success' ? (
+                <ConnectivityStatusIcon state={singleConnectivity.status.state} />
+                {singleConnectivity.status.state === 'success' ? (
                   <span className={styles.connectivityHintSuccess}>
                     {t('providersPage.connectivity.success')}
                   </span>
                 ) : null}
               </div>
             ) : null}
-            {brand === 'claude' && connectivity.claudeStatus.state === 'error' ? (
-              <div className={styles.connectivityError}>{connectivity.claudeStatus.message}</div>
+            {singleConnectivity?.status.state === 'error' ? (
+              <div className={styles.connectivityError}>{singleConnectivity.status.message}</div>
             ) : null}
           </div>
         ) : null}
@@ -658,6 +709,22 @@ export function BaseProviderForm({
             </span>
           </label>
         ) : null}
+
+        {supportsDisableCooling ? (
+          <label className={styles.checkboxRow}>
+            <input
+              type="checkbox"
+              className={styles.checkboxBox}
+              checked={form.disableCooling ?? false}
+              disabled={mutating}
+              onChange={(e) => updateField('disableCooling', e.target.checked)}
+            />
+            <span className={styles.checkboxText}>
+              <span>{t('providersPage.form.disableCooling')}</span>
+              <small>{t('providersPage.form.disableCoolingHint')}</small>
+            </span>
+          </label>
+        ) : null}
       </div>
 
       {/* 高级折叠区 */}
@@ -676,7 +743,9 @@ export function BaseProviderForm({
                 type="button"
                 className={styles.addBtn}
                 disabled={mutating}
-                onClick={() => updateField('apiKeyEntries', [...apiKeyEntries, emptyApiKeyEntry()])}
+                onClick={() =>
+                  updateField('apiKeyEntries', [...actualApiKeyEntries, emptyApiKeyEntry()])
+                }
               >
                 <IconPlus size={12} />
                 <span>{t('providersPage.form.addApiKeyEntry')}</span>
@@ -724,7 +793,7 @@ export function BaseProviderForm({
                       <button
                         type="button"
                         className={styles.removeBtn}
-                        disabled={mutating || apiKeyEntries.length <= 1}
+                        disabled={mutating || actualApiKeyEntries.length === 0}
                         onClick={() => removeApiKeyEntry(realIdx)}
                       >
                         <IconX size={12} />
@@ -901,50 +970,97 @@ export function BaseProviderForm({
                 onClose={closeDiscovery}
               />
             ) : null}
-            {modelsList.map((entry, idx) => (
-              <div
-                key={idx}
-                style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}
-              >
-                <input
-                  className={styles.input}
-                  placeholder="model-name"
-                  value={entry.name}
-                  onChange={(e) =>
-                    updateField(
-                      'models',
-                      modelsList.map((it, i) => (i === idx ? { ...it, name: e.target.value } : it))
-                    )
-                  }
-                  disabled={mutating}
-                />
-                <input
-                  className={styles.input}
-                  placeholder="alias (optional)"
-                  value={entry.alias ?? ''}
-                  onChange={(e) =>
-                    updateField(
-                      'models',
-                      modelsList.map((it, i) => (i === idx ? { ...it, alias: e.target.value } : it))
-                    )
-                  }
-                  disabled={mutating}
-                />
-                <button
-                  type="button"
-                  className={styles.removeBtn}
-                  disabled={mutating || modelsList.length <= 1}
-                  onClick={() =>
-                    updateField(
-                      'models',
-                      modelsList.filter((_, i) => i !== idx)
-                    )
-                  }
+            {modelsList.map((entry, idx) =>
+              supportsOpenAIModelOptions ? (
+                <div key={idx} className={styles.entryCard}>
+                  <div className={styles.entryCardHeader}>
+                    <span>{t('providersPage.form.modelEntry', { index: idx + 1 })}</span>
+                    <button
+                      type="button"
+                      className={styles.removeBtn}
+                      disabled={mutating || modelsList.length <= 1}
+                      onClick={() => removeModelEntry(idx)}
+                    >
+                      <IconX size={12} />
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input
+                      className={styles.input}
+                      placeholder="model-name"
+                      value={entry.name}
+                      onChange={(e) => updateModelEntry(idx, { name: e.target.value })}
+                      disabled={mutating}
+                    />
+                    <input
+                      className={styles.input}
+                      placeholder="alias (optional)"
+                      value={entry.alias ?? ''}
+                      onChange={(e) => updateModelEntry(idx, { alias: e.target.value })}
+                      disabled={mutating}
+                    />
+                  </div>
+                  <label className={styles.checkboxRow}>
+                    <input
+                      type="checkbox"
+                      className={styles.checkboxBox}
+                      checked={entry.image === true}
+                      disabled={mutating}
+                      onChange={(e) => updateModelEntry(idx, { image: e.target.checked })}
+                    />
+                    <span className={styles.checkboxText}>
+                      <span>{t('providersPage.form.modelImage')}</span>
+                      <small>{t('providersPage.form.modelImageHint')}</small>
+                    </span>
+                  </label>
+                  <div className={styles.field}>
+                    <label className={styles.label}>
+                      {t('providersPage.form.thinkingConfig')}
+                      <span className={styles.labelHint}>
+                        {' '}
+                        · {t('providersPage.form.thinkingConfigHint')}
+                      </span>
+                    </label>
+                    <textarea
+                      className={styles.textarea}
+                      rows={4}
+                      value={entry.thinkingJson ?? ''}
+                      onChange={(e) => updateModelEntry(idx, { thinkingJson: e.target.value })}
+                      disabled={mutating}
+                      placeholder={'{"levels":["low","medium","high"]}'}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div
+                  key={idx}
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8 }}
                 >
-                  <IconX size={12} />
-                </button>
-              </div>
-            ))}
+                  <input
+                    className={styles.input}
+                    placeholder="model-name"
+                    value={entry.name}
+                    onChange={(e) => updateModelEntry(idx, { name: e.target.value })}
+                    disabled={mutating}
+                  />
+                  <input
+                    className={styles.input}
+                    placeholder="alias (optional)"
+                    value={entry.alias ?? ''}
+                    onChange={(e) => updateModelEntry(idx, { alias: e.target.value })}
+                    disabled={mutating}
+                  />
+                  <button
+                    type="button"
+                    className={styles.removeBtn}
+                    disabled={mutating || modelsList.length <= 1}
+                    onClick={() => removeModelEntry(idx)}
+                  >
+                    <IconX size={12} />
+                  </button>
+                </div>
+              )
+            )}
             <button
               type="button"
               className={styles.addBtn}
@@ -997,6 +1113,32 @@ export function BaseProviderForm({
               />
               <span className={styles.checkboxText}>
                 <span>{t('providersPage.form.cloakStrict')}</span>
+              </span>
+            </label>
+            <label className={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                className={styles.checkboxBox}
+                checked={form.cloak.cacheUserId}
+                disabled={mutating}
+                onChange={(e) => updateCloak('cacheUserId', e.target.checked)}
+              />
+              <span className={styles.checkboxText}>
+                <span>{t('providersPage.form.cloakCacheUserId')}</span>
+                <small>{t('providersPage.form.cloakCacheUserIdHint')}</small>
+              </span>
+            </label>
+            <label className={styles.checkboxRow}>
+              <input
+                type="checkbox"
+                className={styles.checkboxBox}
+                checked={form.experimentalCchSigning ?? false}
+                disabled={mutating}
+                onChange={(e) => updateField('experimentalCchSigning', e.target.checked)}
+              />
+              <span className={styles.checkboxText}>
+                <span>{t('providersPage.form.experimentalCchSigning')}</span>
+                <small>{t('providersPage.form.experimentalCchSigningHint')}</small>
               </span>
             </label>
             <div className={styles.field}>

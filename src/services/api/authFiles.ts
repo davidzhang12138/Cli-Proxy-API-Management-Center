@@ -12,6 +12,7 @@ import type {
   RefreshAuthQuotasResponse,
 } from '@/types/authFile';
 import type { OAuthModelAliasEntry } from '@/types';
+import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
 import { parseTimestampMs } from '@/utils/timestamp';
 
 type StatusError = { status?: number };
@@ -446,9 +447,7 @@ const normalizeOauthExcludedModels = (payload: unknown): Record<string, string[]
   const result: Record<string, string[]> = {};
 
   Object.entries(source as Record<string, unknown>).forEach(([provider, models]) => {
-    const key = String(provider ?? '')
-      .trim()
-      .toLowerCase();
+    const key = normalizeOAuthProviderKey(String(provider ?? ''));
     if (!key) return;
 
     const rawList = Array.isArray(models)
@@ -457,8 +456,8 @@ const normalizeOauthExcludedModels = (payload: unknown): Record<string, string[]
         ? models.split(/[\n,]+/)
         : [];
 
-    const seen = new Set<string>();
-    const normalized: string[] = [];
+    const normalized = result[key] ?? [];
+    const seen = new Set(normalized.map((item) => item.toLowerCase()));
     rawList.forEach((item) => {
       const trimmed = String(item ?? '').trim();
       if (!trimmed) return;
@@ -484,14 +483,13 @@ const normalizeOauthModelAlias = (payload: unknown): Record<string, OAuthModelAl
   const result: Record<string, OAuthModelAliasEntry[]> = {};
 
   Object.entries(source as Record<string, unknown>).forEach(([channel, mappings]) => {
-    const key = String(channel ?? '')
-      .trim()
-      .toLowerCase();
+    const key = normalizeOAuthProviderKey(String(channel ?? ''));
     if (!key) return;
     if (!Array.isArray(mappings)) return;
 
-    const seen = new Set<string>();
-    const normalized = mappings
+    const normalized = result[key] ?? [];
+    const seenAlias = new Set(normalized.map((entry) => entry.alias.toLowerCase()));
+    mappings
       .map((item) => {
         if (!item || typeof item !== 'object') return null;
         const entry = item as Record<string, unknown>;
@@ -502,13 +500,13 @@ const normalizeOauthModelAlias = (payload: unknown): Record<string, OAuthModelAl
         return fork ? { name, alias, fork } : { name, alias };
       })
       .filter(Boolean)
-      .filter((entry) => {
+      .forEach((entry) => {
         const aliasEntry = entry as OAuthModelAliasEntry;
-        const dedupeKey = `${aliasEntry.name.toLowerCase()}::${aliasEntry.alias.toLowerCase()}::${aliasEntry.fork ? '1' : '0'}`;
-        if (seen.has(dedupeKey)) return false;
-        seen.add(dedupeKey);
-        return true;
-      }) as OAuthModelAliasEntry[];
+        const aliasKey = aliasEntry.alias.toLowerCase();
+        if (seenAlias.has(aliasKey)) return;
+        seenAlias.add(aliasKey);
+        normalized.push(aliasEntry);
+      });
 
     if (normalized.length) {
       result[key] = normalized;
@@ -627,13 +625,13 @@ export const authFilesApi = {
   },
 
   replaceOauthExcludedModels: async (models: Record<string, string[]>) => {
-    await apiClient.put('/oauth-excluded-models', { 'oauth-excluded-models': models });
+    await apiClient.put('/oauth-excluded-models', {
+      'oauth-excluded-models': normalizeOauthExcludedModels(models),
+    });
   },
 
   saveOauthExcludedModels: async (provider: string, models: string[]) => {
-    const normalizedProvider = String(provider ?? '')
-      .trim()
-      .toLowerCase();
+    const normalizedProvider = normalizeOAuthProviderKey(String(provider ?? ''));
     const normalizedModels = Array.from(
       new Set(models.map((model) => String(model ?? '').trim()).filter(Boolean))
     );
@@ -644,9 +642,7 @@ export const authFilesApi = {
   },
 
   deleteOauthExcludedEntry: async (provider: string) => {
-    const normalizedProvider = String(provider ?? '')
-      .trim()
-      .toLowerCase();
+    const normalizedProvider = normalizeOAuthProviderKey(String(provider ?? ''));
     try {
       await apiClient.patch('/oauth-excluded-models', {
         provider: normalizedProvider,
@@ -667,9 +663,7 @@ export const authFilesApi = {
   },
 
   saveOauthModelAlias: async (channel: string, aliases: OAuthModelAliasEntry[]) => {
-    const normalizedChannel = String(channel ?? '')
-      .trim()
-      .toLowerCase();
+    const normalizedChannel = normalizeOAuthProviderKey(String(channel ?? ''));
     const normalizedAliases =
       normalizeOauthModelAlias({ [normalizedChannel]: aliases })[normalizedChannel] ?? [];
     await apiClient.patch(OAUTH_MODEL_ALIAS_ENDPOINT, {
@@ -679,9 +673,7 @@ export const authFilesApi = {
   },
 
   deleteOauthModelAlias: async (channel: string) => {
-    const normalizedChannel = String(channel ?? '')
-      .trim()
-      .toLowerCase();
+    const normalizedChannel = normalizeOAuthProviderKey(String(channel ?? ''));
 
     try {
       await apiClient.patch(OAUTH_MODEL_ALIAS_ENDPOINT, {
@@ -714,9 +706,7 @@ export const authFilesApi = {
   async getModelDefinitions(
     channel: string
   ): Promise<{ id: string; display_name?: string; type?: string; owned_by?: string }[]> {
-    const normalizedChannel = String(channel ?? '')
-      .trim()
-      .toLowerCase();
+    const normalizedChannel = normalizeOAuthProviderKey(String(channel ?? ''));
     if (!normalizedChannel) return [];
     const data = await apiClient.get<Record<string, unknown>>(
       `/model-definitions/${encodeURIComponent(normalizedChannel)}`
