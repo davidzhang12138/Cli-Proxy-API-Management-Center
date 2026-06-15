@@ -45,6 +45,7 @@ import {
   resolveProviderUiFilterValue,
 } from '@/features/authFiles/providerScope';
 import type { AuthFileItem } from '@/types';
+import { withActiveAuthFileStatus } from './QuotaPage.helpers';
 import styles from './QuotaPage.module.scss';
 
 type QuotaAvailabilityFilter = 'all' | 'has' | 'none' | 'expired' | 'uncached';
@@ -381,14 +382,16 @@ export function QuotaPage() {
           const responses = await Promise.all(
             typesToLoad.map(async (type) => {
               const pageState = paginationState[type];
-              const data = await authFilesApi.list({
-                page: pageState.page,
-                pageSize: pageState.pageSize,
-                provider: type,
-                search: normalizedDeferredSearchQuery || undefined,
-                quotaFilter: availabilityFilter === 'all' ? undefined : availabilityFilter,
-                sort: serverQuotaSortMode,
-              });
+              const data = await authFilesApi.list(
+                withActiveAuthFileStatus({
+                  page: pageState.page,
+                  pageSize: pageState.pageSize,
+                  provider: type,
+                  search: normalizedDeferredSearchQuery || undefined,
+                  quotaFilter: availabilityFilter === 'all' ? undefined : availabilityFilter,
+                  sort: serverQuotaSortMode,
+                })
+              );
               return { type, data };
             })
           );
@@ -421,7 +424,7 @@ export function QuotaPage() {
                   sort: serverQuotaSortMode,
                 }
               : undefined;
-          const data = await authFilesApi.list(listOptions);
+          const data = await authFilesApi.list(withActiveAuthFileStatus(listOptions));
           const nextFiles = data?.files || [];
           setFiles(nextFiles);
           setFilesByType({});
