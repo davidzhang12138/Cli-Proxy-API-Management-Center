@@ -45,7 +45,7 @@ import {
   resolveProviderUiFilterValue,
 } from '@/features/authFiles/providerScope';
 import type { AuthFileItem } from '@/types';
-import { withActiveAuthFileStatus } from './QuotaPage.helpers';
+import { withEnabledAuthFileStatus } from './QuotaPage.helpers';
 import styles from './QuotaPage.module.scss';
 
 type QuotaAvailabilityFilter = 'all' | 'has' | 'none' | 'expired' | 'uncached';
@@ -383,7 +383,7 @@ export function QuotaPage() {
             typesToLoad.map(async (type) => {
               const pageState = paginationState[type];
               const data = await authFilesApi.list(
-                withActiveAuthFileStatus({
+                withEnabledAuthFileStatus({
                   page: pageState.page,
                   pageSize: pageState.pageSize,
                   provider: type,
@@ -424,7 +424,7 @@ export function QuotaPage() {
                   sort: serverQuotaSortMode,
                 }
               : undefined;
-          const data = await authFilesApi.list(withActiveAuthFileStatus(listOptions));
+          const data = await authFilesApi.list(withEnabledAuthFileStatus(listOptions));
           const nextFiles = data?.files || [];
           setFiles(nextFiles);
           setFilesByType({});

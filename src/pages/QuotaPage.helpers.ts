@@ -1,10 +1,10 @@
 import type { AuthFilesListOptions } from '@/types';
 
-export type ActiveAuthFilesListOptions = AuthFilesListOptions & { status: 'active' };
+export type EnabledAuthFilesListOptions = AuthFilesListOptions & { status: 'enabled' };
 
-export const withActiveAuthFileStatus = (
+export const withEnabledAuthFileStatus = (
   options: AuthFilesListOptions = {}
-): ActiveAuthFilesListOptions => ({
+): EnabledAuthFilesListOptions => ({
   ...options,
-  status: 'active',
+  status: 'enabled',
 });
