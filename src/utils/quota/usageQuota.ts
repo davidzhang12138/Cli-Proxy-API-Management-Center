@@ -133,6 +133,16 @@ const usageQuotaResourceToAntigravityGroup = (
     models: resourceType ? [resourceType] : [],
     remainingFraction,
     resetTime,
+    buckets: [
+      {
+        id: `${usageQuotaResourceId(resourceType)}-quota`,
+        label: usageQuotaResourceLabel(resourceType),
+        remainingFraction,
+        remainingAmount: remaining ?? undefined,
+        minimumAmount: resource.minimumCreditAmountForUsage ?? undefined,
+        resetTime,
+      },
+    ],
   };
   if (remaining !== null && resource.totalLimit === null) {
     group.remainingAmount = remaining;
@@ -295,6 +305,15 @@ export const buildAntigravityQuotaGroupsFromUsageQuota = (
     models: snapshot.resourceType ? [snapshot.resourceType] : [],
     remainingFraction,
     resetTime: snapshot.nextReset,
+    buckets: [
+      {
+        id: `${usageQuotaResourceId(snapshot.resourceType)}-quota`,
+        label: usageQuotaResourceLabel(snapshot.resourceType),
+        remainingFraction,
+        remainingAmount: remaining ?? undefined,
+        resetTime: snapshot.nextReset,
+      },
+    ],
   };
   if (remaining !== null) {
     group.remainingAmount = remaining;

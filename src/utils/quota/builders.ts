@@ -3,10 +3,12 @@
  */
 
 import type {
+  AntigravityQuotaBucket,
   AntigravityQuotaGroup,
   AntigravityQuotaGroupDefinition,
   AntigravityQuotaInfo,
   AntigravityModelsPayload,
+  AntigravityQuotaSummaryPayload,
   GeminiCliParsedBucket,
   GeminiCliQuotaBucketState,
   KimiUsagePayload,
@@ -20,7 +22,7 @@ import {
   GEMINI_CLI_GROUP_LOOKUP,
   GEMINI_CLI_GROUP_ORDER,
 } from './constants';
-import { normalizeQuotaFraction } from './parsers';
+import { normalizeQuotaFraction, normalizeStringValue } from './parsers';
 import { isIgnoredGeminiCliModel } from './validators';
 
 export function pickEarlierResetTime(current?: string, next?: string): string | undefined {
@@ -137,6 +139,29 @@ export function buildGeminiCliQuotaBuckets(
     });
 }
 
+const ANTIGRAVITY_BUCKET_WINDOW_ORDER = new Map<string, number>([
+  ['5h', 0],
+  ['five-hour', 0],
+  ['five_hour', 0],
+  ['weekly', 1],
+  ['week', 1],
+]);
+
+function toStableId(value: string, fallback: string): string {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return normalized || fallback;
+}
+
+function getAntigravityWindowOrder(bucket: AntigravityQuotaBucket): number {
+  const window = bucket.window?.toLowerCase();
+  if (!window) return Number.MAX_SAFE_INTEGER;
+  return ANTIGRAVITY_BUCKET_WINDOW_ORDER.get(window) ?? Number.MAX_SAFE_INTEGER;
+}
+
 export function getAntigravityQuotaInfo(entry?: AntigravityQuotaInfo): {
   remainingFraction: number | null;
   resetTime?: string;
@@ -180,9 +205,18 @@ export function findAntigravityModel(
   return null;
 }
 
-export function buildAntigravityQuotaGroups(
+const buildLegacyAntigravityGroupBucket = (
+  group: Pick<AntigravityQuotaGroup, 'id' | 'label' | 'remainingFraction' | 'resetTime'>
+): AntigravityQuotaBucket => ({
+  id: `${group.id}-quota`,
+  label: group.label,
+  remainingFraction: group.remainingFraction,
+  resetTime: group.resetTime,
+});
+
+const buildAntigravityGroupsFromModels = (
   models: AntigravityModelsPayload
-): AntigravityQuotaGroup[] {
+): AntigravityQuotaGroup[] => {
   const groups: AntigravityQuotaGroup[] = [];
   const definitions = new Map(
     ANTIGRAVITY_QUOTA_GROUPS.map((definition) => [definition.id, definition] as const)
@@ -217,20 +251,22 @@ export function buildAntigravityQuotaGroups(
       overrideResetTime ?? quotaEntries.map((entry) => entry.resetTime).find(Boolean);
     const displayName = quotaEntries.map((entry) => entry.displayName).find(Boolean);
     const label = def.labelFromModel && displayName ? displayName : def.label;
-
-    return {
+    const group = {
       id: def.id,
       label,
       models: quotaEntries.map((entry) => entry.id),
       remainingFraction,
       resetTime,
+      buckets: [],
+    };
+
+    return {
+      ...group,
+      buckets: [buildLegacyAntigravityGroupBucket(group)],
     };
   };
 
-  const appendGroup = (
-    id: string,
-    overrideResetTime?: string
-  ): AntigravityQuotaGroup | null => {
+  const appendGroup = (id: string, overrideResetTime?: string): AntigravityQuotaGroup | null => {
     const definition = definitions.get(id);
     if (!definition) return null;
     const group = buildGroup(definition, overrideResetTime);
@@ -251,6 +287,72 @@ export function buildAntigravityQuotaGroups(
   appendGroup('gemini-image', geminiProResetTime);
 
   return groups;
+};
+
+export function buildAntigravityQuotaGroups(
+  payload: AntigravityQuotaSummaryPayload | AntigravityModelsPayload
+): AntigravityQuotaGroup[] {
+  if (!Array.isArray((payload as AntigravityQuotaSummaryPayload).groups)) {
+    return buildAntigravityGroupsFromModels(payload as AntigravityModelsPayload);
+  }
+
+  const groups = Array.isArray(payload.groups) ? payload.groups : [];
+
+  return groups
+    .map((group, groupIndex): AntigravityQuotaGroup | null => {
+      const label =
+        normalizeStringValue(group.displayName ?? group.display_name) ??
+        `Quota Group ${groupIndex + 1}`;
+      const groupId = toStableId(label, `quota-group-${groupIndex + 1}`);
+      const buckets = Array.isArray(group.buckets) ? group.buckets : [];
+      const parsedBuckets = buckets
+        .map((bucket, bucketIndex): AntigravityQuotaBucket | null => {
+          const remainingFraction = normalizeQuotaFraction(
+            bucket.remainingFraction ?? bucket.remaining_fraction
+          );
+          if (remainingFraction === null) return null;
+
+          const window = normalizeStringValue(bucket.window) ?? undefined;
+          const rawId =
+            normalizeStringValue(bucket.bucketId ?? bucket.bucket_id) ??
+            `${groupId}-${window ?? `bucket-${bucketIndex + 1}`}`;
+          const label = normalizeStringValue(bucket.displayName ?? bucket.display_name) ?? rawId;
+
+          return {
+            id: rawId,
+            label,
+            window,
+            remainingFraction,
+            resetTime: normalizeStringValue(bucket.resetTime ?? bucket.reset_time) ?? undefined,
+            description: normalizeStringValue(bucket.description) ?? undefined,
+          };
+        })
+        .filter((bucket): bucket is AntigravityQuotaBucket => bucket !== null)
+        .sort((a, b) => {
+          const orderDiff = getAntigravityWindowOrder(a) - getAntigravityWindowOrder(b);
+          if (orderDiff !== 0) return orderDiff;
+          return a.label.localeCompare(b.label);
+        });
+
+      if (parsedBuckets.length === 0) return null;
+
+      const remainingFraction = Math.min(...parsedBuckets.map((bucket) => bucket.remainingFraction));
+      const resetTime = parsedBuckets.reduce<string | undefined>(
+        (current, bucket) => pickEarlierResetTime(current, bucket.resetTime),
+        undefined
+      );
+
+      return {
+        id: groupId,
+        label,
+        description: normalizeStringValue(group.description) ?? undefined,
+        models: parsedBuckets.map((bucket) => bucket.id),
+        remainingFraction,
+        resetTime,
+        buckets: parsedBuckets,
+      };
+    })
+    .filter((group): group is AntigravityQuotaGroup => group !== null);
 }
 
 function toInt(value: unknown): number | null {

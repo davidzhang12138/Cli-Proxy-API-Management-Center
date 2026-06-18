@@ -532,7 +532,10 @@ export function AuthFilesPage() {
     ? Math.min(page, totalPages)
     : Math.min(page, totalPages);
   const start = (currentPage - 1) * pageSize;
-  const pageItems = serverPaginationEnabled ? sorted : sorted.slice(start, start + pageSize);
+  const pageItems = useMemo(
+    () => (serverPaginationEnabled ? sorted : sorted.slice(start, start + pageSize)),
+    [pageSize, serverPaginationEnabled, sorted, start]
+  );
   const totalVisibleCount = serverPaginationEnabled
     ? (pagination?.total ?? sorted.length)
     : sorted.length;
