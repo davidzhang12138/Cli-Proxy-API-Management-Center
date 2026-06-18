@@ -294,7 +294,7 @@ export interface AntigravityQuotaGroup {
   remainingAmount?: number;
   minimumAmount?: number;
   resetTime?: string;
-  buckets: AntigravityQuotaBucket[];
+  buckets?: AntigravityQuotaBucket[];
 }
 
 export interface AntigravityQuotaSubscription {

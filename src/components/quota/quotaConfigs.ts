@@ -1225,6 +1225,24 @@ const getAntigravityPlanLabel = (
   );
 };
 
+const resolveAntigravityGroupBuckets = (group: AntigravityQuotaGroup) => {
+  if (Array.isArray(group.buckets) && group.buckets.length > 0) {
+    return group.buckets;
+  }
+
+  return [
+    {
+      id: `${group.id}-quota`,
+      label: group.label,
+      remainingFraction: group.remainingFraction,
+      remainingAmount: group.remainingAmount,
+      minimumAmount: group.minimumAmount,
+      resetTime: group.resetTime,
+      description: group.description,
+    },
+  ];
+};
+
 const renderAntigravityItems = (
   quota: AntigravityQuotaState,
   t: TFunction,
@@ -1291,7 +1309,7 @@ const renderAntigravityItems = (
             ? h('span', { className: styleMap.antigravityQuotaGroupDescription }, groupDescription)
             : null
         ),
-        ...group.buckets.map((bucket) => {
+        ...resolveAntigravityGroupBuckets(group).map((bucket) => {
           const clamped = Math.max(0, Math.min(1, bucket.remainingFraction));
           const percent = clamped * 100;
           const percentLabel =
