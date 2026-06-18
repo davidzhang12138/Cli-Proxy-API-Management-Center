@@ -7,9 +7,12 @@ export type UsageAuthLookupEntry = [string, CredentialInfo];
 const AUTH_LOOKUP_PAGE_SIZE = 20;
 const AUTH_LOOKUP_MAX_TERMS = 120;
 const AUTH_LOOKUP_BATCH_SIZE = 8;
+const AUTH_LOOKUP_ALL_CACHE_MS = 30_000;
 
 const authLookupCache = new Map<string, UsageAuthLookupEntry[]>();
 const inFlightAuthLookups = new Map<string, Promise<UsageAuthLookupEntry[]>>();
+let allAuthLookupCache: { expiresAt: number; entries: UsageAuthLookupEntry[] } | null = null;
+let inFlightAllAuthLookup: Promise<UsageAuthLookupEntry[]> | null = null;
 
 export const normalizeUsageSourceForAuthLookup = (value: unknown): string => {
   const raw = typeof value === 'string' ? value.trim() : '';
@@ -46,6 +49,49 @@ export const credentialInfoFromAuthFile = (file: unknown): UsageAuthLookupEntry 
   ];
 };
 
+export const collectAuthFileLookupEntries = (payload: unknown): UsageAuthLookupEntry[] => {
+  if (!payload || typeof payload !== 'object') return [];
+  const files = (payload as { files?: unknown }).files;
+  if (!Array.isArray(files)) return [];
+  return files
+    .map(credentialInfoFromAuthFile)
+    .filter((entry): entry is UsageAuthLookupEntry => Boolean(entry));
+};
+
+const addLookupEntriesToMap = (
+  map: Map<string, CredentialInfo>,
+  entries: UsageAuthLookupEntry[]
+) => {
+  entries.forEach(([authIndex, info]) => {
+    map.set(authIndex, info);
+  });
+};
+
+const fetchAllAuthLookupEntries = (): Promise<UsageAuthLookupEntry[]> => {
+  const now = Date.now();
+  if (allAuthLookupCache && allAuthLookupCache.expiresAt > now) {
+    return Promise.resolve(allAuthLookupCache.entries);
+  }
+  if (inFlightAllAuthLookup) return inFlightAllAuthLookup;
+
+  inFlightAllAuthLookup = authFilesApi
+    .list()
+    .then((response) => {
+      const entries = collectAuthFileLookupEntries(response);
+      allAuthLookupCache = {
+        entries,
+        expiresAt: Date.now() + AUTH_LOOKUP_ALL_CACHE_MS,
+      };
+      return entries;
+    })
+    .catch(() => [])
+    .finally(() => {
+      inFlightAllAuthLookup = null;
+    });
+
+  return inFlightAllAuthLookup;
+};
+
 const fetchUsageAuthLookupTerm = (term: string): Promise<UsageAuthLookupEntry[]> => {
   const key = term.trim().toLowerCase();
   if (!key) return Promise.resolve([]);
@@ -63,9 +109,7 @@ const fetchUsageAuthLookupTerm = (term: string): Promise<UsageAuthLookupEntry[]>
       pageSize: AUTH_LOOKUP_PAGE_SIZE,
     })
     .then((response) => {
-      const results = (response.files || [])
-        .map(credentialInfoFromAuthFile)
-        .filter((entry): entry is UsageAuthLookupEntry => Boolean(entry));
+      const results = collectAuthFileLookupEntries(response);
       authLookupCache.set(key, results);
       return results;
     })
@@ -84,12 +128,12 @@ export const loadUsageAuthFileMap = async (usage: unknown): Promise<Map<string, 
   const terms = collectUsageAuthLookupTerms(usage);
   const authFileMap = new Map<string, CredentialInfo>();
 
+  addLookupEntriesToMap(authFileMap, await fetchAllAuthLookupEntries());
+
   for (let index = 0; index < terms.length; index += AUTH_LOOKUP_BATCH_SIZE) {
     const batch = terms.slice(index, index + AUTH_LOOKUP_BATCH_SIZE);
     const results = await Promise.all(batch.map(fetchUsageAuthLookupTerm));
-    results.flat().forEach(([authIndex, info]) => {
-      authFileMap.set(authIndex, info);
-    });
+    addLookupEntriesToMap(authFileMap, results.flat());
   }
 
   return authFileMap;

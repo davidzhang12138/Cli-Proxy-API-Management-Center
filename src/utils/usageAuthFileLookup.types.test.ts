@@ -1,4 +1,8 @@
-import { collectUsageAuthLookupTerms, credentialInfoFromAuthFile } from './usageAuthFileLookup';
+import {
+  collectAuthFileLookupEntries,
+  collectUsageAuthLookupTerms,
+  credentialInfoFromAuthFile,
+} from './usageAuthFileLookup';
 
 const lookupTerms = collectUsageAuthLookupTerms({
   apis: {
@@ -25,5 +29,16 @@ const authLookupEntry = credentialInfoFromAuthFile({
   provider: 'codex',
 });
 
+const authLookupEntries = collectAuthFileLookupEntries({
+  files: [
+    {
+      auth_index: 'runtime-codex-auth',
+      name: 'codex-runtime',
+      provider: 'codex',
+    },
+  ],
+});
+
 void lookupTerms;
 void authLookupEntry;
+void authLookupEntries;

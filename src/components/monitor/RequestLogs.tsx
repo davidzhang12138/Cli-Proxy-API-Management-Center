@@ -105,6 +105,37 @@ const maskApiKeyWithTail = (value: string, tailLength = 10): string => {
   return `***${value.slice(-safeTailLength)}`;
 };
 
+const readProviderTypeCandidate = (value: unknown): string => {
+  if (typeof value !== 'string') return '';
+  return value.trim();
+};
+
+const resolveProviderType = (
+  detail: {
+    provider?: string;
+    provider_type?: string;
+    providerType?: string;
+    request_type?: string;
+    requestType?: string;
+  },
+  sourceInfoType: string,
+  source: string,
+  normalizedSource: string,
+  providerTypeMap: Record<string, string>
+): string => {
+  const candidates = [
+    sourceInfoType,
+    detail.provider,
+    detail.provider_type,
+    detail.providerType,
+    detail.request_type,
+    detail.requestType,
+    providerTypeMap[source],
+    providerTypeMap[normalizedSource],
+  ];
+  return candidates.map(readProviderTypeCandidate).find(Boolean) || '--';
+};
+
 export function RequestLogs({ data, loading: parentLoading, providerMap, providerTypeMap, sourceInfoMap, authFileMap: propAuthFileMap, apiFilter }: RequestLogsProps) {
   const { t } = useTranslation();
   const modelPrices = useMemo(() => loadModelPrices(), []);
@@ -293,7 +324,13 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
             normalizeCache.set(source, normalizedSource);
           }
           const sourceInfo = resolveSourceDisplay(normalizedSource, detail.auth_index, sourceInfoMap, authFileMap);
-          const providerType = sourceInfo.type || providerTypeMap[source] || '--';
+          const providerType = resolveProviderType(
+            detail,
+            sourceInfo.type,
+            source,
+            normalizedSource,
+            providerTypeMap
+          );
           const resolvedName = sourceInfo.displayName && sourceInfo.displayName !== normalizedSource
             ? sourceInfo.displayName
             : null;

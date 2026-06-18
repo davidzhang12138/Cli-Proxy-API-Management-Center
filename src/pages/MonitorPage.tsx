@@ -55,6 +55,11 @@ export interface UsageDetail {
   failed: boolean;
   source: string;
   auth_index: string;
+  provider?: string;
+  provider_type?: string;
+  providerType?: string;
+  request_type?: string;
+  requestType?: string;
   latency_ms?: number | string | null;
   tokens: {
     input_tokens: number;
