@@ -2069,6 +2069,8 @@
     "model_price_cache": "缓存价格",
     "model_price_save": "保存价格",
     "model_price_empty": "暂未设置任何模型价格",
+    "model_price_search_placeholder": "搜索已保存模型",
+    "model_price_no_search_result": "没有匹配的模型价格",
     "model_price_model": "模型",
     "model_price_saved": "模型价格已保存",
     "model_price_model_required": "请选择要设置价格的模型",

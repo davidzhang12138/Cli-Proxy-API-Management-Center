@@ -674,11 +674,61 @@
   gap: 10px;
 }
 
+.pricesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  :global(.form-group) {
+    margin: 0;
+  }
+
+  @include mobile {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
 .pricesTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+}
+
+.pricesCount {
+  min-width: 42px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.priceSearchInput {
+  width: min(280px, 32vw);
+  height: 34px;
+  box-sizing: border-box;
+
+  @include mobile {
+    width: 100%;
+  }
+}
+
+.pricesScroll {
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
 }
 
 .pricesGrid {
@@ -715,14 +765,18 @@
   font-weight: 600;
   color: var(--text-primary);
   font-size: 11px;
-  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .priceMeta {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   font-size: 10px;
   color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 
   @include mobile {
     flex-direction: column;

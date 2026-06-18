@@ -2045,6 +2045,8 @@
     "model_price_cache": "Цена кэша",
     "model_price_save": "Сохранить цену",
     "model_price_empty": "Цена для моделей не задана",
+    "model_price_search_placeholder": "Поиск сохранённых моделей",
+    "model_price_no_search_result": "Нет подходящих цен моделей",
     "model_price_model": "Модель",
     "model_price_saved": "Цена модели сохранена",
     "model_price_model_required": "Выберите модель для задания цены",

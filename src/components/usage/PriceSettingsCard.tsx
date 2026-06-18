@@ -32,6 +32,7 @@ export function PriceSettingsCard({
   const [editPrompt, setEditPrompt] = useState('');
   const [editCompletion, setEditCompletion] = useState('');
   const [editCache, setEditCache] = useState('');
+  const [priceSearch, setPriceSearch] = useState('');
 
   const handleSavePrice = () => {
     if (!selectedModel) return;
@@ -91,6 +92,18 @@ export function PriceSettingsCard({
     ],
     [modelNames, t]
   );
+  const savedPriceEntries = useMemo(
+    () =>
+      Object.entries(modelPrices).sort(([left], [right]) =>
+        left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })
+      ),
+    [modelPrices]
+  );
+  const filteredPriceEntries = useMemo(() => {
+    const query = priceSearch.trim().toLowerCase();
+    if (!query) return savedPriceEntries;
+    return savedPriceEntries.filter(([model]) => model.toLowerCase().includes(query));
+  }, [priceSearch, savedPriceEntries]);
 
   return (
     <Card title={t('usage_stats.model_price_settings')}>
@@ -145,36 +158,62 @@ export function PriceSettingsCard({
 
         {/* Saved Prices List */}
         <div className={styles.pricesList}>
-          <h4 className={styles.pricesTitle}>{t('usage_stats.saved_prices')}</h4>
-          {Object.keys(modelPrices).length > 0 ? (
-            <div className={styles.pricesGrid}>
-              {Object.entries(modelPrices).map(([model, price]) => (
-                <div key={model} className={styles.priceItem}>
-                  <div className={styles.priceInfo}>
-                    <span className={styles.priceModel}>{model}</span>
-                    <div className={styles.priceMeta}>
-                      <span>
-                        {t('usage_stats.model_price_prompt')}: ${price.prompt.toFixed(4)}/1M
-                      </span>
-                      <span>
-                        {t('usage_stats.model_price_completion')}: ${price.completion.toFixed(4)}/1M
-                      </span>
-                      <span>
-                        {t('usage_stats.model_price_cache')}: ${price.cache.toFixed(4)}/1M
-                      </span>
+          <div className={styles.pricesHeader}>
+            <h4 className={styles.pricesTitle}>
+              {t('usage_stats.saved_prices')}
+              {savedPriceEntries.length > 0 && (
+                <span className={styles.pricesCount}>
+                  {filteredPriceEntries.length}/{savedPriceEntries.length}
+                </span>
+              )}
+            </h4>
+            {savedPriceEntries.length > 0 && (
+              <Input
+                className={styles.priceSearchInput}
+                value={priceSearch}
+                onChange={(e) => setPriceSearch(e.target.value)}
+                placeholder={t('usage_stats.model_price_search_placeholder')}
+              />
+            )}
+          </div>
+          {savedPriceEntries.length > 0 ? (
+            filteredPriceEntries.length > 0 ? (
+              <div className={styles.pricesScroll}>
+                <div className={styles.pricesGrid}>
+                  {filteredPriceEntries.map(([model, price]) => (
+                    <div key={model} className={styles.priceItem}>
+                      <div className={styles.priceInfo}>
+                        <span className={styles.priceModel} title={model}>
+                          {model}
+                        </span>
+                        <div className={styles.priceMeta}>
+                          <span>
+                            {t('usage_stats.model_price_prompt')}: ${price.prompt.toFixed(4)}/1M
+                          </span>
+                          <span>
+                            {t('usage_stats.model_price_completion')}: $
+                            {price.completion.toFixed(4)}/1M
+                          </span>
+                          <span>
+                            {t('usage_stats.model_price_cache')}: ${price.cache.toFixed(4)}/1M
+                          </span>
+                        </div>
+                      </div>
+                      <div className={styles.priceActions}>
+                        <Button variant="secondary" size="sm" onClick={() => handleOpenEdit(model)}>
+                          {t('common.edit')}
+                        </Button>
+                        <Button variant="danger" size="sm" onClick={() => handleDeletePrice(model)}>
+                          {t('common.delete')}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                  <div className={styles.priceActions}>
-                    <Button variant="secondary" size="sm" onClick={() => handleOpenEdit(model)}>
-                      {t('common.edit')}
-                    </Button>
-                    <Button variant="danger" size="sm" onClick={() => handleDeletePrice(model)}>
-                      {t('common.delete')}
-                    </Button>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className={styles.hint}>{t('usage_stats.model_price_no_search_result')}</div>
+            )
           ) : (
             <div className={styles.hint}>{t('usage_stats.model_price_empty')}</div>
           )}

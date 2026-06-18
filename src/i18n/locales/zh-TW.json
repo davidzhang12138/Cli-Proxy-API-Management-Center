@@ -1854,6 +1854,8 @@
     "model_price_cache": "快取定價",
     "model_price_save": "儲存定價",
     "model_price_empty": "尚未設定任何模型定價",
+    "model_price_search_placeholder": "搜尋已儲存模型",
+    "model_price_no_search_result": "沒有符合的模型定價",
     "model_price_model": "模型",
     "model_price_saved": "模型定價已儲存",
     "model_price_model_required": "請選擇要設定定價的模型",

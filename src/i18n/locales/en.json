@@ -2069,6 +2069,8 @@
     "model_price_cache": "Cache price",
     "model_price_save": "Save Price",
     "model_price_empty": "No model prices set",
+    "model_price_search_placeholder": "Search saved models",
+    "model_price_no_search_result": "No matching model prices",
     "model_price_model": "Model",
     "model_price_saved": "Model price saved",
     "model_price_model_required": "Please choose a model to set pricing",
