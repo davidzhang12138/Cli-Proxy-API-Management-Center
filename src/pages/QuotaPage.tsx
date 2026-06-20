@@ -34,7 +34,6 @@ import {
   ANTIGRAVITY_CONFIG,
   CLAUDE_CONFIG,
   CODEX_CONFIG,
-  GEMINI_CLI_CONFIG,
   KIRO_CONFIG,
   KIMI_CONFIG,
   XAI_CONFIG,
@@ -64,7 +63,6 @@ const QUOTA_CONFIGS = [
   CODEX_CONFIG,
   KIRO_CONFIG,
   XAI_CONFIG,
-  GEMINI_CLI_CONFIG,
   KIMI_CONFIG,
 ] as const;
 type ActiveQuotaType = (typeof QUOTA_CONFIGS)[number]['type'];
@@ -727,15 +725,6 @@ export function QuotaPage() {
       case XAI_CONFIG.type:
         return (
           <QuotaSection key={type} config={XAI_CONFIG} {...commonSectionProps} {...sectionProps} />
-        );
-      case GEMINI_CLI_CONFIG.type:
-        return (
-          <QuotaSection
-            key={type}
-            config={GEMINI_CLI_CONFIG}
-            {...commonSectionProps}
-            {...sectionProps}
-          />
         );
       case KIMI_CONFIG.type:
         return (

@@ -330,7 +330,6 @@
 .antigravityGrid,
 .claudeGrid,
 .codexGrid,
-.geminiCliGrid,
 .kiroGrid,
 .kimiGrid,
 .xaiGrid {
@@ -346,7 +345,6 @@
 .antigravityControls,
 .claudeControls,
 .codexControls,
-.geminiCliControls,
 .kiroControls,
 .kimiControls,
 .xaiControls {
@@ -360,7 +358,6 @@
 .antigravityControl,
 .claudeControl,
 .codexControl,
-.geminiCliControl,
 .kiroControl,
 .kimiControl,
 .xaiControl {
@@ -668,10 +665,6 @@
   background-image: linear-gradient(180deg,
       rgba(255, 248, 225, 0.18),
       rgba(255, 248, 225, 0));
-}
-
-.geminiCliCard {
-  background-image: linear-gradient(180deg, rgba(224, 232, 255, 0.2), rgba(224, 232, 255, 0));
 }
 
 .kimiCard {

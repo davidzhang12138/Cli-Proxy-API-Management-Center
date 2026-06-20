@@ -21,12 +21,6 @@ import type {
   CodexUsageWindow,
   CodexQuotaWindow,
   CodexUsagePayload,
-  GeminiCliCodeAssistPayload,
-  GeminiCliCredits,
-  GeminiCliParsedBucket,
-  GeminiCliQuotaBucketState,
-  GeminiCliQuotaState,
-  GeminiCliUserTier,
   KimiQuotaRow,
   KimiQuotaState,
   KiroQuotaState,
@@ -41,7 +35,6 @@ import {
   getApiCallErrorMessage,
   type AntigravitySubscriptionSummary,
 } from '@/services/api';
-import { useQuotaStore } from '@/stores';
 import {
   ANTIGRAVITY_QUOTA_URLS,
   ANTIGRAVITY_REQUEST_HEADERS,
@@ -52,25 +45,18 @@ import {
   CODEX_RATE_LIMIT_RESET_CREDITS_CONSUME_URL,
   CODEX_USAGE_URL,
   CODEX_REQUEST_HEADERS,
-  GEMINI_CLI_QUOTA_URL,
-  GEMINI_CLI_CODE_ASSIST_URL,
-  GEMINI_CLI_REQUEST_HEADERS,
   KIMI_USAGE_URL,
   KIMI_REQUEST_HEADERS,
   KIRO_QUOTA_URL,
   KIRO_REQUEST_HEADERS,
   XAI_BILLING_URL,
   XAI_REQUEST_HEADERS,
-  normalizeGeminiCliModelId,
   normalizeNumberValue,
   normalizePlanType,
-  normalizeQuotaFraction,
   normalizeStringValue,
   parseAntigravityPayload,
   parseClaudeUsagePayload,
   parseCodexUsagePayload,
-  parseGeminiCliQuotaPayload,
-  parseGeminiCliCodeAssistPayload,
   parseUsageQuotaSnapshot,
   parseKimiUsagePayload,
   parseKiroQuotaPayload,
@@ -78,14 +64,12 @@ import {
   resolveCodexChatgptAccountId,
   resolveCodexPlanType,
   resolveCodexSubscriptionActiveUntil,
-  resolveGeminiCliProjectId,
   resolveCodexQuotaWindowMeta,
   formatCodexResetLabel,
   formatQuotaResetTime,
   formatKimiResetHint,
   buildAntigravityQuotaGroups,
   buildAntigravityQuotaGroupsFromUsageQuota,
-  buildGeminiCliQuotaBuckets,
   buildKiroQuotaDataFromUsageQuota,
   buildKimiQuotaRows,
   CODEX_WINDOW_META,
@@ -97,10 +81,8 @@ import {
   isClaudeFile,
   isCodexFile,
   isDisabledAuthFile,
-  isGeminiCliFile,
   isKimiFile,
   isKiroFile,
-  isRuntimeOnlyAuthFile,
   isXaiFile,
   toFutureKiroResetIso,
 } from '@/utils/quota';
@@ -111,7 +93,7 @@ import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaUpdater<T> = T | ((prev: T) => T);
 
-type QuotaType = 'antigravity' | 'claude' | 'codex' | 'gemini-cli' | 'kiro' | 'kimi' | 'xai';
+type QuotaType = 'antigravity' | 'claude' | 'codex' | 'kiro' | 'kimi' | 'xai';
 
 type AntigravityQuotaData = {
   groups: AntigravityQuotaGroup[];
@@ -128,29 +110,17 @@ export const ANTIGRAVITY_VISIBLE_GROUP_IDS = new Set([
   'gemini-3-flash',
 ]);
 const ANTIGRAVITY_FALLBACK_VISIBLE_GROUP_LIMIT = 4;
-const geminiCliSupplementaryRequestIds = new Map<string, number>();
-const geminiCliSupplementaryCache = new Map<
-  string,
-  {
-    requestId: number;
-    tierLabel: string | null;
-    tierId: string | null;
-    creditBalance: number | null;
-  }
->();
 
 export interface QuotaStore {
   antigravityQuota: Record<string, AntigravityQuotaState>;
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
-  geminiCliQuota: Record<string, GeminiCliQuotaState>;
   kiroQuota: Record<string, KiroQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
-  setGeminiCliQuota: (updater: QuotaUpdater<Record<string, GeminiCliQuotaState>>) => void;
   setKiroQuota: (updater: QuotaUpdater<Record<string, KiroQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
@@ -877,251 +847,6 @@ const resetCodexQuota = async (
   return fetchCodexQuota(file, t);
 };
 
-const GEMINI_CLI_G1_CREDIT_TYPE = 'GOOGLE_ONE_AI';
-
-const GEMINI_CLI_TIER_LABELS: Record<string, string> = {
-  'free-tier': 'tier_free',
-  'legacy-tier': 'tier_legacy',
-  'standard-tier': 'tier_standard',
-  'g1-pro-tier': 'tier_pro',
-  'g1-ultra-tier': 'tier_ultra',
-};
-
-const resolveGeminiCliTierLabel = (
-  payload: GeminiCliCodeAssistPayload | null,
-  t: TFunction
-): string | null => {
-  if (!payload) return null;
-  const currentTier: GeminiCliUserTier | null | undefined =
-    payload.currentTier ?? payload.current_tier;
-  const paidTier: GeminiCliUserTier | null | undefined = payload.paidTier ?? payload.paid_tier;
-  const rawId = normalizeStringValue(paidTier?.id) ?? normalizeStringValue(currentTier?.id);
-  if (!rawId) return null;
-  const tierId = rawId.toLowerCase();
-  const labelKey = GEMINI_CLI_TIER_LABELS[tierId];
-  return labelKey ? t(`gemini_cli_quota.${labelKey}`) : rawId;
-};
-
-const resolveGeminiCliTierId = (payload: GeminiCliCodeAssistPayload | null): string | null => {
-  if (!payload) return null;
-  const currentTier: GeminiCliUserTier | null | undefined =
-    payload.currentTier ?? payload.current_tier;
-  const paidTier: GeminiCliUserTier | null | undefined = payload.paidTier ?? payload.paid_tier;
-  const rawId = normalizeStringValue(paidTier?.id) ?? normalizeStringValue(currentTier?.id);
-  return rawId ? rawId.toLowerCase() : null;
-};
-
-const resolveGeminiCliCreditBalance = (
-  payload: GeminiCliCodeAssistPayload | null
-): number | null => {
-  if (!payload) return null;
-  const paidTier: GeminiCliUserTier | null | undefined = payload.paidTier ?? payload.paid_tier;
-  const currentTier: GeminiCliUserTier | null | undefined =
-    payload.currentTier ?? payload.current_tier;
-  const tier = paidTier ?? currentTier;
-  if (!tier) return null;
-  const credits: GeminiCliCredits[] = tier.availableCredits ?? tier.available_credits ?? [];
-  let total = 0;
-  let found = false;
-  for (const credit of credits) {
-    const creditType = normalizeStringValue(credit.creditType ?? credit.credit_type);
-    if (creditType !== GEMINI_CLI_G1_CREDIT_TYPE) continue;
-    const amount = normalizeNumberValue(credit.creditAmount ?? credit.credit_amount);
-    if (amount !== null) {
-      total += amount;
-      found = true;
-    }
-  }
-  return found ? total : null;
-};
-
-const fetchGeminiCliCodeAssist = async (
-  authIndex: string,
-  projectId: string,
-  t: TFunction
-): Promise<{ tierLabel: string | null; tierId: string | null; creditBalance: number | null }> => {
-  try {
-    const result = await apiCallApi.request({
-      authIndex,
-      method: 'POST',
-      url: GEMINI_CLI_CODE_ASSIST_URL,
-      header: { ...GEMINI_CLI_REQUEST_HEADERS },
-      data: JSON.stringify({
-        cloudaicompanionProject: projectId,
-        metadata: {
-          ideType: 'IDE_UNSPECIFIED',
-          platform: 'PLATFORM_UNSPECIFIED',
-          pluginType: 'GEMINI',
-          duetProject: projectId,
-        },
-      }),
-    });
-
-    if (result.statusCode < 200 || result.statusCode >= 300) {
-      return { tierLabel: null, tierId: null, creditBalance: null };
-    }
-
-    const payload = parseGeminiCliCodeAssistPayload(result.body ?? result.bodyText);
-    return {
-      tierLabel: resolveGeminiCliTierLabel(payload, t),
-      tierId: resolveGeminiCliTierId(payload),
-      creditBalance: resolveGeminiCliCreditBalance(payload),
-    };
-  } catch {
-    return { tierLabel: null, tierId: null, creditBalance: null };
-  }
-};
-
-const readGeminiCliSupplementarySnapshot = (
-  fileName: string,
-  requestId: number
-): { tierLabel: string | null; tierId: string | null; creditBalance: number | null } => {
-  const cached = geminiCliSupplementaryCache.get(fileName);
-  if (!cached || cached.requestId !== requestId) {
-    return { tierLabel: null, tierId: null, creditBalance: null };
-  }
-
-  return {
-    tierLabel: cached.tierLabel,
-    tierId: cached.tierId,
-    creditBalance: cached.creditBalance,
-  };
-};
-
-const scheduleGeminiCliSupplementaryRefresh = (
-  fileName: string,
-  authIndex: string,
-  projectId: string,
-  t: TFunction
-): number => {
-  const requestId = (geminiCliSupplementaryRequestIds.get(fileName) ?? 0) + 1;
-  geminiCliSupplementaryRequestIds.set(fileName, requestId);
-  geminiCliSupplementaryCache.delete(fileName);
-
-  void (async () => {
-    const supplementary = await fetchGeminiCliCodeAssist(authIndex, projectId, t);
-    if (geminiCliSupplementaryRequestIds.get(fileName) !== requestId) {
-      return;
-    }
-
-    geminiCliSupplementaryCache.set(fileName, { requestId, ...supplementary });
-
-    useQuotaStore.getState().setGeminiCliQuota((prev) => {
-      const current = prev[fileName];
-      if (!current || current.status !== 'success') {
-        return prev;
-      }
-
-      if (
-        current.tierLabel === supplementary.tierLabel &&
-        current.tierId === supplementary.tierId &&
-        current.creditBalance === supplementary.creditBalance
-      ) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        [fileName]: {
-          ...current,
-          tierLabel: supplementary.tierLabel,
-          tierId: supplementary.tierId,
-          creditBalance: supplementary.creditBalance,
-        },
-      };
-    });
-  })();
-
-  return requestId;
-};
-
-const fetchGeminiCliQuota = async (
-  file: AuthFileItem,
-  t: TFunction
-): Promise<{
-  fileName: string;
-  supplementaryRequestId: number;
-  buckets: GeminiCliQuotaBucketState[];
-  tierLabel: string | null;
-  tierId: string | null;
-  creditBalance: number | null;
-}> => {
-  const rawAuthIndex = file['auth_index'] ?? file.authIndex;
-  const authIndex = normalizeAuthIndex(rawAuthIndex);
-  if (!authIndex) {
-    throw new Error(t('gemini_cli_quota.missing_auth_index'));
-  }
-
-  const projectId = resolveGeminiCliProjectId(file);
-  if (!projectId) {
-    throw new Error(t('gemini_cli_quota.missing_project_id'));
-  }
-
-  const quotaResponse = await apiCallApi.request({
-    authIndex,
-    method: 'POST',
-    url: GEMINI_CLI_QUOTA_URL,
-    header: { ...GEMINI_CLI_REQUEST_HEADERS },
-    data: JSON.stringify({ project: projectId }),
-  });
-  if (quotaResponse.statusCode < 200 || quotaResponse.statusCode >= 300) {
-    throw createStatusError(getApiCallErrorMessage(quotaResponse), quotaResponse.statusCode);
-  }
-
-  const payload = parseGeminiCliQuotaPayload(quotaResponse.body ?? quotaResponse.bodyText);
-  const buckets = Array.isArray(payload?.buckets) ? payload?.buckets : [];
-
-  const parsedBuckets = buckets
-    .map((bucket) => {
-      const modelId = normalizeGeminiCliModelId(bucket.modelId ?? bucket.model_id);
-      if (!modelId) return null;
-      const tokenType = normalizeStringValue(bucket.tokenType ?? bucket.token_type);
-      const remainingFractionRaw = normalizeQuotaFraction(
-        bucket.remainingFraction ?? bucket.remaining_fraction
-      );
-      const remainingAmount = normalizeNumberValue(
-        bucket.remainingAmount ?? bucket.remaining_amount
-      );
-      const resetTime = normalizeStringValue(bucket.resetTime ?? bucket.reset_time) ?? undefined;
-      let fallbackFraction: number | null = null;
-      if (remainingAmount !== null) {
-        fallbackFraction = remainingAmount <= 0 ? 0 : null;
-      } else if (resetTime) {
-        fallbackFraction = 0;
-      }
-      const remainingFraction = remainingFractionRaw ?? fallbackFraction;
-      return {
-        modelId,
-        tokenType,
-        remainingFraction,
-        remainingAmount,
-        resetTime,
-      };
-    })
-    .filter((bucket): bucket is GeminiCliParsedBucket => bucket !== null);
-
-  const builtBuckets = buildGeminiCliQuotaBuckets(parsedBuckets);
-  const supplementaryRequestId = scheduleGeminiCliSupplementaryRefresh(
-    file.name,
-    authIndex,
-    projectId,
-    t
-  );
-  const supplementarySnapshot = readGeminiCliSupplementarySnapshot(
-    file.name,
-    supplementaryRequestId
-  );
-
-  return {
-    fileName: file.name,
-    supplementaryRequestId,
-    buckets: builtBuckets,
-    tierLabel: supplementarySnapshot.tierLabel,
-    tierId: supplementarySnapshot.tierId,
-    creditBalance: supplementarySnapshot.creditBalance,
-  };
-};
-
 const isResetTimeExpired = (resetTime?: string): boolean => {
   if (!resetTime) return false;
   const timestamp = Date.parse(resetTime);
@@ -1354,7 +1079,6 @@ const renderAntigravityItems = (
   return h(Fragment, null, ...nodes);
 };
 
-const PREMIUM_GEMINI_CLI_TIER_IDS = new Set(['g1-ultra-tier']);
 const PREMIUM_CODEX_PLAN_TYPES = new Set(['pro', 'prolite', 'pro-lite', 'pro_lite']);
 
 const renderCodexItems = (
@@ -1469,172 +1193,6 @@ const renderCodexItems = (
   );
 
   return h(Fragment, null, ...nodes);
-};
-
-const renderGeminiCliItems = (
-  quota: GeminiCliQuotaState,
-  t: TFunction,
-  helpers: QuotaRenderHelpers
-): ReactNode => {
-  const { styles: styleMap, QuotaProgressBar } = helpers;
-  const { createElement: h, Fragment } = React;
-  const buckets = quota.buckets ?? [];
-  const tierLabel = quota.tierLabel ?? null;
-  const tierId = quota.tierId ?? null;
-  const creditBalance = quota.creditBalance ?? null;
-  const isPremiumTier = tierId !== null && PREMIUM_GEMINI_CLI_TIER_IDS.has(tierId);
-  const nodes: ReactNode[] = [];
-
-  if (tierLabel) {
-    const valueClass = isPremiumTier ? styleMap.premiumPlanValue : styleMap.codexPlanValue;
-    nodes.push(
-      h(
-        'div',
-        { key: 'tier', className: styleMap.codexPlan },
-        h('span', { className: styleMap.codexPlanLabel }, t('gemini_cli_quota.tier_label')),
-        h('span', { className: valueClass }, tierLabel)
-      )
-    );
-  }
-
-  if (creditBalance !== null) {
-    nodes.push(
-      h(
-        'div',
-        { key: 'credits', className: styleMap.codexPlan },
-        h('span', { className: styleMap.codexPlanLabel }, t('gemini_cli_quota.credit_label')),
-        h(
-          'span',
-          { className: styleMap.codexPlanValue },
-          t('gemini_cli_quota.credit_amount', { count: creditBalance })
-        )
-      )
-    );
-  }
-
-  if (buckets.length === 0) {
-    nodes.push(
-      h(
-        'div',
-        { key: 'empty', className: styleMap.quotaMessage },
-        t('gemini_cli_quota.empty_buckets')
-      )
-    );
-    return h(Fragment, null, ...nodes);
-  }
-
-  nodes.push(
-    ...buckets.map((bucket) => {
-      const fraction = bucket.remainingFraction;
-      const clamped = fraction === null ? null : Math.max(0, Math.min(1, fraction));
-      const percent = clamped === null ? null : Math.round(clamped * 100);
-      const percentLabel = percent === null ? '--' : `${percent}%`;
-      const remainingAmountLabel =
-        bucket.remainingAmount === null || bucket.remainingAmount === undefined
-          ? null
-          : t('gemini_cli_quota.remaining_amount', {
-              count: bucket.remainingAmount,
-            });
-      const titleBase =
-        bucket.modelIds && bucket.modelIds.length > 0 ? bucket.modelIds.join(', ') : bucket.label;
-      const title = bucket.tokenType ? `${titleBase} (${bucket.tokenType})` : titleBase;
-
-      const resetLabel = formatQuotaResetTime(bucket.resetTime);
-      const expired = isResetTimeExpired(bucket.resetTime);
-      const resetClassName = expired ? styleMap.quotaResetExpired : styleMap.quotaReset;
-
-      return h(
-        'div',
-        { key: bucket.id, className: styleMap.quotaRow },
-        h(
-          'div',
-          { className: styleMap.quotaRowHeader },
-          h('span', { className: styleMap.quotaModel, title }, bucket.label),
-          h(
-            'div',
-            { className: styleMap.quotaMeta },
-            h('span', { className: styleMap.quotaPercent }, percentLabel),
-            remainingAmountLabel
-              ? h('span', { className: styleMap.quotaAmount }, remainingAmountLabel)
-              : null,
-            h('span', { className: resetClassName }, resetLabel)
-          )
-        ),
-        h(QuotaProgressBar, {
-          percent,
-          highThreshold: QUOTA_PROGRESS_HIGH_THRESHOLD,
-          mediumThreshold: QUOTA_PROGRESS_MEDIUM_THRESHOLD,
-        })
-      );
-    })
-  );
-
-  return h(Fragment, null, ...nodes);
-};
-
-const buildGeminiCliQuotaStateFromUsageQuota = (
-  file: AuthFileItem
-): Pick<GeminiCliQuotaState, 'buckets' | 'tierLabel' | 'tierId' | 'creditBalance'> | null => {
-  const snapshot = parseUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota);
-  if (!snapshot || !snapshot.known || snapshot.error) return null;
-
-  const toBucket = (
-    resourceType: string | undefined,
-    totalLimit: number | null,
-    currentUsage: number | null,
-    remaining: number | null,
-    exhausted: boolean
-  ): GeminiCliQuotaBucketState | null => {
-    const usage = computeSnapshotUsage(totalLimit, currentUsage, remaining, exhausted);
-    if (
-      usage.normalizedLimit === null &&
-      usage.normalizedUsage === null &&
-      usage.normalizedRemaining === null
-    ) {
-      return null;
-    }
-    return {
-      id: snapshotResourceId(resourceType, 'quota'),
-      label: snapshotResourceLabel(resourceType, 'Gemini CLI'),
-      remainingFraction: usage.remainingFraction,
-      remainingAmount: usage.normalizedRemaining,
-      resetTime: snapshot.nextReset,
-      tokenType: null,
-      modelIds: resourceType ? [resourceType] : undefined,
-    };
-  };
-
-  const buckets =
-    snapshot.resources.length > 0
-      ? snapshot.resources
-          .map((resource) =>
-            toBucket(
-              resource.resourceType,
-              resource.totalLimit,
-              resource.currentUsage,
-              resource.remaining,
-              resource.exhausted
-            )
-          )
-          .filter((bucket): bucket is GeminiCliQuotaBucketState => Boolean(bucket))
-      : [
-          toBucket(
-            snapshot.resourceType,
-            snapshot.totalLimit,
-            snapshot.currentUsage,
-            snapshot.remaining,
-            snapshot.exhausted
-          ),
-        ].filter((bucket): bucket is GeminiCliQuotaBucketState => Boolean(bucket));
-
-  if (buckets.length === 0) return null;
-
-  return {
-    buckets,
-    tierLabel: null,
-    tierId: null,
-    creditBalance: null,
-  };
 };
 
 const buildKimiQuotaStateFromUsageQuota = (
@@ -2077,72 +1635,6 @@ export const CODEX_CONFIG: QuotaConfig<
   controlClassName: styles.codexControl,
   gridClassName: styles.codexGrid,
   renderQuotaItems: renderCodexItems,
-};
-
-export const GEMINI_CLI_CONFIG: QuotaConfig<
-  GeminiCliQuotaState,
-  {
-    fileName: string;
-    supplementaryRequestId: number;
-    buckets: GeminiCliQuotaBucketState[];
-    tierLabel: string | null;
-    tierId: string | null;
-    creditBalance: number | null;
-  }
-> = {
-  type: 'gemini-cli',
-  i18nPrefix: 'gemini_cli_quota',
-  cardIdleMessageKey: 'quota_management.card_idle_hint',
-  filterFn: (file) =>
-    isGeminiCliFile(file) && !isRuntimeOnlyAuthFile(file) && !isDisabledAuthFile(file),
-  fetchQuota: fetchGeminiCliQuota,
-  storeSelector: (state) => state.geminiCliQuota,
-  storeSetter: 'setGeminiCliQuota',
-  buildLoadingState: () => ({
-    status: 'loading',
-    buckets: [],
-    tierLabel: null,
-    tierId: null,
-    creditBalance: null,
-  }),
-  buildSuccessState: (data) => {
-    const supplementarySnapshot = readGeminiCliSupplementarySnapshot(
-      data.fileName,
-      data.supplementaryRequestId
-    );
-
-    return {
-      status: 'success',
-      buckets: data.buckets,
-      tierLabel: supplementarySnapshot.tierLabel ?? data.tierLabel,
-      tierId: supplementarySnapshot.tierId ?? data.tierId,
-      creditBalance: supplementarySnapshot.creditBalance ?? data.creditBalance,
-    };
-  },
-  buildErrorState: (message, status) => ({
-    status: 'error',
-    buckets: [],
-    error: message,
-    errorStatus: status,
-  }),
-  buildSnapshotState: (file) => {
-    if (!hasKnownUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota)) return null;
-    const data = buildGeminiCliQuotaStateFromUsageQuota(file);
-    return data
-      ? {
-          status: 'success',
-          buckets: data.buckets,
-          tierLabel: data.tierLabel,
-          tierId: data.tierId,
-          creditBalance: data.creditBalance,
-        }
-      : null;
-  },
-  cardClassName: styles.geminiCliCard,
-  controlsClassName: styles.geminiCliControls,
-  controlClassName: styles.geminiCliControl,
-  gridClassName: styles.geminiCliGrid,
-  renderQuotaItems: renderGeminiCliItems,
 };
 
 type KiroQuotaData = {

@@ -8,7 +8,6 @@ import type {
   AntigravityQuotaState,
   ClaudeQuotaState,
   CodexQuotaState,
-  GeminiCliQuotaState,
   KimiQuotaState,
   KiroQuotaState,
   XaiQuotaState,
@@ -24,14 +23,12 @@ interface QuotaStoreState {
   antigravityQuota: Record<string, AntigravityQuotaState>;
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
-  geminiCliQuota: Record<string, GeminiCliQuotaState>;
   kiroQuota: Record<string, KiroQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
-  setGeminiCliQuota: (updater: QuotaUpdater<Record<string, GeminiCliQuotaState>>) => void;
   setKiroQuota: (updater: QuotaUpdater<Record<string, KiroQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
@@ -44,7 +41,6 @@ type PersistedQuotaStoreState = Pick<
   | 'antigravityQuota'
   | 'claudeQuota'
   | 'codexQuota'
-  | 'geminiCliQuota'
   | 'kiroQuota'
   | 'kimiQuota'
   | 'xaiQuota'
@@ -138,7 +134,6 @@ const sanitizePersistedQuotaState = (
   antigravityQuota: sanitizeQuotaMap(state.antigravityQuota ?? {}),
   claudeQuota: sanitizeQuotaMap(state.claudeQuota ?? {}),
   codexQuota: sanitizeQuotaMap(state.codexQuota ?? {}),
-  geminiCliQuota: sanitizeQuotaMap(state.geminiCliQuota ?? {}),
   kiroQuota: sanitizeQuotaMap(state.kiroQuota ?? {}),
   kimiQuota: sanitizeQuotaMap(state.kimiQuota ?? {}),
   xaiQuota: sanitizeQuotaMap(state.xaiQuota ?? {}),
@@ -150,7 +145,6 @@ export const useQuotaStore = create<QuotaStoreState>()(
       antigravityQuota: {},
       claudeQuota: {},
       codexQuota: {},
-      geminiCliQuota: {},
       kiroQuota: {},
       kimiQuota: {},
       xaiQuota: {},
@@ -169,13 +163,6 @@ export const useQuotaStore = create<QuotaStoreState>()(
         set((state) => ({
           codexQuota: stampQuotaMap(resolveUpdater(updater, state.codexQuota), state.codexQuota),
         })),
-      setGeminiCliQuota: (updater) =>
-        set((state) => ({
-          geminiCliQuota: stampQuotaMap(
-            resolveUpdater(updater, state.geminiCliQuota),
-            state.geminiCliQuota
-          ),
-        })),
       setKiroQuota: (updater) =>
         set((state) => ({
           kiroQuota: stampQuotaMap(resolveUpdater(updater, state.kiroQuota), state.kiroQuota),
@@ -193,7 +180,6 @@ export const useQuotaStore = create<QuotaStoreState>()(
           antigravityQuota: {},
           claudeQuota: {},
           codexQuota: {},
-          geminiCliQuota: {},
           kiroQuota: {},
           kimiQuota: {},
           xaiQuota: {},
@@ -204,7 +190,6 @@ export const useQuotaStore = create<QuotaStoreState>()(
             antigravityQuota: state.antigravityQuota,
             claudeQuota: state.claudeQuota,
             codexQuota: state.codexQuota,
-            geminiCliQuota: state.geminiCliQuota,
             kiroQuota: state.kiroQuota,
             kimiQuota: state.kimiQuota,
             xaiQuota: state.xaiQuota,
@@ -218,7 +203,6 @@ export const useQuotaStore = create<QuotaStoreState>()(
           antigravityQuota: state.antigravityQuota,
           claudeQuota: state.claudeQuota,
           codexQuota: state.codexQuota,
-          geminiCliQuota: state.geminiCliQuota,
           kiroQuota: state.kiroQuota,
           kimiQuota: state.kimiQuota,
           xaiQuota: state.xaiQuota,

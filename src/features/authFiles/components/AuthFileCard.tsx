@@ -110,8 +110,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
           ? styles.codexCard
           : quotaType === 'kiro'
             ? styles.kiroCard
-          : quotaType === 'gemini-cli'
-            ? styles.geminiCliCard
             : quotaType === 'kimi'
               ? styles.kimiCard
               : quotaType === 'xai'

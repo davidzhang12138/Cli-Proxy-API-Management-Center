@@ -9,21 +9,22 @@ import type {
   AntigravityQuotaInfo,
   AntigravityModelsPayload,
   AntigravityQuotaSummaryPayload,
-  GeminiCliParsedBucket,
-  GeminiCliQuotaBucketState,
   KimiUsagePayload,
   KimiUsageDetail,
   KimiLimitItem,
   KimiLimitWindow,
   KimiQuotaRow,
 } from '@/types';
-import {
-  ANTIGRAVITY_QUOTA_GROUPS,
-  GEMINI_CLI_GROUP_LOOKUP,
-  GEMINI_CLI_GROUP_ORDER,
-} from './constants';
+import { ANTIGRAVITY_QUOTA_GROUPS } from './constants';
 import { normalizeQuotaFraction, normalizeStringValue } from './parsers';
-import { isIgnoredGeminiCliModel } from './validators';
+
+const ANTIGRAVITY_BUCKET_WINDOW_ORDER = new Map<string, number>([
+  ['5h', 0],
+  ['five-hour', 0],
+  ['five_hour', 0],
+  ['weekly', 1],
+  ['week', 1],
+]);
 
 export function pickEarlierResetTime(current?: string, next?: string): string | undefined {
   if (!current) return next;
@@ -34,118 +35,6 @@ export function pickEarlierResetTime(current?: string, next?: string): string | 
   if (Number.isNaN(nextTime)) return current;
   return currentTime <= nextTime ? current : next;
 }
-
-export function minNullableNumber(current: number | null, next: number | null): number | null {
-  if (current === null) return next;
-  if (next === null) return current;
-  return Math.min(current, next);
-}
-
-export function buildGeminiCliQuotaBuckets(
-  buckets: GeminiCliParsedBucket[]
-): GeminiCliQuotaBucketState[] {
-  if (buckets.length === 0) return [];
-
-  type GeminiCliQuotaBucketGroup = {
-    id: string;
-    label: string;
-    tokenType: string | null;
-    modelIds: string[];
-    preferredModelId?: string;
-    preferredBucket?: GeminiCliParsedBucket;
-    fallbackRemainingFraction: number | null;
-    fallbackRemainingAmount: number | null;
-    fallbackResetTime: string | undefined;
-  };
-
-  const grouped = new Map<string, GeminiCliQuotaBucketGroup>();
-
-  buckets.forEach((bucket) => {
-    if (isIgnoredGeminiCliModel(bucket.modelId)) return;
-    const group = GEMINI_CLI_GROUP_LOOKUP.get(bucket.modelId);
-    const groupId = group?.id ?? bucket.modelId;
-    const label = group?.label ?? bucket.modelId;
-    const tokenKey = bucket.tokenType ?? '';
-    const mapKey = `${groupId}::${tokenKey}`;
-    const existing = grouped.get(mapKey);
-
-    if (!existing) {
-      const preferredModelId = group?.preferredModelId;
-      const preferredBucket =
-        preferredModelId && bucket.modelId === preferredModelId ? bucket : undefined;
-      grouped.set(mapKey, {
-        id: `${groupId}${tokenKey ? `-${tokenKey}` : ''}`,
-        label,
-        tokenType: bucket.tokenType,
-        modelIds: [bucket.modelId],
-        preferredModelId,
-        preferredBucket,
-        fallbackRemainingFraction: bucket.remainingFraction,
-        fallbackRemainingAmount: bucket.remainingAmount,
-        fallbackResetTime: bucket.resetTime,
-      });
-      return;
-    }
-
-    existing.fallbackRemainingFraction = minNullableNumber(
-      existing.fallbackRemainingFraction,
-      bucket.remainingFraction
-    );
-    existing.fallbackRemainingAmount = minNullableNumber(
-      existing.fallbackRemainingAmount,
-      bucket.remainingAmount
-    );
-    existing.fallbackResetTime = pickEarlierResetTime(existing.fallbackResetTime, bucket.resetTime);
-    existing.modelIds.push(bucket.modelId);
-
-    if (existing.preferredModelId && bucket.modelId === existing.preferredModelId) {
-      existing.preferredBucket = bucket;
-    }
-  });
-
-  const toGroupOrder = (bucket: GeminiCliQuotaBucketGroup): number => {
-    const tokenSuffix = bucket.tokenType ? `-${bucket.tokenType}` : '';
-    const groupId = bucket.id.endsWith(tokenSuffix)
-      ? bucket.id.slice(0, bucket.id.length - tokenSuffix.length)
-      : bucket.id;
-    return GEMINI_CLI_GROUP_ORDER.get(groupId) ?? Number.MAX_SAFE_INTEGER;
-  };
-
-  return Array.from(grouped.values())
-    .sort((a, b) => {
-      const orderDiff = toGroupOrder(a) - toGroupOrder(b);
-      if (orderDiff !== 0) return orderDiff;
-      const tokenTypeA = a.tokenType ?? '';
-      const tokenTypeB = b.tokenType ?? '';
-      return tokenTypeA.localeCompare(tokenTypeB);
-    })
-    .map((bucket) => {
-      const uniqueModelIds = Array.from(new Set(bucket.modelIds));
-      const preferred = bucket.preferredBucket;
-      const remainingFraction = preferred
-        ? preferred.remainingFraction
-        : bucket.fallbackRemainingFraction;
-      const remainingAmount = preferred ? preferred.remainingAmount : bucket.fallbackRemainingAmount;
-      const resetTime = preferred ? preferred.resetTime : bucket.fallbackResetTime;
-      return {
-        id: bucket.id,
-        label: bucket.label,
-        remainingFraction,
-        remainingAmount,
-        resetTime,
-        tokenType: bucket.tokenType,
-        modelIds: uniqueModelIds,
-      };
-    });
-}
-
-const ANTIGRAVITY_BUCKET_WINDOW_ORDER = new Map<string, number>([
-  ['5h', 0],
-  ['five-hour', 0],
-  ['five_hour', 0],
-  ['weekly', 1],
-  ['week', 1],
-]);
 
 function toStableId(value: string, fallback: string): string {
   const normalized = value

@@ -22,7 +22,6 @@ import type {
   ClaudeQuotaWindow,
   CodexQuotaWindow,
   CodexQuotaState,
-  GeminiCliQuotaState,
   KimiQuotaState,
   KiroQuotaState,
   ResolvedTheme,
@@ -321,14 +320,6 @@ const quotaStateMatchesModel = (
         group.models.some((model) => normalizeModelKey(model) === normalizedSelectedModel)
       );
     }
-    case 'gemini-cli': {
-      const state = quotaState as GeminiCliQuotaState;
-      return state.buckets.some((bucket) =>
-        (bucket.modelIds ?? []).some(
-          (model) => normalizeModelKey(model) === normalizedSelectedModel
-        )
-      );
-    }
     default:
       return null;
   }
@@ -350,18 +341,6 @@ const getQuotaRemainingRatioForModel = (
           group.models.some((model) => normalizeModelKey(model) === normalizedSelectedModel)
         )
         .map((group) => clampQuotaRatio(group.remainingFraction))
-        .filter((ratio): ratio is number => ratio !== null);
-      return ratios.length ? Math.max(...ratios) : null;
-    }
-    case 'gemini-cli': {
-      const state = quotaState as GeminiCliQuotaState;
-      const ratios = state.buckets
-        .filter((bucket) =>
-          (bucket.modelIds ?? []).some(
-            (model) => normalizeModelKey(model) === normalizedSelectedModel
-          )
-        )
-        .map((bucket) => clampQuotaRatio(bucket.remainingFraction))
         .filter((ratio): ratio is number => ratio !== null);
       return ratios.length ? Math.max(...ratios) : null;
     }
@@ -402,19 +381,6 @@ const getQuotaRemainingRatio = (
         )
         .filter((ratio): ratio is number => ratio !== null);
       return ratios.length ? Math.max(...ratios) : null;
-    }
-    case 'gemini-cli': {
-      const state = quotaState as GeminiCliQuotaState;
-      const ratios = state.buckets
-        .map((bucket) => clampQuotaRatio(bucket.remainingFraction))
-        .filter((ratio): ratio is number => ratio !== null);
-      if (ratios.length) {
-        return Math.max(...ratios);
-      }
-      if (typeof state.creditBalance === 'number') {
-        return state.creditBalance > 0 ? 1 : 0;
-      }
-      return null;
     }
     case 'kiro': {
       const state = getEffectiveKiroQuotaState(quotaState as KiroQuotaState);
@@ -464,8 +430,6 @@ const isQuotaResetExpired = (
       return (quotaState as ClaudeQuotaState).windows.some((w) => isPastResetTime(w.resetTime));
     case 'codex':
       return (quotaState as CodexQuotaState).windows.some((w) => isPastResetTime(w.resetTime));
-    case 'gemini-cli':
-      return (quotaState as GeminiCliQuotaState).buckets.some((b) => isPastResetTime(b.resetTime));
     case 'kiro': {
       const effective = getEffectiveKiroQuotaState(quotaState as KiroQuotaState);
       return isPastResetTime(effective.nextReset) || isPastResetTime(effective.bonusNextReset);
@@ -531,17 +495,6 @@ const getQuotaResetTimestampForModel = (
         )
       );
     }
-    case 'gemini-cli': {
-      const state = quotaState as GeminiCliQuotaState;
-      const matchedBuckets = normalizedSelectedModel
-        ? state.buckets.filter((bucket) =>
-            (bucket.modelIds ?? []).some(
-              (model) => normalizeModelKey(model) === normalizedSelectedModel
-            )
-          )
-        : state.buckets;
-      return pickEarliest(matchedBuckets.map((bucket) => toResetTimestamp(bucket.resetTime)));
-    }
     case 'kiro': {
       const state = getEffectiveKiroQuotaState(quotaState as KiroQuotaState);
       return pickEarliest([
@@ -588,8 +541,7 @@ const getQuotaUsedRatioForUsageModel = (
     remainingRatio === null ? null : clampQuotaRatio(1 - remainingRatio);
 
   switch (quotaType) {
-    case 'antigravity':
-    case 'gemini-cli': {
+    case 'antigravity': {
       return toUsedRatio(getQuotaRemainingRatioForModel(quotaType, quotaState, normalizedModel));
     }
     case 'claude': {

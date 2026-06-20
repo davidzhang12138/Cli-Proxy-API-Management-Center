@@ -11,7 +11,6 @@ export type AuthFileType =
   | 'kimi'
   | 'kiro'
   | 'gemini'
-  | 'gemini-cli'
   | 'aistudio'
   | 'claude'
   | 'codex'

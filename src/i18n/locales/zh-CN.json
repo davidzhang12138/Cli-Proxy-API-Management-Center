@@ -565,7 +565,6 @@
     "filter_all": "全部",
     "filter_qwen": "Qwen",
     "filter_gemini": "Gemini",
-    "filter_gemini-cli": "GeminiCLI",
     "filter_kimi": "Kimi",
     "filter_aistudio": "AIStudio",
     "filter_claude": "Claude",
@@ -579,7 +578,6 @@
     "filter_unknown": "其他",
     "type_qwen": "Qwen",
     "type_gemini": "Gemini",
-    "type_gemini-cli": "GeminiCLI",
     "type_kimi": "Kimi",
     "type_aistudio": "AIStudio",
     "type_claude": "Claude",
@@ -767,28 +765,6 @@
     "plan_pro": "Pro 20x",
     "plan_prolite": "Pro 5x"
   },
-  "gemini_cli_quota": {
-    "title": "Gemini CLI 额度",
-    "empty_title": "暂无 Gemini CLI 认证",
-    "empty_desc": "上传 Gemini CLI 认证文件后即可查看额度。",
-    "idle": "点击此处刷新额度",
-    "loading": "正在加载额度...",
-    "load_failed": "额度获取失败：{{message}}",
-    "missing_auth_index": "认证文件缺少 auth_index",
-    "missing_project_id": "Gemini CLI 凭证缺少 Project ID",
-    "empty_buckets": "暂无额度数据",
-    "refresh_button": "刷新额度",
-    "fetch_all": "获取全部",
-    "remaining_amount": "剩余 {{count}}",
-    "tier_label": "层级",
-    "tier_free": "免费版",
-    "tier_legacy": "旧版",
-    "tier_standard": "标准版",
-    "tier_pro": "Pro",
-    "tier_ultra": "Ultra",
-    "credit_label": "Google One AI 积分",
-    "credit_amount": "{{count}} 积分"
-  },
   "kimi_quota": {
     "title": "Kimi 额度",
     "empty_title": "暂无 Kimi 认证",
@@ -872,7 +848,7 @@
     "refreshing": "刷新中...",
     "provider_label": "提供商",
     "provider_auto": "跟随当前过滤",
-    "provider_placeholder": "例如 gemini-cli / openai",
+    "provider_placeholder": "例如 codex / openai",
     "provider_hint": "默认选中当前筛选的提供商，也可直接输入或选择其他名称。",
     "models_label": "禁用的模型",
     "models_loading": "正在加载模型列表...",
@@ -906,7 +882,7 @@
     "add": "新增别名",
     "add_title": "新增提供商模型别名",
     "provider_label": "提供商",
-    "provider_placeholder": "例如 gemini-cli / vertex",
+    "provider_placeholder": "例如 codex / vertex",
     "provider_hint": "默认选中当前筛选的提供商，也可直接输入或选择其他名称。",
     "model_source_loading": "正在加载模型列表...",
     "model_source_unsupported": "当前 CPA 版本不支持获取模型列表（仍可手动输入）。",
@@ -998,21 +974,6 @@
     "antigravity_oauth_status_error": "认证失败:",
     "antigravity_oauth_start_error": "启动 Antigravity OAuth 失败:",
     "antigravity_oauth_polling_error": "检查认证状态失败:",
-    "gemini_cli_oauth_title": "Gemini CLI OAuth",
-    "gemini_cli_oauth_button": "开始 Gemini CLI 登录",
-    "gemini_cli_oauth_hint": "通过 OAuth 流程登录 Google Gemini CLI 服务，自动获取并保存认证文件。",
-    "gemini_cli_project_id_label": "Google Cloud 项目 ID (可选):",
-    "gemini_cli_project_id_placeholder": "留空将自动选择第一个可用项目",
-    "gemini_cli_project_id_hint": "可选填写项目 ID。如不填写，系统将自动选择您账号下的第一个可用项目。输入 ALL 可获取全部项目。",
-    "gemini_cli_project_id_required": "请填写 Google Cloud 项目 ID。",
-    "gemini_cli_oauth_url_label": "授权链接:",
-    "gemini_cli_open_link": "打开链接",
-    "gemini_cli_copy_link": "复制链接",
-    "gemini_cli_oauth_status_waiting": "等待认证中...",
-    "gemini_cli_oauth_status_success": "认证成功！",
-    "gemini_cli_oauth_status_error": "认证失败:",
-    "gemini_cli_oauth_start_error": "启动 Gemini CLI OAuth 失败:",
-    "gemini_cli_oauth_polling_error": "检查认证状态失败:",
     "kimi_oauth_title": "Kimi OAuth",
     "kimi_oauth_button": "开始 Kimi 登录",
     "kimi_oauth_hint": "通过设备授权流程登录 Kimi 服务，自动获取并保存认证文件。",
@@ -1256,7 +1217,33 @@
     "visual": {
       "notice": "可视化模式覆盖常用字段，未覆盖的配置仍需在源文件模式中查看或编辑。",
       "quick_jump": "快速跳转",
+      "mode": {
+        "simple": "简单",
+        "full": "完整",
+        "label": "编辑模式",
+        "more_settings": "切换到完整模式，查看全部 {{total}} 个配置分区",
+        "validation_banner": "部分高级配置项存在校验错误，已阻止保存。请切换到完整模式进行修复。",
+        "switch_to_full": "切换完整模式"
+      },
+      "search": {
+        "placeholder": "搜索配置项（标签或 YAML 键名）",
+        "no_results": "没有匹配的配置项"
+      },
       "sections": {
+        "connectivity": {
+          "title": "接入与认证",
+          "description": "服务地址、端口、认证目录与 API 密钥"
+        },
+        "logging": {
+          "title": "日志与诊断",
+          "description": "调试、日志输出与使用统计"
+        },
+        "advanced": {
+          "title": "高级与实验",
+          "description": "请求头伪装、签名缓存、插件源等不常修改的设置",
+          "plugins_title": "插件",
+          "signature_title": "Antigravity 签名"
+        },
         "server": {
           "title": "服务器配置",
           "description": "基础服务器设置",
@@ -1364,9 +1351,7 @@
           "disable_cooling_desc": "全局禁用认证/模型失败后的冷却窗口",
           "session_affinity": "会话粘性路由",
           "ws_auth": "WebSocket 认证",
-          "ws_auth_desc": "启用 WebSocket 连接认证 (/v1/ws)",
-          "enable_gemini_cli_endpoint": "启用 Gemini CLI 内部端点",
-          "enable_gemini_cli_endpoint_desc": "启用 /v1internal:* 兼容端点"
+          "ws_auth_desc": "启用 WebSocket 连接认证 (/v1/ws)"
         },
         "quota": {
           "title": "配额回退",
