@@ -247,6 +247,26 @@ const normalizeOpenAIProvider = (provider: unknown): OpenAIProviderConfig | null
   if (disabled !== undefined) result.disabled = disabled;
   const disableCooling = normalizeBoolean(provider['disable-cooling']);
   if (disableCooling !== undefined) result.disableCooling = disableCooling;
+  const quotaBackoffMinRaw = provider['quota-backoff-min'];
+  if (typeof quotaBackoffMinRaw === 'string' && quotaBackoffMinRaw.trim()) {
+    result.quotaBackoffMin = quotaBackoffMinRaw.trim();
+  } else {
+    const minSeconds = provider['quota-backoff-min-seconds'];
+    const minSecNum = typeof minSeconds === 'number' ? minSeconds : Number(minSeconds);
+    if (Number.isFinite(minSecNum) && minSecNum > 0) {
+      result.quotaBackoffMin = secondsToDurationString(minSecNum);
+    }
+  }
+  const quotaBackoffMaxRaw = provider['quota-backoff-max'];
+  if (typeof quotaBackoffMaxRaw === 'string' && quotaBackoffMaxRaw.trim()) {
+    result.quotaBackoffMax = quotaBackoffMaxRaw.trim();
+  } else {
+    const maxSeconds = provider['quota-backoff-max-seconds'];
+    const maxSecNum = typeof maxSeconds === 'number' ? maxSeconds : Number(maxSeconds);
+    if (Number.isFinite(maxSecNum) && maxSecNum > 0) {
+      result.quotaBackoffMax = secondsToDurationString(maxSecNum);
+    }
+  }
   const prefix = normalizePrefix(provider.prefix);
   if (prefix) result.prefix = prefix;
   if (headers) result.headers = headers;
