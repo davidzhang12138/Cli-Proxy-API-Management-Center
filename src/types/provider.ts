@@ -65,6 +65,10 @@ export interface OpenAIProviderConfig {
   priority?: number;
   testModel?: string;
   disableCooling?: boolean;
+  /** 429 配额退避冷却下限,Go duration 字符串如 "30s"/"5m"/"1h"。yaml: quota-backoff-min */
+  quotaBackoffMin?: string;
+  /** 429 配额退避冷却上限,Go duration 字符串如 "30m"/"1h"/"2h30m"。yaml: quota-backoff-max */
+  quotaBackoffMax?: string;
   authIndex?: string;
   [key: string]: unknown;
 }
