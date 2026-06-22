@@ -112,6 +112,10 @@ export interface ProviderEntryFormInput {
   prefix: string;
   disabled: boolean;
   disableCooling?: boolean;
+  /** OpenAI 兼容 provider 的 429 配额退避下限(duration 字符串) */
+  quotaBackoffMin?: string;
+  /** OpenAI 兼容 provider 的 429 配额退避上限(duration 字符串) */
+  quotaBackoffMax?: string;
   priority?: number;
 
   /** 高级折叠区 */
