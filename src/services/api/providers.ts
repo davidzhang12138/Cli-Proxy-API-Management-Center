@@ -405,8 +405,10 @@ const serializeOpenAIProvider = (provider: OpenAIProviderConfig) => {
   if (provider.priority !== undefined) payload.priority = provider.priority;
   if (provider.testModel) payload['test-model'] = provider.testModel;
   if (provider.disableCooling) payload['disable-cooling'] = true;
-  if (provider.quotaBackoffMin?.trim()) payload['quota-backoff-min'] = provider.quotaBackoffMin.trim();
-  if (provider.quotaBackoffMax?.trim()) payload['quota-backoff-max'] = provider.quotaBackoffMax.trim();
+  if (provider.quotaBackoffMin?.trim())
+    payload['quota-backoff-min'] = provider.quotaBackoffMin.trim();
+  if (provider.quotaBackoffMax?.trim())
+    payload['quota-backoff-max'] = provider.quotaBackoffMax.trim();
   return payload;
 };
 

@@ -1,9 +1,11 @@
 /**
- * 回退判定逻辑的等价验证。
- * 直接 import 真实的 secondsToDurationString,回退判定代码逐字复制自
- * normalizeOpenAIProvider,确保字符串优先、否则数字/数字字符串回退的协同正确。
+ * quota-backoff 读取链路的集成验证:直接调用真实 normalizeConfigResponse,
+ * 覆盖 normalizeOpenAIProvider 的回退分支(字符串优先 -> 否则 -seconds 回退)。
+ *
+ * 运行:npx tsx src/services/api/transformers.fallback.test.ts
+ * (tsx 解析 tsconfig paths,可处理 @/ 别名,故能直接调真实实现而非复制逻辑)
  */
-import { secondsToDurationString } from './durationString.ts';
+import { normalizeConfigResponse } from './transformers.ts';
 
 const assertEqual = (actual: unknown, expected: unknown, message: string) => {
   if (actual !== expected) {
@@ -11,37 +13,79 @@ const assertEqual = (actual: unknown, expected: unknown, message: string) => {
   }
 };
 
-// 逐字复制 normalizeOpenAIProvider 里的回退判定(仅 min 分支,max 同理)
-const resolveMin = (provider: Record<string, unknown>): string | undefined => {
-  const quotaBackoffMinRaw = provider['quota-backoff-min'];
-  if (typeof quotaBackoffMinRaw === 'string' && quotaBackoffMinRaw.trim()) {
-    return quotaBackoffMinRaw.trim();
-  }
-  const minSeconds = provider['quota-backoff-min-seconds'];
-  const minSecNum = typeof minSeconds === 'number' ? minSeconds : Number(minSeconds);
-  if (Number.isFinite(minSecNum) && minSecNum > 0) {
-    return secondsToDurationString(minSecNum);
-  }
-  return undefined;
+const resolve = (provider: Record<string, unknown>) => {
+  const cfg = normalizeConfigResponse({ 'openai-compatibility': [provider] });
+  const entry = cfg.openaiCompatibility?.[0];
+  return { min: entry?.quotaBackoffMin, max: entry?.quotaBackoffMax };
 };
 
-// 新字段优先,原样保留
-assertEqual(resolveMin({ 'quota-backoff-min': ' 5m ' }), '5m', 'new string field trimmed');
+// 新字段优先,原样保留(含 trim)
+assertEqual(
+  resolve({ name: 'a', 'base-url': 'http://a', 'quota-backoff-min': ' 5m ' }).min,
+  '5m',
+  'new string field trimmed'
+);
 
-// 新字段为空字符串 → 回退旧数字字段
-assertEqual(resolveMin({ 'quota-backoff-min': '', 'quota-backoff-min-seconds': 1800 }), '30m0s', 'fallback to -seconds number');
+// 新字段为空字符串 -> 回退旧数字字段
+assertEqual(
+  resolve({
+    name: 'a',
+    'base-url': 'http://a',
+    'quota-backoff-min': '',
+    'quota-backoff-min-seconds': 1800,
+  }).min,
+  '30m0s',
+  'fallback to -seconds number'
+);
 
-// 新字段不存在 → 回退旧数字字符串
-assertEqual(resolveMin({ 'quota-backoff-min-seconds': '3600' }), '1h0m0s', 'fallback to -seconds numeric string');
+// 新字段不存在 -> 回退旧数字字符串
+assertEqual(
+  resolve({ name: 'a', 'base-url': 'http://a', 'quota-backoff-min-seconds': '3600' }).min,
+  '1h0m0s',
+  'fallback to -seconds numeric string'
+);
 
-// 两者都没有 → undefined
-assertEqual(resolveMin({}), undefined, 'no fields -> undefined');
+// 两者都没有 -> undefined
+assertEqual(
+  resolve({ name: 'a', 'base-url': 'http://a' }).min,
+  undefined,
+  'no fields -> undefined'
+);
 
-// 旧字段为 0/负数 → 不回退
-assertEqual(resolveMin({ 'quota-backoff-min-seconds': 0 }), undefined, 'zero seconds ignored');
-assertEqual(resolveMin({ 'quota-backoff-min-seconds': -10 }), undefined, 'negative seconds ignored');
+// 旧字段为 0/负数 -> 不回退
+assertEqual(
+  resolve({ name: 'a', 'base-url': 'http://a', 'quota-backoff-min-seconds': 0 }).min,
+  undefined,
+  'zero seconds ignored'
+);
+assertEqual(
+  resolve({ name: 'a', 'base-url': 'http://a', 'quota-backoff-min-seconds': -10 }).min,
+  undefined,
+  'negative seconds ignored'
+);
 
-// 新字段空白 → 回退
-assertEqual(resolveMin({ 'quota-backoff-min': '   ', 'quota-backoff-min-seconds': 90 }), '1m30s', 'whitespace new field falls back');
+// 新字段空白 -> 回退
+assertEqual(
+  resolve({
+    name: 'a',
+    'base-url': 'http://a',
+    'quota-backoff-min': '   ',
+    'quota-backoff-min-seconds': 90,
+  }).min,
+  '1m30s',
+  'whitespace new field falls back'
+);
+
+// max 分支同样回退(对称覆盖,防字段名拼写回归)
+assertEqual(
+  resolve({ name: 'a', 'base-url': 'http://a', 'quota-backoff-max-seconds': 1800 }).max,
+  '30m0s',
+  'max fallback to -seconds number'
+);
+assertEqual(
+  resolve({ name: 'a', 'base-url': 'http://a', 'quota-backoff-max': '2h' }).max,
+  '2h',
+  'max new string field'
+);
 
 console.log('fallback resolution: all assertions passed');
