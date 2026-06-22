@@ -454,6 +454,10 @@ export function BaseProviderForm({
     brand === 'claude' ||
     brand === 'openaiCompatibility';
   const supportsOpenAIModelOptions = brand === 'openaiCompatibility';
+  const supportsQuotaBackoff = brand === 'openaiCompatibility';
+  const quotaBackoffCount = [form.quotaBackoffMin, form.quotaBackoffMax].filter(
+    (v) => v && v.trim()
+  ).length;
   const singleConnectivity =
     brand === 'codex'
       ? { status: connectivity.codexStatus, run: connectivity.runCodex }
@@ -728,6 +732,49 @@ export function BaseProviderForm({
               <small>{t('providersPage.form.disableCoolingHint')}</small>
             </span>
           </label>
+        ) : null}
+
+        {supportsQuotaBackoff ? (
+          <Collapsible
+            label={t('providersPage.form.quotaBackoffSection')}
+            hint={String(quotaBackoffCount)}
+            defaultOpen={false}
+          >
+            <div className={styles.fieldRow}>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor={`${fid}-qbackoffMin`}>
+                  {t('providersPage.form.quotaBackoffMin')}
+                </label>
+                <input
+                  id={`${fid}-qbackoffMin`}
+                  className={styles.input}
+                  value={form.quotaBackoffMin ?? ''}
+                  placeholder="30s / 5m / 1h"
+                  onChange={(e) => updateField('quotaBackoffMin', e.target.value)}
+                  disabled={mutating}
+                />
+                <small className={styles.labelHint}>
+                  {t('providersPage.form.quotaBackoffMinHint')}
+                </small>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor={`${fid}-qbackoffMax`}>
+                  {t('providersPage.form.quotaBackoffMax')}
+                </label>
+                <input
+                  id={`${fid}-qbackoffMax`}
+                  className={styles.input}
+                  value={form.quotaBackoffMax ?? ''}
+                  placeholder="30m / 1h / 2h30m"
+                  onChange={(e) => updateField('quotaBackoffMax', e.target.value)}
+                  disabled={mutating}
+                />
+                <small className={styles.labelHint}>
+                  {t('providersPage.form.quotaBackoffMaxHint')}
+                </small>
+              </div>
+            </div>
+          </Collapsible>
         ) : null}
       </div>
 
