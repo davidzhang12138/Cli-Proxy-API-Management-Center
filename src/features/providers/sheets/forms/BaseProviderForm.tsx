@@ -414,6 +414,19 @@ export function BaseProviderForm({
     if (descriptor.baseUrlRequired && !form.baseUrl.trim()) {
       return t('providersPage.form.validation.baseUrlRequired');
     }
+    if (brand === 'openaiCompatibility') {
+      const DURATION_RE = /^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$/;
+      const NUM_RE = /^\d+(\.\d+)?$/;
+      const isDurationLike = (v: string) => DURATION_RE.test(v) || NUM_RE.test(v);
+      const min = form.quotaBackoffMin?.trim() ?? '';
+      const max = form.quotaBackoffMax?.trim() ?? '';
+      if (min && !isDurationLike(min)) {
+        return t('providersPage.form.validation.invalidDuration');
+      }
+      if (max && !isDurationLike(max)) {
+        return t('providersPage.form.validation.invalidDuration');
+      }
+    }
     return null;
   };
 
