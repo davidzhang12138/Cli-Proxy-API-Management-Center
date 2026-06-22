@@ -9,6 +9,9 @@ import type {
 import type { Config } from '@/types/config';
 import { buildHeaderObject } from '@/utils/headers';
 import { isRecord } from '@/utils/helpers';
+import { secondsToDurationString } from './durationString';
+
+export { secondsToDurationString };
 
 const normalizeBoolean = (value: unknown): boolean | undefined =>
   typeof value === 'boolean' ? value : undefined;
