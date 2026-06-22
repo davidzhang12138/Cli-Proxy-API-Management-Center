@@ -173,6 +173,8 @@ const buildOpenAIConfig = (
     apiKeyEntries,
     disabled: input.disabled,
     disableCooling: input.disableCooling === true,
+    quotaBackoffMin: input.quotaBackoffMin?.trim() || undefined,
+    quotaBackoffMax: input.quotaBackoffMax?.trim() || undefined,
     headers: Object.keys(headers).length ? headers : undefined,
     models: models.length ? models : undefined,
     priority: input.priority,

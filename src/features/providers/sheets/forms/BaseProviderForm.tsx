@@ -75,6 +75,8 @@ function buildInitialForm(
       prefix: '',
       disabled: false,
       disableCooling: false,
+      quotaBackoffMin: '',
+      quotaBackoffMax: '',
       priority: undefined,
       models: [emptyModel()],
       headers: [emptyHeader()],
@@ -107,6 +109,8 @@ function buildInitialForm(
       prefix: cfg.prefix ?? '',
       disabled: cfg.disabled === true,
       disableCooling: cfg.disableCooling === true,
+      quotaBackoffMin: cfg.quotaBackoffMin ?? '',
+      quotaBackoffMax: cfg.quotaBackoffMax ?? '',
       priority: cfg.priority,
       models: cfg.models?.length
         ? cfg.models.map((m) => ({
