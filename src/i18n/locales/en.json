@@ -2229,6 +2229,11 @@
       "hideApiKey": "Hide API key",
       "disableCooling": "Disable cooling",
       "disableCoolingHint": "Disable failure cooldown windows only for this credential or provider",
+      "quotaBackoffSection": "Quota backoff",
+      "quotaBackoffMin": "Quota backoff min",
+      "quotaBackoffMinHint": "Min 429 quota cooldown, e.g. 30s / 5m / 1h / 2h30m",
+      "quotaBackoffMax": "Quota backoff max",
+      "quotaBackoffMaxHint": "Max 429 quota cooldown, e.g. 30m / 1h / 2h30m",
       "modelEntry": "Model #{{index}}",
       "modelImage": "Allow image endpoints",
       "modelImageHint": "Allow this model on /v1/images/generations and /v1/images/edits",
@@ -2241,7 +2246,8 @@
       "validation": {
         "nameRequired": "Name is required",
         "apiKeyRequired": "At least one API key is required",
-        "baseUrlRequired": "Base URL is required"
+        "baseUrlRequired": "Base URL is required",
+        "invalidDuration": "Invalid duration format, use 30s / 5m / 1h"
       }
     },
     "delete": {

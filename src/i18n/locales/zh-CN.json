@@ -2229,6 +2229,11 @@
       "hideApiKey": "隐藏密钥",
       "disableCooling": "禁用冷却调度",
       "disableCoolingHint": "仅对当前凭据或提供商禁用失败后的冷却窗口",
+      "quotaBackoffSection": "配额退避",
+      "quotaBackoffMin": "配额退避下限",
+      "quotaBackoffMinHint": "429 配额冷却下限,支持 30s / 5m / 1h / 2h30m",
+      "quotaBackoffMax": "配额退避上限",
+      "quotaBackoffMaxHint": "429 配额冷却上限,支持 30m / 1h / 2h30m",
       "modelEntry": "模型 #{{index}}",
       "modelImage": "允许图片端点",
       "modelImageHint": "允许该模型用于 /v1/images/generations 和 /v1/images/edits",
@@ -2241,7 +2246,8 @@
       "validation": {
         "nameRequired": "名称必填",
         "apiKeyRequired": "至少填写一个 API 密钥",
-        "baseUrlRequired": "服务地址必填"
+        "baseUrlRequired": "服务地址必填",
+        "invalidDuration": "时长格式无效,请使用 30s / 5m / 1h 这样的格式"
       }
     },
     "delete": {
