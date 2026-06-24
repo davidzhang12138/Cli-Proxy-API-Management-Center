@@ -4,9 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
-import { oauthApi, qwenAuthApi, type OAuthProvider } from '@/services/api/oauth';
+import { oauthApi, type OAuthProvider } from '@/services/api/oauth';
 import { vertexApi, type VertexImportResponse } from '@/services/api/vertex';
 import { copyToClipboard } from '@/utils/clipboard';
 import { normalizeApiBase } from '@/utils/connection';
@@ -21,7 +20,6 @@ import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
-import iconQwen from '@/assets/icons/qwen.svg';
 
 interface ProviderState {
   url?: string;
@@ -60,21 +58,6 @@ interface KiroState {
   loading: boolean;
   error?: string;
   success?: boolean;
-}
-
-interface QwenState {
-  email: string;
-  token: string;
-  password: string;
-  savePassword: boolean;
-  proxyUrl: string;
-  cookies: string;
-  label: string;
-  loading: boolean;
-  status?: 'success' | 'error';
-  error?: string;
-  fileName?: string;
-  authKind?: 'web_token' | 'password';
 }
 
 function getErrorStatus(error: unknown): number | undefined {
@@ -235,16 +218,6 @@ export function OAuthPage() {
     proxyUrl: '',
     loading: false,
   });
-  const [qwenState, setQwenState] = useState<QwenState>({
-    email: '',
-    token: '',
-    password: '',
-    savePassword: false,
-    proxyUrl: '',
-    cookies: '',
-    label: '',
-    loading: false,
-  });
   const pollingTimers = useRef<Partial<Record<OAuthProvider, number>>>({});
   const successResetTimers = useRef<Partial<Record<OAuthProvider, number>>>({});
   const vertexFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -273,10 +246,6 @@ export function OAuthPage() {
       ...prev,
       [provider]: { ...(prev[provider] ?? {}), ...next },
     }));
-  };
-
-  const updateQwenState = (next: Partial<QwenState>) => {
-    setQwenState((prev) => ({ ...prev, ...next }));
   };
 
   const clearPollingTimer = (provider: OAuthProvider) => {
@@ -594,60 +563,6 @@ export function OAuthPage() {
     }
   };
 
-  const submitQwenAuth = async () => {
-    const email = qwenState.email.trim();
-    const token = qwenState.token.trim();
-    const password = qwenState.password.trim();
-
-    if (!email) {
-      showNotification(t('auth_login.qwen_email_required'), 'warning');
-      return;
-    }
-    if (!token && !password) {
-      showNotification(t('auth_login.qwen_credential_required'), 'warning');
-      return;
-    }
-    if (qwenState.savePassword && !password) {
-      showNotification(t('auth_login.qwen_save_password_requires_password'), 'warning');
-      return;
-    }
-
-    updateQwenState({
-      loading: true,
-      status: undefined,
-      error: undefined,
-      fileName: undefined,
-      authKind: undefined,
-    });
-
-    try {
-      const response = await qwenAuthApi.submit({
-        email,
-        token,
-        password,
-        savePassword: qwenState.savePassword,
-        proxyUrl: qwenState.proxyUrl,
-        cookies: qwenState.cookies,
-        label: qwenState.label,
-      });
-      updateQwenState({
-        loading: false,
-        status: 'success',
-        fileName: response.fileName,
-        authKind: response.authKind,
-      });
-      showNotification(t('auth_login.qwen_save_success'), 'success');
-    } catch (err: unknown) {
-      const message = getErrorMessage(err);
-      updateQwenState({
-        loading: false,
-        status: 'error',
-        error: message || t('common.unknown_error'),
-      });
-      showNotification(`${t('auth_login.qwen_save_error')} ${message || ''}`.trim(), 'error');
-    }
-  };
-
   return (
     <div className={styles.container}>
       <h1 className={styles.pageTitle}>{t('nav.oauth', { defaultValue: 'OAuth' })}</h1>
@@ -790,126 +705,6 @@ export function OAuthPage() {
             </div>
           );
         })}
-
-        <Card
-          title={
-            <span className={styles.cardTitle}>
-              <img src={iconQwen} alt="" className={styles.cardTitleIcon} />
-              {t('auth_login.qwen_web_title')}
-            </span>
-          }
-          extra={
-            <Button onClick={submitQwenAuth} loading={qwenState.loading}>
-              {t('auth_login.qwen_save_button')}
-            </Button>
-          }
-        >
-          <div className={styles.cardContent}>
-            <div className={styles.cardHint}>{t('auth_login.qwen_web_hint')}</div>
-
-            <div className={styles.qwenGrid}>
-              <Input
-                label={t('auth_login.qwen_email_label')}
-                value={qwenState.email}
-                disabled={qwenState.loading}
-                onChange={(e) => updateQwenState({ email: e.target.value })}
-                placeholder={t('auth_login.qwen_email_placeholder')}
-                autoComplete="username"
-              />
-              <Input
-                label={t('auth_login.qwen_label_label')}
-                hint={t('auth_login.qwen_label_hint')}
-                value={qwenState.label}
-                disabled={qwenState.loading}
-                onChange={(e) => updateQwenState({ label: e.target.value })}
-                placeholder={t('auth_login.qwen_label_placeholder')}
-              />
-            </div>
-
-            <Input
-              label={t('auth_login.qwen_token_label')}
-              hint={t('auth_login.qwen_token_hint')}
-              value={qwenState.token}
-              disabled={qwenState.loading}
-              onChange={(e) => updateQwenState({ token: e.target.value })}
-              placeholder={t('auth_login.qwen_token_placeholder')}
-              autoComplete="off"
-            />
-
-            <div className={styles.qwenGrid}>
-              <Input
-                type="password"
-                label={t('auth_login.qwen_password_label')}
-                hint={t('auth_login.qwen_password_hint')}
-                value={qwenState.password}
-                disabled={qwenState.loading}
-                onChange={(e) => updateQwenState({ password: e.target.value })}
-                placeholder={t('auth_login.qwen_password_placeholder')}
-                autoComplete="new-password"
-                data-1p-ignore="true"
-                data-lpignore="true"
-                data-bwignore="true"
-              />
-              <div className={styles.qwenSwitchField}>
-                <ToggleSwitch
-                  checked={qwenState.savePassword}
-                  disabled={qwenState.loading}
-                  onChange={(checked) => updateQwenState({ savePassword: checked })}
-                  label={t('auth_login.qwen_save_password_label')}
-                />
-                <div className={styles.cardHintSecondary}>
-                  {t('auth_login.qwen_save_password_hint')}
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.oauthProxyField}>
-              <Input
-                label={t('auth_login.oauth_proxy_url_label')}
-                hint={t('auth_login.oauth_proxy_url_hint')}
-                value={qwenState.proxyUrl}
-                disabled={qwenState.loading}
-                onChange={(e) => updateQwenState({ proxyUrl: e.target.value })}
-                placeholder={t('auth_login.oauth_proxy_url_placeholder')}
-              />
-            </div>
-
-            <div className={styles.formItem}>
-              <label className={styles.formItemLabel} htmlFor="qwen-cookies">
-                {t('auth_login.qwen_cookies_label')}
-              </label>
-              <div className={styles.cardHintSecondary}>{t('auth_login.qwen_cookies_hint')}</div>
-              <textarea
-                id="qwen-cookies"
-                className={styles.textarea}
-                rows={3}
-                value={qwenState.cookies}
-                disabled={qwenState.loading}
-                onChange={(e) => updateQwenState({ cookies: e.target.value })}
-                placeholder={t('auth_login.qwen_cookies_placeholder')}
-              />
-            </div>
-
-            {qwenState.status === 'success' && (
-              <>
-                <div className="status-badge success">
-                  {t('auth_login.qwen_save_success')}
-                  {qwenState.fileName ? ` ${qwenState.fileName}` : ''}
-                </div>
-                <div className={styles.successActions}>
-                  <Button variant="secondary" size="sm" onClick={() => navigate('/auth-files')}>
-                    {t('auth_login.view_auth_files')}
-                  </Button>
-                </div>
-              </>
-            )}
-            {qwenState.status === 'error' && (
-              <div className="status-badge error">
-                {t('auth_login.qwen_save_error')} {qwenState.error || ''}
-              </div>
-            )}
-          </div>
-        </Card>
 
         <Card
           title={

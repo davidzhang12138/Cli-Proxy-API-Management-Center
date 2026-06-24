@@ -7,7 +7,6 @@ import type { RecentRequestBucket } from '@/utils/recentRequests';
 import type { UsageQuotaSnapshotPayload } from './quota';
 
 export type AuthFileType =
-  | 'qwen'
   | 'kimi'
   | 'kiro'
   | 'gemini'

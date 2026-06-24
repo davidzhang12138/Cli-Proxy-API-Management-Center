@@ -181,35 +181,6 @@
   }
 }
 
-.qwenGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: $spacing-md;
-  align-items: start;
-
-  :global(.form-group) {
-    margin-top: 0;
-    margin-bottom: 0;
-    gap: $spacing-sm;
-  }
-
-  @include mobile {
-    grid-template-columns: 1fr;
-  }
-}
-
-.qwenSwitchField {
-  min-height: 76px;
-  padding: 11px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: $radius-md;
-  background: var(--bg-secondary);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: $spacing-xs;
-}
-
 .textarea {
   width: 100%;
   min-height: 88px;

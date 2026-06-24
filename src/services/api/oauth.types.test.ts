@@ -1,5 +1,4 @@
-import type { OAuthStartOptions, QwenAuthRequest } from './oauth';
-import { qwenAuthApi } from './oauth';
+import type { OAuthStartOptions } from './oauth';
 import { authFilesApi } from './authFiles';
 
 const oauthStartOptionsAcceptsProxyUrl = {
@@ -7,31 +6,6 @@ const oauthStartOptionsAcceptsProxyUrl = {
 } satisfies OAuthStartOptions;
 
 void oauthStartOptionsAcceptsProxyUrl;
-
-const qwenAuthRequestAcceptsTokenOrPassword = {
-  email: 'qwen@example.com',
-  token: 'web-token',
-  password: 'secret-password',
-  savePassword: true,
-  proxyUrl: 'socks5://127.0.0.1:1080',
-  cookies: 'token=web-token',
-  label: 'Qwen main',
-} satisfies QwenAuthRequest;
-
-void qwenAuthRequestAcceptsTokenOrPassword;
-
-const qwenAuthSubmitReturnsSavedFile = qwenAuthApi
-  .submit(qwenAuthRequestAcceptsTokenOrPassword)
-  .then((response) => {
-    const fileName: string = response.fileName;
-    const authKind: 'web_token' | 'password' = response.authKind;
-    const hasCookies: boolean | undefined = response.hasCookies;
-    void fileName;
-    void authKind;
-    void hasCookies;
-  });
-
-void qwenAuthSubmitReturnsSavedFile;
 
 const authFilesListAcceptsUsageQuota = authFilesApi.list().then((response) => {
   const totalFromPagination: number | undefined = response.pagination?.total;

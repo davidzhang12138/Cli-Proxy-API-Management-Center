@@ -9,7 +9,6 @@ import iconIflow from '@/assets/icons/iflow.svg';
 import iconKiro from '@/assets/icons/kiro.svg';
 import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
-import iconQwen from '@/assets/icons/qwen.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import type { AuthFileItem } from '@/types';
 import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
@@ -65,11 +64,6 @@ export const FALSY_TEXT_VALUES = new Set(['false', '0', 'no', 'n', 'off']);
 
 // 标签类型颜色配置 — 基于各提供商 Logo 品牌色调配，确保彼此不重复
 export const TYPE_COLORS: Record<string, TypeColorSet> = {
-  // Qwen logo: 紫罗兰渐变 #6336E7 → #6F69F7
-  qwen: {
-    light: { bg: '#ede5fd', text: '#5530c7' },
-    dark: { bg: '#36208a', text: '#b5a3f0' },
-  },
   // Kimi logo: 亮蓝 #027AFF（K字 + 蓝色圆点）
   kimi: {
     light: { bg: '#dce8ff', text: '#0560cf' },
@@ -109,7 +103,7 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#f3f4f6', text: '#111827', border: '1px solid #d1d5db' },
     dark: { bg: '#111827', text: '#f9fafb', border: '1px solid #374151' },
   },
-  // iFlow logo: 品红紫渐变 #5C5CFF → #AE5CFF，偏品红以区别于 Qwen 的紫罗兰
+  // iFlow logo: 品红紫渐变 #5C5CFF → #AE5CFF
   iflow: {
     light: { bg: '#f5e3fc', text: '#9025c8' },
     dark: { bg: '#521490', text: '#d49cf5' },
@@ -139,7 +133,6 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   iflow: iconIflow,
   kiro: iconKiro,
   kimi: { light: iconKimiLight, dark: iconKimiDark },
-  qwen: iconQwen,
   vertex: iconVertex,
 };
 

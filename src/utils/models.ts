@@ -16,7 +16,6 @@ const MODEL_CATEGORIES = [
   { id: 'claude', label: 'Claude', patterns: [/claude/i] },
   { id: 'gemini', label: 'Gemini', patterns: [/gemini/i, /\bgai\b/i] },
   { id: 'kimi', label: 'Kimi', patterns: [/kimi/i] },
-  { id: 'qwen', label: 'Qwen', patterns: [/qwen/i] },
   { id: 'glm', label: 'GLM', patterns: [/glm/i, /chatglm/i] },
   { id: 'grok', label: 'Grok', patterns: [/grok/i] },
   { id: 'deepseek', label: 'DeepSeek', patterns: [/deepseek/i] },
