@@ -314,30 +314,20 @@ export function OAuthPage() {
     }, SUCCESS_RESET_DELAY_MS);
   };
 
-  const startPolling = (provider: OAuthProvider, state: string) => {
+  const startPolling = (
+    provider: OAuthProvider,
+    state: string,
+    freebuff?: { fingerprintId: string; fingerprintHash: string; expiresAt: string; proxyUrl?: string }
+  ) => {
     clearPollingTimer(provider);
     const timer = window.setInterval(async () => {
       try {
-        if (provider === 'freebuff') {
-          const providerState = states[provider];
-          const fingerprintId = providerState?.fingerprintId?.trim();
-          const fingerprintHash = providerState?.fingerprintHash?.trim();
-          const expiresAt = providerState?.expiresAt?.trim();
-          if (!fingerprintId || !fingerprintHash || !expiresAt) {
-            const message = t('auth_login.missing_state');
-            updateProviderState(provider, { status: 'error', error: message, polling: false });
-            showNotification(message, 'error');
-            window.clearInterval(timer);
-            delete pollingTimers.current[provider];
-            return;
-          }
+        if (provider === 'freebuff' && freebuff) {
           const res = await freebuffAuthApi.getStatus({
-            fingerprintId,
-            fingerprintHash,
-            expiresAt,
-            ...(providerState?.oauthProxyUrl?.trim()
-              ? { proxyUrl: providerState.oauthProxyUrl.trim() }
-              : {}),
+            fingerprintId: freebuff.fingerprintId,
+            fingerprintHash: freebuff.fingerprintHash,
+            expiresAt: freebuff.expiresAt,
+            ...(freebuff.proxyUrl ? { proxyUrl: freebuff.proxyUrl } : {}),
           });
           if (res.status === 'ok' && res.token_added) {
             completeProviderAuth(provider);
@@ -429,7 +419,12 @@ export function OAuthPage() {
           fingerprintHash,
           expiresAt,
         });
-        startPolling(provider, fingerprintId);
+        startPolling(provider, fingerprintId, {
+          fingerprintId,
+          fingerprintHash,
+          expiresAt,
+          ...(proxyUrl ? { proxyUrl } : {}),
+        });
         return;
       }
 
