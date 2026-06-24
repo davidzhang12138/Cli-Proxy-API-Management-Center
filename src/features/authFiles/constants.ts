@@ -9,6 +9,7 @@ import iconIflow from '@/assets/icons/iflow.svg';
 import iconKiro from '@/assets/icons/kiro.svg';
 import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
+import iconFreebuff from '@/assets/icons/freebuff.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import type { AuthFileItem } from '@/types';
 import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
@@ -113,6 +114,11 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#e4edfd', text: '#2b5fbc' },
     dark: { bg: '#1a3d80', text: '#89b3f7' },
   },
+  // Freebuff logo: 黑白单色，用石墨色系标签
+  freebuff: {
+    light: { bg: '#eef0f2', text: '#1f2937', border: '1px solid #d4d7dc' },
+    dark: { bg: '#1f2937', text: '#e5e7eb', border: '1px solid #374151' },
+  },
   empty: {
     light: { bg: '#f5f5f5', text: '#616161' },
     dark: { bg: '#424242', text: '#bdbdbd' },
@@ -133,6 +139,7 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   iflow: iconIflow,
   kiro: iconKiro,
   kimi: { light: iconKimiLight, dark: iconKimiDark },
+  freebuff: iconFreebuff,
   vertex: iconVertex,
 };
 

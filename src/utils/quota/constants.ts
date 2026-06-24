@@ -46,6 +46,10 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#e4edfd', text: '#2b5fbc' },
     dark: { bg: '#1a3d80', text: '#89b3f7' },
   },
+  freebuff: {
+    light: { bg: '#eef0f2', text: '#1f2937', border: '1px solid #d4d7dc' },
+    dark: { bg: '#1f2937', text: '#e5e7eb', border: '1px solid #374151' },
+  },
   empty: {
     light: { bg: '#f5f5f5', text: '#616161' },
     dark: { bg: '#424242', text: '#bdbdbd' },

@@ -29,6 +29,7 @@ import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconDeepseek from '@/assets/icons/deepseek.svg';
 import iconMinimax from '@/assets/icons/minimax.svg';
+import iconFreebuff from '@/assets/icons/freebuff.svg';
 import styles from './SystemPage.module.scss';
 
 const MODEL_CATEGORY_ICONS: Record<string, string | { light: string; dark: string }> = {
@@ -40,6 +41,7 @@ const MODEL_CATEGORY_ICONS: Record<string, string | { light: string; dark: strin
   grok: { light: iconGrok, dark: iconGrokDark },
   deepseek: iconDeepseek,
   minimax: iconMinimax,
+  freebuff: iconFreebuff,
 };
 
 const parseVersionSegments = (version?: string | null) => {

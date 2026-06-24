@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
-import { oauthApi, type OAuthProvider } from '@/services/api/oauth';
+import { oauthApi, freebuffAuthApi, type OAuthProvider } from '@/services/api/oauth';
 import { vertexApi, type VertexImportResponse } from '@/services/api/vertex';
 import { copyToClipboard } from '@/utils/clipboard';
 import { normalizeApiBase } from '@/utils/connection';
@@ -20,6 +20,7 @@ import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
+import iconFreebuff from '@/assets/icons/freebuff.svg';
 
 interface ProviderState {
   url?: string;
@@ -32,6 +33,10 @@ interface ProviderState {
   callbackStatus?: 'success' | 'error';
   callbackError?: string;
   oauthProxyUrl?: string;
+  // Freebuff 专用：startAuth 返回的 fingerprint 信息，用于专用轮询端点
+  fingerprintId?: string;
+  fingerprintHash?: string;
+  expiresAt?: string;
 }
 
 interface VertexImportResult {
@@ -106,6 +111,13 @@ const PROVIDERS: {
     hintKey: 'auth_login.xai_oauth_hint',
     urlLabelKey: 'auth_login.xai_oauth_url_label',
     icon: { light: iconGrok, dark: iconGrokDark },
+  },
+  {
+    id: 'freebuff',
+    titleKey: 'auth_login.freebuff_oauth_title',
+    hintKey: 'auth_login.freebuff_oauth_hint',
+    urlLabelKey: 'auth_login.freebuff_oauth_url_label',
+    icon: iconFreebuff,
   },
 ];
 
@@ -306,6 +318,45 @@ export function OAuthPage() {
     clearPollingTimer(provider);
     const timer = window.setInterval(async () => {
       try {
+        if (provider === 'freebuff') {
+          const providerState = states[provider];
+          const fingerprintId = providerState?.fingerprintId?.trim();
+          const fingerprintHash = providerState?.fingerprintHash?.trim();
+          const expiresAt = providerState?.expiresAt?.trim();
+          if (!fingerprintId || !fingerprintHash || !expiresAt) {
+            const message = t('auth_login.missing_state');
+            updateProviderState(provider, { status: 'error', error: message, polling: false });
+            showNotification(message, 'error');
+            window.clearInterval(timer);
+            delete pollingTimers.current[provider];
+            return;
+          }
+          const res = await freebuffAuthApi.getStatus({
+            fingerprintId,
+            fingerprintHash,
+            expiresAt,
+            ...(providerState?.oauthProxyUrl?.trim()
+              ? { proxyUrl: providerState.oauthProxyUrl.trim() }
+              : {}),
+          });
+          if (res.status === 'ok' && res.token_added) {
+            completeProviderAuth(provider);
+            showNotification(t(getAuthKey(provider, 'oauth_status_success')), 'success');
+          } else if (res.status === 'pending') {
+            // 继续轮询
+          } else {
+            const message = res.error || t('auth_login.oauth_status_error');
+            updateProviderState(provider, { status: 'error', error: message, polling: false });
+            showNotification(
+              `${t(getAuthKey(provider, 'oauth_status_error'))} ${message}`,
+              'error'
+            );
+            window.clearInterval(timer);
+            delete pollingTimers.current[provider];
+          }
+          return;
+        }
+
         const res = await oauthApi.getAuthStatus(state);
         if (res.status === 'ok') {
           completeProviderAuth(provider);
@@ -344,8 +395,44 @@ export function OAuthPage() {
       callbackStatus: undefined,
       callbackError: undefined,
       callbackUrl: '',
+      fingerprintId: undefined,
+      fingerprintHash: undefined,
+      expiresAt: undefined,
     });
     try {
+      if (provider === 'freebuff') {
+        const res = await freebuffAuthApi.startAuth({
+          ...(proxyUrl ? { proxyUrl } : {}),
+        });
+        const fingerprintId = res.fingerprint_id?.trim();
+        const fingerprintHash = res.fingerprint_hash?.trim();
+        const expiresAt = res.expires_at?.trim();
+        const url = res.url || res.login_url || '';
+        if (!fingerprintId || !fingerprintHash || !expiresAt) {
+          const message = t('auth_login.missing_state');
+          updateProviderState(provider, {
+            url,
+            state: res.state,
+            status: 'error',
+            error: message,
+            polling: false,
+          });
+          showNotification(message, 'error');
+          return;
+        }
+        updateProviderState(provider, {
+          url,
+          state: res.state || fingerprintId,
+          status: 'waiting',
+          polling: true,
+          fingerprintId,
+          fingerprintHash,
+          expiresAt,
+        });
+        startPolling(provider, fingerprintId);
+        return;
+      }
+
       const res = await oauthApi.startAuth(provider, {
         ...(proxyUrl ? { proxyUrl } : {}),
       });
