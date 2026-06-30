@@ -6,6 +6,7 @@ import React from 'react';
 import type { ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import type {
+  AntigravityQuotaBucket,
   AntigravityQuotaGroup,
   AntigravityQuotaSubscription,
   AntigravityQuotaSummaryPayload,
@@ -968,6 +969,26 @@ const resolveAntigravityGroupBuckets = (group: AntigravityQuotaGroup) => {
   ];
 };
 
+/**
+ * A group rendered from the models payload only carries a single bucket that
+ * mirrors the group itself (see buildLegacyAntigravityGroupBucket, which
+ * assigns `bucket.label = group.label`, and the usage-quota snapshot builders
+ * that derive both labels from the same helper). Rendering both the group
+ * header and that bucket's title would print the same label twice, so callers
+ * should drop the bucket title for self buckets. The two labels are produced
+ * from the same source, so a strict equality check is sufficient and avoids
+ * false positives on genuinely distinct window-scoped bucket labels.
+ */
+export const isAntigravityGroupSelfBucket = (
+  group: AntigravityQuotaGroup,
+  bucket: AntigravityQuotaBucket
+): boolean => {
+  if (Array.isArray(group.buckets) && group.buckets.length === 1) {
+    return bucket.label === group.label;
+  }
+  return false;
+};
+
 const renderAntigravityItems = (
   quota: AntigravityQuotaState,
   t: TFunction,
@@ -1044,6 +1065,7 @@ const renderAntigravityItems = (
                   percent: Math.round(percent),
                 });
           const resetLabel = formatAntigravityResetLabel(bucket.resetTime, t, nowMs);
+          const isSelfBucket = isAntigravityGroupSelfBucket(group, bucket);
           const bucketLabel = translateAntigravityQuotaLabel(
             bucket.label,
             ANTIGRAVITY_BUCKET_LABEL_KEYS,
@@ -1057,7 +1079,13 @@ const renderAntigravityItems = (
             h(
               'div',
               { className: styleMap.quotaRowHeader },
-              h('span', { className: styleMap.quotaModel, title: bucketDescription }, bucketLabel),
+              isSelfBucket
+                ? null
+                : h(
+                    'span',
+                    { className: styleMap.quotaModel, title: bucketDescription },
+                    bucketLabel
+                  ),
               h(
                 'div',
                 { className: styleMap.quotaMeta },
