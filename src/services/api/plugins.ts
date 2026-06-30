@@ -1,5 +1,9 @@
 import { apiClient } from './client';
 import { isRecord } from '@/utils/helpers';
+import {
+  isManagementOAuthProviderKey,
+  normalizeManagementOAuthProviderKey,
+} from '@/utils/providerKeys';
 import type {
   PluginConfigField,
   PluginConfigObject,
@@ -10,8 +14,10 @@ import type {
   PluginMenu,
   PluginStoreEntry,
   PluginStoreInstallResult,
+  PluginStorePlatform,
   PluginStoreResponse,
   PluginStoreSource,
+  PluginStoreSourceError,
 } from '@/types';
 
 const asString = (value: unknown): string => {
@@ -20,6 +26,14 @@ const asString = (value: unknown): string => {
 };
 
 const asBoolean = (value: unknown): boolean => value === true;
+
+const normalizePluginOAuthProvider = (value: unknown): string | undefined => {
+  const provider = normalizeManagementOAuthProviderKey(asString(value));
+  return isManagementOAuthProviderKey(provider) ? provider : undefined;
+};
+
+const hasOwn = (source: Record<string, unknown>, key: string): boolean =>
+  Object.prototype.hasOwnProperty.call(source, key);
 
 const normalizeConfigField = (value: unknown): PluginConfigField | null => {
   if (!isRecord(value)) return null;
@@ -38,7 +52,7 @@ const normalizeConfigField = (value: unknown): PluginConfigField | null => {
 
 const normalizeConfigFields = (value: unknown): PluginConfigField[] =>
   Array.isArray(value)
-    ? value.map((item) => normalizeConfigField(item)).filter(Boolean) as PluginConfigField[]
+    ? (value.map((item) => normalizeConfigField(item)).filter(Boolean) as PluginConfigField[])
     : [];
 
 const normalizeMetadata = (value: unknown): PluginMetadata | null => {
@@ -78,7 +92,7 @@ const normalizeMenu = (value: unknown): PluginMenu | null => {
 
 const normalizeMenus = (value: unknown): PluginMenu[] =>
   Array.isArray(value)
-    ? value.map((item) => normalizeMenu(item)).filter(Boolean) as PluginMenu[]
+    ? (value.map((item) => normalizeMenu(item)).filter(Boolean) as PluginMenu[])
     : [];
 
 const normalizePluginEntry = (value: unknown): PluginListEntry | null => {
@@ -88,6 +102,12 @@ const normalizePluginEntry = (value: unknown): PluginListEntry | null => {
 
   const metadata = normalizeMetadata(value.metadata);
   const configFields = normalizeConfigFields(value.config_fields);
+  const supportsOAuth = asBoolean(value.supports_oauth);
+  const oauthProvider = normalizePluginOAuthProvider(value.oauth_provider);
+  const legacyOAuthProvider =
+    supportsOAuth && !hasOwn(value, 'oauth_provider')
+      ? normalizePluginOAuthProvider(id)
+      : undefined;
 
   return {
     id,
@@ -96,9 +116,10 @@ const normalizePluginEntry = (value: unknown): PluginListEntry | null => {
     registered: asBoolean(value.registered),
     enabled: value.enabled !== false,
     effectiveEnabled: asBoolean(value.effective_enabled),
-    supportsOAuth: asBoolean(value.supports_oauth),
+    supportsOAuth,
+    oauthProvider: oauthProvider ?? legacyOAuthProvider,
     logo: asString(value.logo || metadata?.logo).trim(),
-    configFields: configFields.length > 0 ? configFields : metadata?.configFields ?? [],
+    configFields: configFields.length > 0 ? configFields : (metadata?.configFields ?? []),
     menus: normalizeMenus(value.menus),
     metadata,
   };
@@ -107,7 +128,9 @@ const normalizePluginEntry = (value: unknown): PluginListEntry | null => {
 const normalizePluginList = (value: unknown): PluginListResponse => {
   const source = isRecord(value) ? value : {};
   const plugins = Array.isArray(source.plugins)
-    ? source.plugins.map((item) => normalizePluginEntry(item)).filter(Boolean) as PluginListEntry[]
+    ? (source.plugins
+        .map((item) => normalizePluginEntry(item))
+        .filter(Boolean) as PluginListEntry[])
     : [];
 
   return {
@@ -142,6 +165,16 @@ const normalizeStoreEntry = (value: unknown): PluginStoreEntry | null => {
   const tags = Array.isArray(value.tags)
     ? value.tags.map((item) => asString(item).trim()).filter(Boolean)
     : [];
+  const platforms = Array.isArray(value.platforms)
+    ? (value.platforms
+        .map((item): PluginStorePlatform | null => {
+          if (!isRecord(item)) return null;
+          const goos = asString(item.goos).trim();
+          const goarch = asString(item.goarch).trim();
+          return goos || goarch ? { goos, goarch } : null;
+        })
+        .filter(Boolean) as PluginStorePlatform[])
+    : [];
 
   return {
     storeId,
@@ -154,6 +187,10 @@ const normalizeStoreEntry = (value: unknown): PluginStoreEntry | null => {
     author: asString(value.author).trim(),
     version: asString(value.version).trim(),
     repository: asString(value.repository).trim(),
+    installType: asString(value.install_type).trim(),
+    authRequired: asBoolean(value.auth_required),
+    authConfigured: asBoolean(value.auth_configured),
+    platforms,
     logo: asString(value.logo).trim(),
     homepage: asString(value.homepage).trim(),
     license: asString(value.license).trim(),
@@ -181,19 +218,43 @@ const normalizeStoreSource = (value: unknown): PluginStoreSource | null => {
   };
 };
 
+const normalizeStoreSourceError = (value: unknown): PluginStoreSourceError | null => {
+  if (!isRecord(value)) return null;
+  const sourceId = asString(value.source_id).trim();
+  const sourceUrl = asString(value.source_url).trim();
+  const message = asString(value.message).trim();
+  if (!sourceId && !sourceUrl && !message) return null;
+  return {
+    sourceId,
+    sourceName: asString(value.source_name).trim(),
+    sourceUrl,
+    message,
+  };
+};
+
 const normalizeStoreList = (value: unknown): PluginStoreResponse => {
   const source = isRecord(value) ? value : {};
   const plugins = Array.isArray(source.plugins)
-    ? source.plugins.map((item) => normalizeStoreEntry(item)).filter(Boolean) as PluginStoreEntry[]
+    ? (source.plugins
+        .map((item) => normalizeStoreEntry(item))
+        .filter(Boolean) as PluginStoreEntry[])
     : [];
   const sources = Array.isArray(source.sources)
-    ? source.sources.map((item) => normalizeStoreSource(item)).filter(Boolean) as PluginStoreSource[]
+    ? (source.sources
+        .map((item) => normalizeStoreSource(item))
+        .filter(Boolean) as PluginStoreSource[])
+    : [];
+  const sourceErrors = Array.isArray(source.source_errors)
+    ? (source.source_errors
+        .map((item) => normalizeStoreSourceError(item))
+        .filter(Boolean) as PluginStoreSourceError[])
     : [];
 
   return {
     pluginsEnabled: asBoolean(source.plugins_enabled),
     pluginsDir: asString(source.plugins_dir).trim() || 'plugins',
     sources,
+    sourceErrors,
     plugins,
   };
 };
@@ -207,11 +268,17 @@ const normalizeInstallResult = (value: unknown): PluginStoreInstallResult => {
     sourceUrl: asString(source.source_url).trim(),
     id: asString(source.id).trim(),
     version: asString(source.version).trim(),
+    installType: asString(source.install_type).trim(),
     path: asString(source.path).trim(),
     pluginsEnabled: asBoolean(source.plugins_enabled),
     restartRequired: asBoolean(source.restart_required),
   };
 };
+
+export interface PluginStoreInstallOptions {
+  sourceId?: string;
+  version?: string;
+}
 
 export const pluginsApi = {
   async list(): Promise<PluginListResponse> {
@@ -245,10 +312,18 @@ export const pluginStoreApi = {
     return normalizeStoreList(data);
   },
 
-  async install(id: string, sourceId?: string): Promise<PluginStoreInstallResult> {
+  async install(
+    id: string,
+    options: PluginStoreInstallOptions = {}
+  ): Promise<PluginStoreInstallResult> {
     const path = `/plugin-store/${encodeURIComponent(id)}/install`;
-    const query = sourceId ? `?${new URLSearchParams({ source: sourceId }).toString()}` : '';
-    const data = await apiClient.post(`${path}${query}`);
+    const params = new URLSearchParams();
+    const sourceId = options.sourceId?.trim();
+    const version = options.version?.trim();
+    if (sourceId) params.set('source', sourceId);
+    if (version) params.set('version', version);
+    const query = params.size > 0 ? `?${params.toString()}` : '';
+    const data = await apiClient.post(`${path}${query}`, version ? { version } : undefined);
     return normalizeInstallResult(data);
   },
 };

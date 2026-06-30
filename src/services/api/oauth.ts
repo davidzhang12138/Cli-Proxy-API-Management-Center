@@ -3,8 +3,14 @@
  */
 
 import { apiClient } from './client';
+import {
+  isManagementOAuthProviderKey,
+  normalizeManagementOAuthProviderKey,
+} from '@/utils/providerKeys';
 
-export type OAuthProvider = 'codex' | 'anthropic' | 'antigravity' | 'kimi' | 'xai' | 'freebuff';
+export type BuiltInOAuthProvider = 'codex' | 'anthropic' | 'antigravity' | 'kimi' | 'xai';
+
+export type OAuthProvider = BuiltInOAuthProvider | 'freebuff';
 
 export interface OAuthStartResponse {
   url: string;
@@ -50,19 +56,28 @@ export interface FreebuffStatusResponse {
   error?: string;
 }
 
-const WEBUI_SUPPORTED: OAuthProvider[] = ['codex', 'anthropic', 'antigravity', 'xai'];
+const WEBUI_SUPPORTED = new Set<string>(['codex', 'anthropic', 'antigravity', 'xai']);
+
+const normalizeProviderForManagementPath = (provider: string): string => {
+  const key = normalizeManagementOAuthProviderKey(provider);
+  if (!isManagementOAuthProviderKey(key)) {
+    throw new Error('Invalid OAuth provider');
+  }
+  return key;
+};
 
 export const oauthApi = {
   startAuth: (provider: OAuthProvider, options?: OAuthStartOptions) => {
+    const providerKey = normalizeProviderForManagementPath(provider);
     const params: Record<string, string | boolean> = {};
-    if (WEBUI_SUPPORTED.includes(provider)) {
+    if (WEBUI_SUPPORTED.has(providerKey)) {
       params.is_webui = true;
     }
     const proxyUrl = options?.proxyUrl?.trim();
     if (proxyUrl) {
       params['proxy-url'] = proxyUrl;
     }
-    return apiClient.get<OAuthStartResponse>(`/${provider}-auth-url`, {
+    return apiClient.get<OAuthStartResponse>(`/${providerKey}-auth-url`, {
       params: Object.keys(params).length ? params : undefined,
     });
   },
@@ -72,9 +87,10 @@ export const oauthApi = {
       params: { state },
     }),
 
-  submitCallback: (provider: OAuthProvider, redirectUrl: string) => {
+  submitCallback: (provider: string, redirectUrl: string) => {
+    const providerKey = normalizeProviderForManagementPath(provider);
     return apiClient.post<OAuthCallbackResponse>('/oauth-callback', {
-      provider,
+      provider: providerKey,
       redirect_url: redirectUrl,
     });
   },

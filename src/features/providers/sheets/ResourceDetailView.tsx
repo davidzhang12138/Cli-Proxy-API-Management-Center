@@ -1,13 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { Collapsible } from '@/components/ui/Collapsible';
 import { IconCheck, IconX } from '@/components/ui/icons';
-import {
-  getProviderTotalStats,
-  type ProviderRecentUsageMap,
-} from '@/components/providers/utils';
+import { getProviderTotalStats, type ProviderRecentUsageMap } from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
 import { maskApiKey } from '@/utils/format';
-import type { ProviderResource } from '../types';
+import { getApiKeyFunProtocolUrls, resolveApiKeyFunBaseUrl } from '../sponsor';
+import type { ProviderResource, SponsorProviderRaw } from '../types';
 import styles from './forms/sharedForm.module.scss';
 
 interface ResourceDetailViewProps {
@@ -17,6 +15,78 @@ interface ResourceDetailViewProps {
 
 export function ResourceDetailView({ resource, usageByProvider }: ResourceDetailViewProps) {
   const { t } = useTranslation();
+
+  if (resource.brand === 'apikeyFun') {
+    const raw = resource.raw as SponsorProviderRaw;
+    const openaiKeyCount = raw.openai.reduce(
+      (count, item) => count + (item.config.apiKeyEntries?.length ?? 0),
+      0
+    );
+    const codexKeyCount = raw.codex.length;
+    const firstKey =
+      raw.openai
+        .flatMap((item) => item.config.apiKeyEntries ?? [])
+        .find((entry) => entry.apiKey?.trim())?.apiKey ??
+      raw.codex.find((item) => item.config.apiKey?.trim())?.config.apiKey ??
+      raw.claude.find((item) => item.config.apiKey?.trim())?.config.apiKey;
+    const baseUrl = resolveApiKeyFunBaseUrl(
+      raw.openai[0]?.config.baseUrl ?? raw.codex[0]?.config.baseUrl ?? raw.claude[0]?.config.baseUrl
+    );
+    const protocolUrls = getApiKeyFunProtocolUrls(baseUrl);
+
+    return (
+      <div>
+        <div className={styles.detailHeader}>
+          <div className={styles.sectionTitle}>{resource.name ?? resource.identifier}</div>
+          <p className={styles.sectionDesc}>{t('providersPage.sponsor.detailHint')}</p>
+        </div>
+
+        <div className={styles.sponsorProtocolGrid}>
+          <div className={styles.sponsorProtocolCard}>
+            <span className={styles.sponsorProtocolName}>
+              {t('providersPage.sponsor.protocols.anthropic')}
+            </span>
+            <span className={styles.sponsorProtocolUrl}>{protocolUrls.anthropic}</span>
+          </div>
+          <div className={styles.sponsorProtocolCard}>
+            <span className={styles.sponsorProtocolName}>
+              {t('providersPage.sponsor.protocols.openai')}
+            </span>
+            <span className={styles.sponsorProtocolUrl}>{protocolUrls.openai}</span>
+          </div>
+          <div className={styles.sponsorProtocolCard}>
+            <span className={styles.sponsorProtocolName}>
+              {t('providersPage.sponsor.protocols.codexResponses')}
+            </span>
+            <span className={styles.sponsorProtocolUrl}>{protocolUrls.codex}</span>
+          </div>
+        </div>
+
+        <dl className={styles.dl} style={{ marginTop: 16 }}>
+          <div>
+            <dt className={styles.dt}>{t('providersPage.detail.fields.identifier')}</dt>
+            <dd className={styles.dd}>{firstKey ? maskApiKey(firstKey) : resource.identifier}</dd>
+          </div>
+          <div>
+            <dt className={styles.dt}>{t('providersPage.detail.fields.prefix')}</dt>
+            <dd className={styles.dd}>{resource.prefix ?? t('providersPage.status.none')}</dd>
+          </div>
+          <div>
+            <dt className={styles.dt}>{t('providersPage.sponsor.openaiEntries')}</dt>
+            <dd className={styles.dd}>{openaiKeyCount}</dd>
+          </div>
+          <div>
+            <dt className={styles.dt}>{t('providersPage.sponsor.codexEntries')}</dt>
+            <dd className={styles.dd}>{codexKeyCount}</dd>
+          </div>
+          <div>
+            <dt className={styles.dt}>{t('providersPage.sponsor.anthropicEntries')}</dt>
+            <dd className={styles.dd}>{raw.claude.length}</dd>
+          </div>
+        </dl>
+      </div>
+    );
+  }
 
   const primary: Array<[string, string]> = [
     ['identifier', resource.identifier],
@@ -34,17 +104,13 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
   ];
 
   const openaiConfig =
-    resource.brand === 'openaiCompatibility'
-      ? (resource.raw as OpenAIProviderConfig)
-      : null;
+    resource.brand === 'openaiCompatibility' ? (resource.raw as OpenAIProviderConfig) : null;
   const apiKeyEntries = openaiConfig?.apiKeyEntries ?? [];
 
   return (
     <div>
       <div className={styles.detailHeader}>
-        <div className={styles.sectionTitle}>
-          {resource.name ?? resource.identifier}
-        </div>
+        <div className={styles.sectionTitle}>{resource.name ?? resource.identifier}</div>
       </div>
 
       <dl className={styles.dl}>
@@ -72,24 +138,17 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
                   )
                 : { success: 0, failure: 0 };
               return (
-                <div
-                  key={`${entry.apiKey}-${entryIndex}`}
-                  className={styles.apiKeyEntryCard}
-                >
+                <div key={`${entry.apiKey}-${entryIndex}`} className={styles.apiKeyEntryCard}>
                   <span className={styles.apiKeyEntryIndex}>{entryIndex + 1}</span>
                   <span className={styles.apiKeyEntryKey}>{maskApiKey(entry.apiKey)}</span>
                   {entry.proxyUrl ? (
                     <span className={styles.apiKeyEntryProxy}>{entry.proxyUrl}</span>
                   ) : null}
                   <div className={styles.apiKeyEntryStats}>
-                    <span
-                      className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatSuccess}`}
-                    >
+                    <span className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatSuccess}`}>
                       <IconCheck size={12} /> {entryStats.success}
                     </span>
-                    <span
-                      className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatFailure}`}
-                    >
+                    <span className={`${styles.apiKeyEntryStat} ${styles.apiKeyEntryStatFailure}`}>
                       <IconX size={12} /> {entryStats.failure}
                     </span>
                   </div>

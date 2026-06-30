@@ -1469,31 +1469,19 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
             const data = await resetQuota(file, t);
             setQuota((prev) => ({
               ...prev,
-              [file.name]: config.buildSuccessState(data)
+              [file.name]: config.buildSuccessState(data),
             }));
             showNotification(t('codex_quota.reset_success', { name: file.name }), 'success');
           } catch (err: unknown) {
             const message = err instanceof Error ? err.message : t('common.unknown_error');
-            showNotification(
-              t('codex_quota.reset_failed', { name: file.name, message }),
-              'error'
-            );
+            showNotification(t('codex_quota.reset_failed', { name: file.name, message }), 'error');
           } finally {
             setResettingQuotaName((current) => (current === file.name ? null : current));
           }
-        }
+        },
       });
     },
-    [
-      config,
-      disabled,
-      quota,
-      resettingQuotaName,
-      setQuota,
-      showConfirmation,
-      showNotification,
-      t
-    ]
+    [config, disabled, quota, resettingQuotaName, setQuota, showConfirmation, showNotification, t]
   );
 
   const titleNode = (

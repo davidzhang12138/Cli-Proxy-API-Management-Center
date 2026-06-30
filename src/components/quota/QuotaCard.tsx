@@ -33,10 +33,9 @@ export interface QuotaProgressBarProps {
 export function QuotaProgressBar({
   percent,
   highThreshold,
-  mediumThreshold
+  mediumThreshold,
 }: QuotaProgressBarProps) {
-  const clamp = (value: number, min: number, max: number) =>
-    Math.min(max, Math.max(min, value));
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
   const normalized = percent === null ? null : clamp(percent, 0, 100);
   const fillClass =
     normalized === null
@@ -207,7 +206,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
   selected = false,
   onSelectionChange,
   resetQuotaAction,
-  renderQuotaItems
+  renderQuotaItems,
 }: QuotaCardProps<TState>) {
   const { t, i18n } = useTranslation();
   const [modelsModalOpen, setModelsModalOpen] = useState(false);
@@ -284,7 +283,9 @@ export function QuotaCard<TState extends QuotaStatusState>({
     : effectiveUsedTokens === 0
       ? t('quota_management.usage_no_data')
       : t('system_info.not_loaded');
-  const idleMessageKey = cardIdleMessageKey ?? `${i18nPrefix}.idle`;
+  const idleMessageKey = onRefresh
+    ? `${i18nPrefix}.idle`
+    : (cardIdleMessageKey ?? `${i18nPrefix}.idle`);
   const usageBreakdownItems = [
     { key: 'input', label: t('usage_stats.input_tokens'), value: effectiveInputTokens },
     { key: 'output', label: t('usage_stats.output_tokens'), value: effectiveOutputTokens },
@@ -426,7 +427,7 @@ export function QuotaCard<TState extends QuotaStatusState>({
         ) : quotaStatus === 'error' ? (
           <div className={styles.quotaError}>
             {t(`${i18nPrefix}.load_failed`, {
-              message: quotaErrorMessage
+              message: quotaErrorMessage,
             })}
           </div>
         ) : quota ? (
