@@ -2382,7 +2382,10 @@ const buildXaiQuotaStateFromUsageQuota = (
     billing: {
       monthlyLimitCents: usage.normalizedLimit,
       usedCents: usage.normalizedUsage,
+      includedUsedCents: usage.normalizedUsage,
       onDemandCapCents: null,
+      onDemandUsedCents: null,
+      onDemandUsedPercent: null,
       billingPeriodEnd: snapshot.nextReset,
       usedPercent: usage.usedPercent,
     },

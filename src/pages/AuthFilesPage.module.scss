@@ -244,10 +244,8 @@
 
 .filterControls {
   display: grid;
-  grid-template-columns: minmax(340px, 1fr) minmax(340px, 420px);
-  grid-template-areas:
-    'search options'
-    'status options';
+  grid-template-columns: minmax(200px, 320px) 150px 150px 1fr;
+  grid-template-areas: 'search sort status options';
   gap: 12px;
   align-items: stretch;
 
@@ -265,6 +263,7 @@
     grid-template-columns: 1fr;
     grid-template-areas:
       'search'
+      'sort'
       'status'
       'options';
   }
@@ -273,6 +272,7 @@
     grid-template-columns: 1fr;
     grid-template-areas:
       'search'
+      'sort'
       'status'
       'options';
   }
@@ -305,11 +305,19 @@
 }
 
 .filterItemSort {
-  min-width: 130px;
-  width: 160px;
+  grid-area: sort;
+  min-width: 0;
+  width: 100%;
 }
 
 .filterToggleItem {
+  grid-area: options;
+  min-width: 0;
+  width: 100%;
+  justify-self: start;
+}
+
+.filterStatusItem {
   grid-area: status;
   min-width: 0;
   width: 100%;

@@ -23,7 +23,6 @@ import { Select } from '@/components/ui/Select';
 import { IconFilterAll, IconSearch } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
-import { AuthFilesStatusFilterCard } from '@/features/authFiles/components/AuthFilesStatusFilterCard';
 import { copyToClipboard } from '@/utils/clipboard';
 import {
   QUOTA_PROVIDER_TYPES,
@@ -882,18 +881,21 @@ export function AuthFilesPage() {
                     fullWidth
                   />
                 </div>
-                <div className={`${styles.filterItem} ${styles.filterToggleItem}`}>
-                  <label>{t('auth_files.display_options_label')}</label>
-                  <AuthFilesStatusFilterCard
-                    label={t('auth_files.problem_filter_label')}
-                    minLabel={statusFilterOptions[0]?.label}
-                    maxLabel={statusFilterOptions[statusFilterOptions.length - 1]?.label}
+                <div className={`${styles.filterItem} ${styles.filterStatusItem}`}>
+                  <label>{t('auth_files.problem_filter_label')}</label>
+                  <Select
+                    className={styles.sortSelect}
                     value={statusFilterMode}
                     options={statusFilterOptions}
                     onChange={(next) =>
                       handleStatusFilterModeChange(next as AuthFilesStatusFilterMode)
                     }
+                    ariaLabel={t('auth_files.problem_filter_label')}
+                    fullWidth
                   />
+                </div>
+                <div className={`${styles.filterItem} ${styles.filterToggleItem}`}>
+                  <label>{t('auth_files.display_options_label')}</label>
                   <div className={styles.filterToggleCard}>
                     <ToggleSwitch
                       checked={compactMode}

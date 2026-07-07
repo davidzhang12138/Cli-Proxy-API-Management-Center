@@ -43,9 +43,6 @@ interface ProviderResourceTableProps {
 
 const columnWidths = ['180px', '220px', '72px', '138px', '174px', '176px'];
 
-const isSponsorResource = (resource: ProviderResource): boolean =>
-  resource.brand === 'apikeyFun' || resource.brand === 'code0';
-
 const getUsageProvider = (resource: ProviderResource): string =>
   resource.brand === 'claudeApi' ? 'claude' : resource.brand;
 
@@ -104,19 +101,8 @@ export function ProviderResourceTable({
     </span>
   );
 
-  const renderProtocolSummary = (r: ProviderResource) =>
-    (r.flags.protocols ?? [])
-      .map((protocol) => t(`providersPage.sponsor.protocols.${protocol}`))
-      .join(' / ');
-
   const renderModelsSummary = (r: ProviderResource) => {
     const items: ReactNode[] = [];
-    if (isSponsorResource(r)) {
-      (r.flags.protocols ?? []).forEach((protocol) => {
-        items.push(renderFlagTag(protocol, t(`providersPage.sponsor.protocols.${protocol}`)));
-      });
-      return <div className={styles.metricsCell}>{items}</div>;
-    }
     if (r.brand === 'openaiCompatibility') {
       items.push(
         renderMetric('models', t('providersPage.table.metrics.models'), r.modelCount),
@@ -131,7 +117,7 @@ export function ProviderResourceTable({
       if (r.brand === 'codex' && r.flags.websockets) {
         items.push(renderFlagTag('ws', t('providersPage.table.websocketsTag')));
       }
-      if (r.brand === 'claude' && r.flags.cloakEnabled) {
+      if ((r.brand === 'claude' || r.brand === 'claudeApi') && r.flags.cloakEnabled) {
         items.push(renderFlagTag('cloak', t('providersPage.table.cloakTag')));
       }
     }
@@ -156,16 +142,6 @@ export function ProviderResourceTable({
   };
 
   const renderPrimary = (r: ProviderResource) => {
-    if (isSponsorResource(r)) {
-      return (
-        <div className={styles.primaryCell}>
-          <span className={styles.primaryName}>{r.name ?? r.identifier}</span>
-          <span className={styles.primarySub}>
-            {r.apiKeyPreview ?? t('providersPage.status.notConfigured')}
-          </span>
-        </div>
-      );
-    }
     if (r.brand === 'openaiCompatibility') {
       const extra = r.apiKeyEntryCount > 1 ? ` · +${r.apiKeyEntryCount - 1}` : '';
       return (
@@ -184,9 +160,6 @@ export function ProviderResourceTable({
   };
 
   const renderBaseUrl = (r: ProviderResource) => {
-    if (isSponsorResource(r)) {
-      return <span className={styles.baseUrl}>{renderProtocolSummary(r)}</span>;
-    }
     if (r.brand === 'claude' && !r.baseUrl) {
       return (
         <span className={styles.baseUrl}>
@@ -233,7 +206,7 @@ export function ProviderResourceTable({
               <TableCell>
                 <div className={styles.statusCell}>
                   {renderStatus(resource)}
-                  {usageByProvider && !isSponsorResource(resource) ? (
+                  {usageByProvider ? (
                     <>
                       {(() => {
                         const stats = resolveTotalStats(resource, usageByProvider);
