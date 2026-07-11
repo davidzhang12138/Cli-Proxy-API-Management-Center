@@ -29,6 +29,7 @@ import type {
   XaiBillingConfig,
   XaiBillingSummary,
   XaiQuotaState,
+  XaiRateLimitQuota,
 } from '@/types';
 import {
   antigravitySubscriptionApi,
@@ -2360,35 +2361,52 @@ const buildXaiBillingSummary = (
 
 const buildXaiQuotaStateFromUsageQuota = (
   file: AuthFileItem
-): Pick<XaiQuotaState, 'billing'> | null => {
+): Pick<XaiQuotaState, 'billing' | 'resources'> | null => {
   const snapshot = parseUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota);
   if (!snapshot || !snapshot.known || snapshot.error) return null;
 
-  const usage = computeSnapshotUsage(
-    snapshot.totalLimit,
-    snapshot.currentUsage,
-    snapshot.remaining,
-    snapshot.exhausted
-  );
-  if (
-    usage.normalizedLimit === null &&
-    usage.normalizedUsage === null &&
-    usage.normalizedRemaining === null
-  ) {
-    return null;
-  }
+  const sourceResources =
+    snapshot.resources.length > 0
+      ? snapshot.resources
+      : [
+          {
+            resourceType: snapshot.resourceType,
+            totalLimit: snapshot.totalLimit,
+            currentUsage: snapshot.currentUsage,
+            remaining: snapshot.remaining,
+            resetAt: snapshot.nextReset,
+            exhausted: snapshot.exhausted,
+          },
+        ];
+  const resources: XaiRateLimitQuota[] = sourceResources
+    .filter(
+      (resource) =>
+        resource.totalLimit !== null ||
+        resource.currentUsage !== null ||
+        resource.remaining !== null
+    )
+    .map((resource) => ({
+      resourceType: resource.resourceType || 'quota',
+      totalLimit: resource.totalLimit,
+      currentUsage: resource.currentUsage,
+      remaining: resource.remaining,
+      resetAt: resource.resetAt || snapshot.nextReset,
+      exhausted: resource.exhausted,
+    }))
+    .sort((a, b) => {
+      const order = (resourceType: string) =>
+        resourceType.toLowerCase() === 'requests'
+          ? 0
+          : resourceType.toLowerCase() === 'tokens'
+            ? 1
+            : 2;
+      return order(a.resourceType) - order(b.resourceType);
+    });
+  if (resources.length === 0) return null;
 
   return {
-    billing: {
-      monthlyLimitCents: usage.normalizedLimit,
-      usedCents: usage.normalizedUsage,
-      includedUsedCents: usage.normalizedUsage,
-      onDemandCapCents: null,
-      onDemandUsedCents: null,
-      onDemandUsedPercent: null,
-      billingPeriodEnd: snapshot.nextReset,
-      usedPercent: usage.usedPercent,
-    },
+    billing: null,
+    resources,
   };
 };
 
@@ -2425,6 +2443,16 @@ const formatUsdFromCents = (cents: number | null): string => {
     style: 'currency',
     currency: 'USD',
   }).format(cents / 100);
+};
+
+const formatXaiRateLimitAmount = (remaining: number | null, totalLimit: number | null): string => {
+  const formatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+  if (remaining !== null && totalLimit !== null) {
+    return `${formatter.format(remaining)} / ${formatter.format(totalLimit)}`;
+  }
+  if (remaining !== null) return formatter.format(remaining);
+  if (totalLimit !== null) return formatter.format(totalLimit);
+  return '--';
 };
 
 const formatXaiRemainingAmount = (billing: XaiBillingSummary): string => {
@@ -2472,6 +2500,58 @@ const renderXaiItems = (
   const { styles: styleMap, QuotaProgressBar } = helpers;
   const { createElement: h, Fragment } = React;
   const billing = quota.billing;
+
+  if (quota.resources.length > 0) {
+    return h(
+      Fragment,
+      null,
+      ...quota.resources.map((resource) => {
+        const usage = computeSnapshotUsage(
+          resource.totalLimit,
+          resource.currentUsage,
+          resource.remaining,
+          resource.exhausted
+        );
+        const remainingPercent =
+          usage.remainingFraction === null ? null : usage.remainingFraction * 100;
+        const normalizedType = resource.resourceType.trim().toLowerCase();
+        const label =
+          normalizedType === 'requests' || normalizedType === 'tokens'
+            ? t(`xai_quota.resource_${normalizedType}`)
+            : snapshotResourceLabel(resource.resourceType, t('xai_quota.resource_quota'));
+
+        return h(
+          'div',
+          { key: `rate-limit-${normalizedType}`, className: styleMap.quotaRow },
+          h(
+            'div',
+            { className: styleMap.quotaRowHeader },
+            h('span', { className: styleMap.quotaModel }, label),
+            h(
+              'div',
+              { className: styleMap.quotaMeta },
+              h(
+                'span',
+                { className: styleMap.quotaPercent },
+                remainingPercent === null ? '--' : `${Math.round(remainingPercent)}%`
+              ),
+              h(
+                'span',
+                { className: styleMap.quotaAmount },
+                formatXaiRateLimitAmount(usage.normalizedRemaining, usage.normalizedLimit)
+              ),
+              h('span', { className: styleMap.quotaReset }, formatQuotaResetTime(resource.resetAt))
+            )
+          ),
+          h(QuotaProgressBar, {
+            percent: remainingPercent,
+            highThreshold: QUOTA_PROGRESS_HIGH_THRESHOLD,
+            mediumThreshold: QUOTA_PROGRESS_MEDIUM_THRESHOLD,
+          })
+        );
+      })
+    );
+  }
 
   if (!billing) {
     return h('div', { className: styleMap.quotaMessage }, t('xai_quota.empty_data'));
@@ -2597,18 +2677,19 @@ export const XAI_CONFIG: QuotaConfig<XaiQuotaState, XaiBillingSummary> = {
   fetchQuota: fetchXaiQuota,
   storeSelector: (state) => state.xaiQuota,
   storeSetter: 'setXaiQuota',
-  buildLoadingState: () => ({ status: 'loading', billing: null }),
-  buildSuccessState: (billing) => ({ status: 'success', billing }),
+  buildLoadingState: () => ({ status: 'loading', billing: null, resources: [] }),
+  buildSuccessState: (billing) => ({ status: 'success', billing, resources: [] }),
   buildErrorState: (message, status) => ({
     status: 'error',
     billing: null,
+    resources: [],
     error: message,
     errorStatus: status,
   }),
   buildSnapshotState: (file) => {
     if (!hasKnownUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota)) return null;
     const data = buildXaiQuotaStateFromUsageQuota(file);
-    return data ? { status: 'success', billing: data.billing } : null;
+    return data ? { status: 'success', billing: data.billing, resources: data.resources } : null;
   },
   cardClassName: styles.xaiCard,
   controlsClassName: styles.xaiControls,

@@ -808,7 +808,10 @@
     "plan_supergrok_heavy": "SuperGrok Heavy",
     "pay_as_you_go_label": "按量付費",
     "pay_as_you_go_enabled": "已啟用，封頂 {{cap}}",
-    "pay_as_you_go_disabled": "未啟用"
+    "pay_as_you_go_disabled": "未啟用",
+    "resource_requests": "請求次數",
+    "resource_tokens": "Token 數量",
+    "resource_quota": "配額"
   },
   "vertex_import": {
     "title": "Vertex JSON 登入",
@@ -978,7 +981,7 @@
     "kimi_oauth_polling_error": "檢查驗證狀態失敗:",
     "xai_oauth_title": "xAI OAuth",
     "xai_oauth_button": "開始 xAI 登入",
-    "xai_oauth_hint": "透過 OAuth 流程登入 xAI Grok 服務，自動取得並儲存驗證檔案。",
+    "xai_oauth_hint": "開啟 xAI 裝置授權連結並確認存取，無需回填回調網址或授權碼。",
     "xai_oauth_url_label": "授權連結:",
     "xai_open_link": "開啟連結",
     "xai_copy_link": "複製連結",
@@ -987,6 +990,7 @@
     "xai_oauth_status_error": "驗證失敗:",
     "xai_oauth_start_error": "啟動 xAI OAuth 失敗:",
     "xai_oauth_polling_error": "檢查驗證狀態失敗:",
+    "xai_device_code_label": "裝置碼:",
     "plugin_oauth_title": "{{name}} OAuth",
     "plugin_oauth_button": "開始 {{name}} 登入",
     "plugin_oauth_hint": "透過插件提供的 OAuth 流程登入 {{name}}，自動取得並儲存驗證檔案。",

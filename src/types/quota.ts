@@ -456,9 +456,19 @@ export interface XaiBillingSummary {
   usedPercent: number | null;
 }
 
+export interface XaiRateLimitQuota {
+  resourceType: string;
+  totalLimit: number | null;
+  currentUsage: number | null;
+  remaining: number | null;
+  resetAt?: string;
+  exhausted: boolean;
+}
+
 export interface XaiQuotaState {
   status: 'idle' | 'loading' | 'success' | 'error';
   billing: XaiBillingSummary | null;
+  resources: XaiRateLimitQuota[];
   error?: string;
   errorStatus?: number;
 }

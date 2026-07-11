@@ -829,7 +829,10 @@
     "plan_supergrok_heavy": "SuperGrok Heavy",
     "pay_as_you_go_label": "按量付费",
     "pay_as_you_go_enabled": "已启用，封顶 {{cap}}",
-    "pay_as_you_go_disabled": "未启用"
+    "pay_as_you_go_disabled": "未启用",
+    "resource_requests": "请求次数",
+    "resource_tokens": "Token 数量",
+    "resource_quota": "额度"
   },
   "vertex_import": {
     "title": "Vertex JSON 登录",
@@ -999,7 +1002,7 @@
     "kimi_oauth_polling_error": "检查认证状态失败:",
     "xai_oauth_title": "xAI OAuth",
     "xai_oauth_button": "开始 xAI 登录",
-    "xai_oauth_hint": "通过 OAuth 流程登录 xAI Grok 服务，自动获取并保存认证文件。",
+    "xai_oauth_hint": "打开 xAI 设备授权链接并确认访问，无需回填回调地址或授权码。",
     "xai_oauth_url_label": "授权链接:",
     "xai_open_link": "打开链接",
     "xai_copy_link": "复制链接",
@@ -1008,6 +1011,7 @@
     "xai_oauth_status_error": "认证失败:",
     "xai_oauth_start_error": "启动 xAI OAuth 失败:",
     "xai_oauth_polling_error": "检查认证状态失败:",
+    "xai_device_code_label": "设备码:",
     "plugin_oauth_title": "{{name}} OAuth",
     "plugin_oauth_button": "开始 {{name}} 登录",
     "plugin_oauth_hint": "通过插件提供的 OAuth 流程登录 {{name}}，自动获取并保存认证文件。",

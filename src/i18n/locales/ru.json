@@ -816,7 +816,10 @@
     "plan_supergrok_heavy": "SuperGrok Heavy",
     "pay_as_you_go_label": "Оплата по факту",
     "pay_as_you_go_enabled": "Включено, лимит {{cap}}",
-    "pay_as_you_go_disabled": "Отключено"
+    "pay_as_you_go_disabled": "Отключено",
+    "resource_requests": "Запросы",
+    "resource_tokens": "Токены",
+    "resource_quota": "Квота"
   },
   "vertex_import": {
     "title": "Вход с Vertex JSON",
@@ -986,7 +989,7 @@
     "kimi_oauth_polling_error": "Не удалось проверить статус аутентификации:",
     "xai_oauth_title": "xAI OAuth",
     "xai_oauth_button": "Начать вход xAI",
-    "xai_oauth_hint": "Выполните вход в xAI Grok через OAuth и автоматически получите/сохраните файлы авторизации.",
+    "xai_oauth_hint": "Откройте ссылку устройства xAI и подтвердите доступ. Вставлять callback-код не требуется.",
     "xai_oauth_url_label": "URL авторизации:",
     "xai_open_link": "Открыть ссылку",
     "xai_copy_link": "Скопировать ссылку",
@@ -995,6 +998,7 @@
     "xai_oauth_status_error": "Ошибка аутентификации:",
     "xai_oauth_start_error": "Не удалось запустить xAI OAuth:",
     "xai_oauth_polling_error": "Не удалось проверить статус аутентификации:",
+    "xai_device_code_label": "Код устройства:",
     "plugin_oauth_title": "{{name}} OAuth",
     "plugin_oauth_button": "Начать вход {{name}}",
     "plugin_oauth_hint": "Выполните вход в {{name}} через OAuth-поток плагина и автоматически получите/сохраните файлы авторизации.",

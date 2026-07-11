@@ -829,7 +829,10 @@
     "plan_supergrok_heavy": "SuperGrok Heavy",
     "pay_as_you_go_label": "Pay as you go",
     "pay_as_you_go_enabled": "Enabled, cap {{cap}}",
-    "pay_as_you_go_disabled": "Disabled"
+    "pay_as_you_go_disabled": "Disabled",
+    "resource_requests": "Requests",
+    "resource_tokens": "Tokens",
+    "resource_quota": "Quota"
   },
   "vertex_import": {
     "title": "Vertex JSON Login",
@@ -999,7 +1002,7 @@
     "kimi_oauth_polling_error": "Failed to check authentication status:",
     "xai_oauth_title": "xAI OAuth",
     "xai_oauth_button": "Start xAI Login",
-    "xai_oauth_hint": "Login to xAI Grok through OAuth flow, automatically obtain and save authentication files.",
+    "xai_oauth_hint": "Open the xAI device link and approve access. No callback code needs to be pasted.",
     "xai_oauth_url_label": "Authorization URL:",
     "xai_open_link": "Open Link",
     "xai_copy_link": "Copy Link",
@@ -1008,6 +1011,7 @@
     "xai_oauth_status_error": "Authentication failed:",
     "xai_oauth_start_error": "Failed to start xAI OAuth:",
     "xai_oauth_polling_error": "Failed to check authentication status:",
+    "xai_device_code_label": "Device code:",
     "plugin_oauth_title": "{{name}} OAuth",
     "plugin_oauth_button": "Start {{name}} Login",
     "plugin_oauth_hint": "Log in to {{name}} through the plugin OAuth flow, automatically obtain and save authentication files.",

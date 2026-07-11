@@ -15,6 +15,9 @@ export type OAuthProvider = BuiltInOAuthProvider | 'freebuff';
 export interface OAuthStartResponse {
   url: string;
   state?: string;
+  method?: 'device_code';
+  user_code?: string;
+  verification_uri?: string;
 }
 
 export interface OAuthCallbackResponse {
@@ -72,6 +75,9 @@ export const oauthApi = {
     const params: Record<string, string | boolean> = {};
     if (WEBUI_SUPPORTED.has(providerKey)) {
       params.is_webui = true;
+    }
+    if (providerKey === 'xai') {
+      params.device = true;
     }
     const proxyUrl = options?.proxyUrl?.trim();
     if (proxyUrl) {
