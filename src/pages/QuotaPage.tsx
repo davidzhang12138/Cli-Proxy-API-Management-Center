@@ -2,6 +2,8 @@
  * Quota management page.
  */
 
+/* eslint-disable react-hooks/preserve-manual-memoization */
+
 import {
   startTransition,
   useCallback,

@@ -20,6 +20,7 @@ type TimedQuotaState = { status?: string; _cachedAt?: number; _cacheExpiresAt?: 
 const QUOTA_CACHE_FALLBACK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface QuotaStoreState {
+  cacheGeneration: number;
   antigravityQuota: Record<string, AntigravityQuotaState>;
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
@@ -38,15 +39,10 @@ interface QuotaStoreState {
 
 type PersistedQuotaStoreState = Pick<
   QuotaStoreState,
-  | 'antigravityQuota'
-  | 'claudeQuota'
-  | 'codexQuota'
-  | 'kiroQuota'
-  | 'kimiQuota'
-  | 'xaiQuota'
+  'antigravityQuota' | 'claudeQuota' | 'codexQuota' | 'kiroQuota' | 'kimiQuota' | 'xaiQuota'
 >;
 
-const resolveUpdater = <T,>(updater: QuotaUpdater<T>, prev: T): T => {
+const resolveUpdater = <T>(updater: QuotaUpdater<T>, prev: T): T => {
   if (typeof updater === 'function') {
     return (updater as (value: T) => T)(prev);
   }
@@ -142,6 +138,7 @@ const sanitizePersistedQuotaState = (
 export const useQuotaStore = create<QuotaStoreState>()(
   persist(
     (set) => ({
+      cacheGeneration: 0,
       antigravityQuota: {},
       claudeQuota: {},
       codexQuota: {},
@@ -176,14 +173,15 @@ export const useQuotaStore = create<QuotaStoreState>()(
           xaiQuota: stampQuotaMap(resolveUpdater(updater, state.xaiQuota), state.xaiQuota),
         })),
       clearQuotaCache: () =>
-        set({
+        set((state) => ({
+          cacheGeneration: state.cacheGeneration + 1,
           antigravityQuota: {},
           claudeQuota: {},
           codexQuota: {},
           kiroQuota: {},
           kimiQuota: {},
           xaiQuota: {},
-        }),
+        })),
       purgeStaleEntries: () =>
         set((state) =>
           sanitizePersistedQuotaState({
@@ -209,10 +207,16 @@ export const useQuotaStore = create<QuotaStoreState>()(
         }),
       merge: (persistedState, currentState) => ({
         ...currentState,
-        ...sanitizePersistedQuotaState(
-          (persistedState as Partial<PersistedQuotaStoreState>) ?? {}
-        ),
+        ...sanitizePersistedQuotaState((persistedState as Partial<PersistedQuotaStoreState>) ?? {}),
       }),
     }
   )
 );
+
+export const captureQuotaCacheGeneration = (): number => useQuotaStore.getState().cacheGeneration;
+
+export const commitIfQuotaCacheCurrent = (generation: number, commit: () => void): boolean => {
+  if (useQuotaStore.getState().cacheGeneration !== generation) return false;
+  commit();
+  return true;
+};

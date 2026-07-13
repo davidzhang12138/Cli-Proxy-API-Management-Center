@@ -120,7 +120,7 @@ export const useAuthStore = create<AuthStoreState>()(
           });
 
           // 测试连接 - 获取配置
-          await useConfigStore.getState().fetchConfig(undefined, true);
+          await useConfigStore.getState().fetchConfig(true);
 
           // 登录成功
           set({

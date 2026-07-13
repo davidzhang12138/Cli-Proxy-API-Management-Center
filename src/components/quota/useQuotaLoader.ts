@@ -5,7 +5,7 @@
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AuthFileItem } from '@/types';
-import { useQuotaStore } from '@/stores';
+import { captureQuotaCacheGeneration, commitIfQuotaCacheCurrent, useQuotaStore } from '@/stores';
 import { getStatusFromError } from '@/utils/quota';
 import type { QuotaConfig } from './quotaConfigs';
 import { canUseManagedQuotaRefresh, refreshManagedQuotaStates } from './managedQuotaRefresh';
@@ -64,6 +64,7 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
       if (loadingRef.current) return null;
       loadingRef.current = true;
       const requestId = ++requestIdRef.current;
+      const cacheGeneration = captureQuotaCacheGeneration();
       setLoading(true, scope);
 
       try {
@@ -147,22 +148,26 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
                 completedCount += 1;
                 if (result.status === 'success') {
                   successCount += 1;
-                  setQuota((prev) => ({
-                    ...prev,
-                    [result.name]:
-                      managedResult?.status === 'success'
-                        ? (result.data as TState)
-                        : config.buildSuccessState(result.data as TData),
-                  }));
+                  commitIfQuotaCacheCurrent(cacheGeneration, () => {
+                    setQuota((prev) => ({
+                      ...prev,
+                      [result.name]:
+                        managedResult?.status === 'success'
+                          ? (result.data as TState)
+                          : config.buildSuccessState(result.data as TData),
+                    }));
+                  });
                 } else {
                   errorCount += 1;
-                  setQuota((prev) => ({
-                    ...prev,
-                    [result.name]: config.buildErrorState(
-                      result.error || t('common.unknown_error'),
-                      result.errorStatus
-                    ),
-                  }));
+                  commitIfQuotaCacheCurrent(cacheGeneration, () => {
+                    setQuota((prev) => ({
+                      ...prev,
+                      [result.name]: config.buildErrorState(
+                        result.error || t('common.unknown_error'),
+                        result.errorStatus
+                      ),
+                    }));
+                  });
                 }
                 onProgress?.({
                   completedCount,
@@ -179,19 +184,21 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
         if (requestId !== requestIdRef.current) return null;
 
         if (!canUseManagedRefresh) {
-          setQuota((prev) => {
-            const nextState = { ...prev };
-            results.forEach((result) => {
-              if (result.status === 'success') {
-                nextState[result.name] = config.buildSuccessState(result.data as TData);
-              } else {
-                nextState[result.name] = config.buildErrorState(
-                  result.error || t('common.unknown_error'),
-                  result.errorStatus
-                );
-              }
+          commitIfQuotaCacheCurrent(cacheGeneration, () => {
+            setQuota((prev) => {
+              const nextState = { ...prev };
+              results.forEach((result) => {
+                if (result.status === 'success') {
+                  nextState[result.name] = config.buildSuccessState(result.data as TData);
+                } else {
+                  nextState[result.name] = config.buildErrorState(
+                    result.error || t('common.unknown_error'),
+                    result.errorStatus
+                  );
+                }
+              });
+              return nextState;
             });
-            return nextState;
           });
         }
 

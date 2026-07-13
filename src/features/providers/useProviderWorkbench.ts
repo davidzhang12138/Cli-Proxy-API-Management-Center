@@ -223,7 +223,7 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
     setErrorMessage(null);
     try {
       const [configResult, vertexResult, openaiResult] = await Promise.allSettled([
-        fetchConfig(undefined, true),
+        fetchConfig(true),
         providersApi.getVertexConfigs(),
         providersApi.getOpenAIProviders(),
       ]);
@@ -488,11 +488,7 @@ export function useProviderWorkbench(): UseProviderWorkbenchResult {
         setMutating(false);
       }
     },
-    [
-      config,
-      refreshSnapshot,
-      updateConfigValue,
-    ]
+    [config, refreshSnapshot, updateConfigValue]
   );
 
   const toggleDisabled = useCallback(

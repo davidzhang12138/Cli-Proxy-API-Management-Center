@@ -196,7 +196,7 @@ export function ProvidersWorkbenchPage() {
     }
 
     const sorted = [...arr].sort((a, b) => {
-      let diff = 0;
+      let diff: number;
       if (providerSortBy === 'name') {
         diff = getResourceSortName(a).localeCompare(getResourceSortName(b));
       } else if (providerSortBy === 'priority') {

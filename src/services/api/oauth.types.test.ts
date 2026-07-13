@@ -7,38 +7,39 @@ const oauthStartOptionsAcceptsProxyUrl = {
 
 void oauthStartOptionsAcceptsProxyUrl;
 
-const authFilesListAcceptsUsageQuota = authFilesApi.list().then((response) => {
-  const totalFromPagination: number | undefined = response.pagination?.total;
-  const providerCategoryCount: number | undefined = response.categories?.providers?.[0]?.count;
-  void totalFromPagination;
-  void providerCategoryCount;
+const acceptsAuthFilesApi = (api: typeof authFilesApi) => {
+  const authFilesListAcceptsUsageQuota = api.list().then((response) => {
+    const totalFromPagination: number | undefined = response.pagination?.total;
+    const providerCategoryCount: number | undefined = response.categories?.providers?.[0]?.count;
+    void totalFromPagination;
+    void providerCategoryCount;
 
-  response.files.forEach((file) => {
-    const quota = file.usage_quota ?? file.usageQuota;
-    if (quota?.known) {
-      const remaining: number | string | null | undefined = quota.remaining;
-      void remaining;
-    }
+    response.files.forEach((file) => {
+      const quota = file.usage_quota ?? file.usageQuota;
+      if (quota?.known) {
+        const remaining: number | string | null | undefined = quota.remaining;
+        void remaining;
+      }
+    });
   });
-});
+  void authFilesListAcceptsUsageQuota;
 
-void authFilesListAcceptsUsageQuota;
+  const authFilesPaginatedListAcceptsFilters = api.list({
+    page: 1,
+    pageSize: 50,
+    provider: 'kiro',
+    status: 'active',
+    search: 'team-a',
+    quotaFilter: 'has',
+    sort: 'quota_desc',
+    problemOnly: true,
+  });
+  void authFilesPaginatedListAcceptsFilters;
 
-const authFilesPaginatedListAcceptsFilters = authFilesApi.list({
-  page: 1,
-  pageSize: 50,
-  provider: 'kiro',
-  status: 'active',
-  search: 'team-a',
-  quotaFilter: 'has',
-  sort: 'quota_desc',
-  problemOnly: true,
-});
+  const authQuotaRefreshAcceptsRuntimeIndexes = api.refreshAuthQuotas({
+    auth_indexes: ['auth-1'],
+  });
+  void authQuotaRefreshAcceptsRuntimeIndexes;
+};
 
-void authFilesPaginatedListAcceptsFilters;
-
-const authQuotaRefreshAcceptsRuntimeIndexes = authFilesApi.refreshAuthQuotas({
-  auth_indexes: ['auth-1'],
-});
-
-void authQuotaRefreshAcceptsRuntimeIndexes;
+void acceptsAuthFilesApi;

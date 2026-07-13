@@ -14,7 +14,13 @@ import {
   usageApi,
   type AuthUsageQueryParams,
 } from '@/services/api';
-import { useNotificationStore, useQuotaStore, useThemeStore } from '@/stores';
+import {
+  captureQuotaCacheGeneration,
+  commitIfQuotaCacheCurrent,
+  useNotificationStore,
+  useQuotaStore,
+  useThemeStore,
+} from '@/stores';
 import type {
   AntigravityQuotaState,
   AuthFileItem,
@@ -807,7 +813,9 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     return () => clearInterval(timer);
   }, [purgeStaleEntries]);
 
-  const [modelPrices, setModelPrices] = useState<Record<string, ModelPrice>>(() => loadModelPrices());
+  const [modelPrices, setModelPrices] = useState<Record<string, ModelPrice>>(() =>
+    loadModelPrices()
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -1391,6 +1399,7 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
     async (file: AuthFileItem) => {
       if (disabled || file.disabled) return;
       if (quota[file.name]?.status === 'loading') return;
+      const cacheGeneration = captureQuotaCacheGeneration();
 
       preserveQuotaSnapshot([file]);
       setQuota((prev) => ({
@@ -1402,14 +1411,16 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         const managedResults = await refreshManagedQuotaStates(config, [file]).catch(() => null);
         const managedResult = managedResults?.[0];
         if (managedResult?.status === 'success') {
-          setQuota((prev) => ({
-            ...prev,
-            [file.name]: managedResult.state as TState,
-          }));
-          if (managedResult.file) {
-            onFilesUpdated?.([managedResult.file]);
-          }
-          showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
+          commitIfQuotaCacheCurrent(cacheGeneration, () => {
+            setQuota((prev) => ({
+              ...prev,
+              [file.name]: managedResult.state as TState,
+            }));
+            if (managedResult.file) {
+              onFilesUpdated?.([managedResult.file]);
+            }
+            showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
+          });
           return;
         }
         if (managedResult?.status === 'error' && managedResult.error) {
@@ -1417,22 +1428,26 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         }
 
         const data = await config.fetchQuota(file, t);
-        setQuota((prev) => ({
-          ...prev,
-          [file.name]: config.buildSuccessState(data),
-        }));
-        showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
+        commitIfQuotaCacheCurrent(cacheGeneration, () => {
+          setQuota((prev) => ({
+            ...prev,
+            [file.name]: config.buildSuccessState(data),
+          }));
+          showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
+        });
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : t('common.unknown_error');
         const status = getStatusFromError(err);
-        setQuota((prev) => ({
-          ...prev,
-          [file.name]: config.buildErrorState(message, status),
-        }));
-        showNotification(
-          t('auth_files.quota_refresh_failed', { name: file.name, message }),
-          'error'
-        );
+        commitIfQuotaCacheCurrent(cacheGeneration, () => {
+          setQuota((prev) => ({
+            ...prev,
+            [file.name]: config.buildErrorState(message, status),
+          }));
+          showNotification(
+            t('auth_files.quota_refresh_failed', { name: file.name, message }),
+            'error'
+          );
+        });
       } finally {
         clearQuotaSnapshot([file]);
       }
@@ -1464,17 +1479,25 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
         confirmText: t('codex_quota.reset_confirm_button'),
         variant: 'primary',
         onConfirm: async () => {
+          const cacheGeneration = captureQuotaCacheGeneration();
           setResettingQuotaName(file.name);
           try {
             const data = await resetQuota(file, t);
-            setQuota((prev) => ({
-              ...prev,
-              [file.name]: config.buildSuccessState(data),
-            }));
-            showNotification(t('codex_quota.reset_success', { name: file.name }), 'success');
+            commitIfQuotaCacheCurrent(cacheGeneration, () => {
+              setQuota((prev) => ({
+                ...prev,
+                [file.name]: config.buildSuccessState(data),
+              }));
+              showNotification(t('codex_quota.reset_success', { name: file.name }), 'success');
+            });
           } catch (err: unknown) {
             const message = err instanceof Error ? err.message : t('common.unknown_error');
-            showNotification(t('codex_quota.reset_failed', { name: file.name, message }), 'error');
+            commitIfQuotaCacheCurrent(cacheGeneration, () => {
+              showNotification(
+                t('codex_quota.reset_failed', { name: file.name, message }),
+                'error'
+              );
+            });
           } finally {
             setResettingQuotaName((current) => (current === file.name ? null : current));
           }
@@ -1709,22 +1732,23 @@ export function QuotaSection<TState extends QuotaStatusState, TData>({
                 !disabled && !item.disabled && quotaState?.status !== 'loading';
               const showResetQuotaAction =
                 quotaState !== undefined && Boolean(config.canResetQuota?.(quotaState));
-              const resetQuotaAction = config.resetQuota && showResetQuotaAction ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className={styles.quotaResetCreditButton}
-                  onClick={() => resetQuotaForFile(item)}
-                  disabled={!canUseQuotaAction || isResettingQuota}
-                  loading={isResettingQuota}
-                  title={t('codex_quota.reset_button')}
-                  aria-label={t('codex_quota.reset_button')}
-                >
-                  {!isResettingQuota && <IconRefreshCw size={14} />}
-                  {t('codex_quota.reset_button')}
-                </Button>
-              ) : undefined;
+              const resetQuotaAction =
+                config.resetQuota && showResetQuotaAction ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className={styles.quotaResetCreditButton}
+                    onClick={() => resetQuotaForFile(item)}
+                    disabled={!canUseQuotaAction || isResettingQuota}
+                    loading={isResettingQuota}
+                    title={t('codex_quota.reset_button')}
+                    aria-label={t('codex_quota.reset_button')}
+                  >
+                    {!isResettingQuota && <IconRefreshCw size={14} />}
+                    {t('codex_quota.reset_button')}
+                  </Button>
+                ) : undefined;
 
               return (
                 <QuotaCard
