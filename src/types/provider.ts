@@ -70,5 +70,7 @@ export interface OpenAIProviderConfig {
   /** 429 配额退避冷却上限,Go duration 字符串如 "30m"/"1h"/"2h30m"。yaml: quota-backoff-max */
   quotaBackoffMax?: string;
   authIndex?: string;
+  /** Original index in the backend openai-compatibility array. */
+  sourceIndex?: number;
   [key: string]: unknown;
 }

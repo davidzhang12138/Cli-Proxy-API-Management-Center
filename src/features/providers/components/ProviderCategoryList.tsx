@@ -9,21 +9,38 @@ interface ProviderCategoryListProps {
   onSelect: (brand: ProviderBrand) => void;
 }
 
+const QUICK_FILL_BRAND_ORDER: readonly ProviderBrand[] = [
+  'code0',
+  'fennoAI',
+  'qiniuCloud',
+  'claudeApi',
+];
+
+const QUICK_FILL_BRANDS: ReadonlySet<ProviderBrand> = new Set(QUICK_FILL_BRAND_ORDER);
+
 export function ProviderCategoryList({ groups, activeBrand, onSelect }: ProviderCategoryListProps) {
   const { t } = useTranslation();
+
+  const quickFillGroups = groups
+    .filter((g) => QUICK_FILL_BRANDS.has(g.id))
+    .sort(
+      (left, right) =>
+        QUICK_FILL_BRAND_ORDER.indexOf(left.id) - QUICK_FILL_BRAND_ORDER.indexOf(right.id)
+    );
+  const providerGroups = groups.filter((g) => !QUICK_FILL_BRANDS.has(g.id));
 
   const renderGroups = (items: ProviderGroup[]) => (
     <div className={styles.list}>
       {items.map((group) => {
         const active = group.id === activeBrand;
-        const realResources = group.resources.filter((r) => !r.flags.isPlaceholder);
-        const total = realResources.length;
-        const activeCount = realResources.filter((r) => !r.disabled).length;
+        const total = group.resources.length;
+        const activeCount = group.resources.filter((r) => !r.disabled).length;
         const logo = PROVIDER_LOGOS[group.id];
         const itemClass = `${styles.item} ${active ? styles.active : ''}`;
         const logoClassName = [
           styles.logo,
           logo?.transparent ? styles.logoTransparent : '',
+          logo?.themeSurface ? styles.logoThemeSurface : '',
           logo?.darkSrc ? styles.logoThemeLight : '',
           logo?.invertOnDark ? styles.logoInvertOnDark : '',
         ]
@@ -32,6 +49,7 @@ export function ProviderCategoryList({ groups, activeBrand, onSelect }: Provider
         const darkLogoClassName = [
           styles.logo,
           logo?.transparent ? styles.logoTransparent : '',
+          logo?.themeSurface ? styles.logoThemeSurface : '',
           styles.logoThemeDark,
         ]
           .filter(Boolean)
@@ -84,8 +102,14 @@ export function ProviderCategoryList({ groups, activeBrand, onSelect }: Provider
     <div className={styles.stack}>
       <aside className={styles.aside}>
         <p className={styles.eyebrow}>{t('providersPage.categories.title')}</p>
-        {renderGroups(groups)}
+        {renderGroups(providerGroups)}
       </aside>
+      {quickFillGroups.length > 0 && (
+        <aside className={styles.aside}>
+          <p className={styles.eyebrow}>{t('providersPage.categories.quickFill')}</p>
+          {renderGroups(quickFillGroups)}
+        </aside>
+      )}
     </div>
   );
 }

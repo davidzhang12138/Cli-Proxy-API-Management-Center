@@ -25,6 +25,7 @@ export type AuthFileModelItem = {
   owned_by?: string;
 };
 export type AuthFileIconAsset = string | { light: string; dark: string };
+export type OAuthConfigLoadError = 'loading' | 'unsupported' | 'load' | null;
 
 export type QuotaProviderType =
   | 'antigravity'
