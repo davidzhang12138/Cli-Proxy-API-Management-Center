@@ -11,3 +11,4 @@ export * from './builders';
 export * from './usageQuota';
 export * from './codexWindows';
 export * from './resetCredits';
+export * from './xaiPaid';
