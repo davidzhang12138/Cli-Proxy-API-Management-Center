@@ -64,6 +64,10 @@ const OPENAI_PROVIDER_FIELDS = [
   'models',
   'test-model',
   'disable-cooling',
+  'quota-backoff-min',
+  'quota-backoff-max',
+  'quota-backoff-min-seconds',
+  'quota-backoff-max-seconds',
 ] as const;
 
 const MODEL_ALIAS_FIELDS = ['name', 'alias', 'priority', 'test-model'] as const;
@@ -421,6 +425,10 @@ const serializeOpenAIProvider = (provider: OpenAIProviderConfig) => {
   if (provider.priority !== undefined) payload.priority = provider.priority;
   if (provider.testModel) payload['test-model'] = provider.testModel;
   if (provider.disableCooling) payload['disable-cooling'] = true;
+  const quotaBackoffMin = provider.quotaBackoffMin?.trim();
+  if (quotaBackoffMin) payload['quota-backoff-min'] = quotaBackoffMin;
+  const quotaBackoffMax = provider.quotaBackoffMax?.trim();
+  if (quotaBackoffMax) payload['quota-backoff-max'] = quotaBackoffMax;
   return payload;
 };
 
