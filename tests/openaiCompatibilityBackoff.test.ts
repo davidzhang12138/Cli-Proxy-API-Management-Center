@@ -1,9 +1,27 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import { buildOpenAIConfig } from '../src/features/providers/useProviderWorkbench';
+import type { ProviderEntryFormInput } from '../src/features/providers/types';
 import { apiClient } from '../src/services/api/client';
 import { providersApi } from '../src/services/api/providers';
 
 const originalGet = apiClient.get;
 const originalPut = apiClient.put;
+
+const openAIFormInput = (
+  overrides: Partial<ProviderEntryFormInput> = {}
+): ProviderEntryFormInput => ({
+  apiKey: '',
+  name: 'morphllm',
+  baseUrl: 'https://morph.example.com/v1',
+  proxyUrl: '',
+  prefix: '',
+  disabled: false,
+  models: [],
+  headers: [],
+  excludedModelsText: '',
+  apiKeyEntries: [{ apiKey: '', existingApiKey: 'existing-key', proxyUrl: '' }],
+  ...overrides,
+});
 
 afterEach(() => {
   apiClient.get = originalGet;
@@ -30,19 +48,17 @@ describe('OpenAI compatibility quota backoff', () => {
       return undefined;
     }) as typeof apiClient.put;
 
-    await providersApi.updateOpenAIProvider('morphllm', 0, {
-      name: 'morphllm',
-      baseUrl: 'https://morph.example.com/v1',
-      apiKeyEntries: [{ apiKey: 'existing-key' }],
-      quotaBackoffMin: ' 1h ',
-      quotaBackoffMax: ' 5h ',
-    });
+    const config = buildOpenAIConfig(
+      openAIFormInput({ quotaBackoffMin: ' 1h ', quotaBackoffMax: ' 5h ' })
+    );
+    await providersApi.updateOpenAIProvider('morphllm', 0, config);
 
     expect(putData).toEqual([
       {
         name: 'morphllm',
         'base-url': 'https://morph.example.com/v1',
         'api-key-entries': [{ 'api-key': 'existing-key', 'future-key-field': 'preserved' }],
+        disabled: false,
         'quota-backoff-min': '1h',
         'quota-backoff-max': '5h',
         'future-provider-field': 'preserved',
@@ -71,19 +87,24 @@ describe('OpenAI compatibility quota backoff', () => {
       return undefined;
     }) as typeof apiClient.put;
 
-    await providersApi.updateOpenAIProvider('morphllm', 0, {
-      name: 'morphllm',
-      baseUrl: 'https://morph.example.com/v1',
-      apiKeyEntries: [{ apiKey: 'existing-key' }],
-      quotaBackoffMin: '   ',
-      quotaBackoffMax: '',
-    });
+    const config = buildOpenAIConfig(
+      openAIFormInput({ quotaBackoffMin: '   ', quotaBackoffMax: '' }),
+      {
+        name: 'morphllm',
+        baseUrl: 'https://morph.example.com/v1',
+        apiKeyEntries: [{ apiKey: 'existing-key' }],
+        quotaBackoffMin: '1h',
+        quotaBackoffMax: '5h',
+      }
+    );
+    await providersApi.updateOpenAIProvider('morphllm', 0, config);
 
     expect(putData).toEqual([
       {
         name: 'morphllm',
         'base-url': 'https://morph.example.com/v1',
         'api-key-entries': [{ 'api-key': 'existing-key' }],
+        disabled: false,
         'future-provider-field': 'preserved',
       },
     ]);
