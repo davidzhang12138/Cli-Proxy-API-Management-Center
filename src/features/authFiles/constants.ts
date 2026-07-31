@@ -11,13 +11,12 @@ import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
-import type { AuthFileItem } from '@/types';
+import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
 import { parseTimestamp } from '@/utils/timestamp';
+import { TYPE_COLORS } from '@/utils/quota';
 
-export type ThemeColors = { bg: string; text: string; border?: string };
-export type TypeColorSet = { light: ThemeColors; dark?: ThemeColors };
-export type ResolvedTheme = 'light' | 'dark';
+export type { ResolvedTheme, ThemeColors, TypeColorSet } from '@/types';
 export type AuthFileModelItem = {
   id: string;
   display_name?: string;
@@ -72,71 +71,8 @@ export const AUTH_FILE_MANUAL_REFRESH_PROVIDERS = new Set([
   'xai',
 ]);
 
-// 标签类型颜色配置 — 基于各提供商 Logo 品牌色调配，确保彼此不重复
-export const TYPE_COLORS: Record<string, TypeColorSet> = {
-  // Kimi logo: 亮蓝 #027AFF（K字 + 蓝色圆点）
-  kimi: {
-    light: { bg: '#dce8ff', text: '#0560cf' },
-    dark: { bg: '#003880', text: '#70b5ff' },
-  },
-  // Gemini logo: 多色蓝 #3186FF（偏柔和的蓝）
-  gemini: {
-    light: { bg: '#e3f2fd', text: '#1565c0' },
-    dark: { bg: '#0d47a1', text: '#64b5f6' },
-  },
-  // AI Studio: 使用 Gemini 图标，中性灰标签
-  aistudio: {
-    light: { bg: '#f0f2f5', text: '#2f343c' },
-    dark: { bg: '#373c42', text: '#cfd3db' },
-  },
-  // Claude logo: 陶土橙 #D97757
-  claude: {
-    light: { bg: '#fbece4', text: '#c05621' },
-    dark: { bg: '#5e2c14', text: '#e8a882' },
-  },
-  // Codex logo: 靛蓝渐变 #B1A7FF → #3941FF
-  codex: {
-    light: { bg: '#eae7ff', text: '#3538d4' },
-    dark: { bg: '#262395', text: '#b5b0ff' },
-  },
-  kiro: {
-    light: { bg: '#fff8e1', text: '#ff8f00' },
-    dark: { bg: '#5f3700', text: '#ffe082' },
-  },
-  // Antigravity logo: 多色（主色 #3789F9 蓝 + #53A89A 青绿），用青色区分
-  antigravity: {
-    light: { bg: '#e0f7fa', text: '#006064' },
-    dark: { bg: '#004d40', text: '#80deea' },
-  },
-  // xAI / Grok: graphite brand treatment, distinct from blue and purple providers
-  xai: {
-    light: { bg: '#f3f4f6', text: '#111827', border: '1px solid #d1d5db' },
-    dark: { bg: '#111827', text: '#f9fafb', border: '1px solid #374151' },
-  },
-  // iFlow logo: 品红紫渐变 #5C5CFF → #AE5CFF
-  iflow: {
-    light: { bg: '#f5e3fc', text: '#9025c8' },
-    dark: { bg: '#521490', text: '#d49cf5' },
-  },
-  // Vertex logo: Google 蓝 #4285F4
-  vertex: {
-    light: { bg: '#e4edfd', text: '#2b5fbc' },
-    dark: { bg: '#1a3d80', text: '#89b3f7' },
-  },
-  // Freebuff logo: 黑白单色，用石墨色系标签
-  freebuff: {
-    light: { bg: '#eef0f2', text: '#1f2937', border: '1px solid #d4d7dc' },
-    dark: { bg: '#1f2937', text: '#e5e7eb', border: '1px solid #374151' },
-  },
-  empty: {
-    light: { bg: '#f5f5f5', text: '#616161' },
-    dark: { bg: '#424242', text: '#bdbdbd' },
-  },
-  unknown: {
-    light: { bg: '#f0f0f0', text: '#666666', border: '1px dashed #999999' },
-    dark: { bg: '#3a3a3a', text: '#aaaaaa', border: '1px dashed #666666' },
-  },
-};
+// 标签类型颜色配置：权威版本在 @/utils/quota/constants.ts，此处仅转发
+export { TYPE_COLORS };
 
 export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   antigravity: iconAntigravity,
@@ -154,16 +90,6 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
 
 export const clampCardPageSize = (value: number) =>
   Math.min(MAX_CARD_PAGE_SIZE, Math.max(MIN_CARD_PAGE_SIZE, Math.round(value)));
-
-export const resolveQuotaErrorMessage = (
-  t: TFunction,
-  status: number | undefined,
-  fallback: string
-): string => {
-  if (status === 404) return t('common.quota_update_required');
-  if (status === 403) return t('common.quota_check_credential');
-  return fallback;
-};
 
 export const normalizeProviderKey = normalizeOAuthProviderKey;
 
@@ -194,8 +120,30 @@ export const getAuthFileStatusMessage = (file: AuthFileItem): string => {
   return String(raw).trim();
 };
 
-export const hasAuthFileStatusMessage = (file: AuthFileItem): boolean =>
-  getAuthFileStatusMessage(file).length > 0;
+/** 这些 status_message 视为健康，不触发告警态。 */
+export const HEALTHY_AUTH_FILE_STATUS_MESSAGES = new Set([
+  'ok',
+  'healthy',
+  'ready',
+  'success',
+  'available',
+]);
+
+/** 是否存在非健康的 status_message（卡片告警态 / 谱条琥珀色共用判定）。 */
+export const hasAuthFileStatusWarning = (file: AuthFileItem): boolean => {
+  const message = getAuthFileStatusMessage(file);
+  return Boolean(message) && !HEALTHY_AUTH_FILE_STATUS_MESSAGES.has(message.toLowerCase());
+};
+
+/**
+ * 是否为需要用户处理的问题凭证。
+ * 主动停用是独立状态，不应进入“问题”筛选或“删除问题凭证”的批量操作。
+ */
+export const isProblemAuthFile = (file: AuthFileItem): boolean => {
+  const status = typeof file.status === 'string' ? file.status.trim().toLowerCase() : '';
+  if (file.disabled === true || status === 'disabled') return false;
+  return file.unavailable === true || status === 'error' || hasAuthFileStatusWarning(file);
+};
 
 export const getTypeLabel = (t: TFunction, type: string): string => {
   const providerKey = normalizeProviderKey(type);

@@ -10,6 +10,7 @@ import type { Config } from '@/types/config';
 import { buildHeaderObject } from '@/utils/headers';
 import { isRecord } from '@/utils/helpers';
 import { secondsToDurationString } from './durationString';
+import { readCredentialWeight } from '@/utils/credentialWeight';
 
 const normalizeBoolean = (value: unknown): boolean | undefined =>
   typeof value === 'boolean' ? value : undefined;
@@ -110,12 +111,14 @@ const normalizeApiKeyEntry = (entry: unknown): ApiKeyEntry | null => {
   if (!trimmed) return null;
 
   const proxyUrl = record?.['proxy-url'];
+  const weight = readCredentialWeight(record?.weight);
   const authIndex = normalizeAuthIndex(record?.['auth-index']);
 
   const result: ApiKeyEntry = {
     apiKey: trimmed,
     proxyUrl: proxyUrl ? String(proxyUrl) : undefined,
   };
+  if (weight !== undefined) result.weight = weight;
   if (authIndex) result.authIndex = authIndex;
   return result;
 };
@@ -128,6 +131,8 @@ const normalizeProviderKeyConfig = (item: unknown): ProviderKeyConfig | null => 
   if (!trimmed) return null;
 
   const config: ProviderKeyConfig = { apiKey: trimmed };
+  const weight = readCredentialWeight(record?.weight);
+  if (weight !== undefined) config.weight = weight;
   const priority = record?.priority;
   if (priority !== undefined && priority !== null && String(priority).trim() !== '') {
     const parsed = Number(priority);
@@ -196,6 +201,8 @@ const normalizeGeminiKeyConfig = (item: unknown): GeminiKeyConfig | null => {
   if (!trimmed) return null;
 
   const config: GeminiKeyConfig = { apiKey: trimmed };
+  const weight = readCredentialWeight(record?.weight);
+  if (weight !== undefined) config.weight = weight;
   const priority = record?.priority;
   if (priority !== undefined && priority !== null && String(priority).trim() !== '') {
     const parsed = Number(priority);
@@ -360,6 +367,13 @@ export const normalizeConfigResponse = (raw: unknown): Config => {
   const geminiList = raw['gemini-api-key'];
   if (Array.isArray(geminiList)) {
     config.geminiApiKeys = geminiList
+      .map((item) => normalizeGeminiKeyConfig(item))
+      .filter(Boolean) as GeminiKeyConfig[];
+  }
+
+  const interactionsList = raw['interactions-api-key'];
+  if (Array.isArray(interactionsList)) {
+    config.interactionsApiKeys = interactionsList
       .map((item) => normalizeGeminiKeyConfig(item))
       .filter(Boolean) as GeminiKeyConfig[];
   }

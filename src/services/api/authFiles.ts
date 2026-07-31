@@ -13,6 +13,11 @@ import type {
 } from '@/types/authFile';
 import type { OAuthModelAliasEntry } from '@/types';
 import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
+import {
+  normalizeRecentRequestAuthIndex,
+  normalizeRecentRequestBuckets,
+  normalizeUsageTotal,
+} from '@/utils/recentRequests';
 import { parseTimestampMs } from '@/utils/timestamp';
 
 type StatusError = { status?: number };
@@ -23,9 +28,12 @@ export type AuthFileFieldsPatch = {
   proxy_url?: string;
   headers?: Record<string, string>;
   priority?: number;
+  weight?: number | null;
   websockets?: boolean;
   using_api?: boolean;
   note?: string;
+  excluded_models?: string[];
+  'excluded-models'?: string[];
   expired?: string;
 };
 type AuthFileBatchFailure = { name: string; error: string };
@@ -254,7 +262,60 @@ const mergeAuthFileEntries = (entries: AuthFileEntry[]): AuthFileEntry => {
   return merged;
 };
 
-const dedupeAuthFilesResponse = (payload: AuthFilesResponse): AuthFilesResponse => {
+const INTEGER_STRING_PATTERN = /^[+-]?\d+$/;
+
+const readIntegerField = (value: unknown): number | undefined => {
+  if (typeof value === 'number') return Number.isSafeInteger(value) ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || !INTEGER_STRING_PATTERN.test(trimmed)) return undefined;
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
+};
+
+const readRuntimeOnlyField = (entry: AuthFileEntry): boolean => {
+  const raw = entry['runtime_only'] ?? entry.runtimeOnly;
+  if (typeof raw === 'boolean') return raw;
+  if (typeof raw === 'string') return raw.trim().toLowerCase() === 'true';
+  return false;
+};
+
+/**
+ * 契约边界归一化：把后端 kebab/snake_case 生字段填充到 AuthFileItem 声明的
+ * camelCase 字段上。原始字段全部透传——quota resolvers 仍直接读
+ * plan_type / id_token / metadata / attributes 等生字段。
+ */
+const normalizeAuthFileEntry = (entry: AuthFileEntry): AuthFileEntry => {
+  const declaredStatusMessage =
+    typeof entry.statusMessage === 'string' ? entry.statusMessage.trim() : '';
+  const statusMessage = readTextField(entry, 'status_message') || declaredStatusMessage;
+  const note = readTextField(entry, 'note');
+  const email = readTextField(entry, 'email');
+  // account / account_type 故意不归一化：api-key 类凭证的 account 就是 API key 本身
+  // （sdk/cliproxy/auth/types.go AccountInfo），不能进入展示与搜索路径。
+  const projectId = readTextField(entry, 'project_id');
+  const modified = readDateField(entry);
+  const priority = readIntegerField(entry['priority']);
+  const weight = readIntegerField(entry['weight']);
+
+  return {
+    ...entry,
+    runtimeOnly: readRuntimeOnlyField(entry),
+    authIndex: normalizeRecentRequestAuthIndex(entry['auth_index'] ?? entry.authIndex),
+    recentRequests: normalizeRecentRequestBuckets(entry.recent_requests ?? entry.recentRequests),
+    successCount: normalizeUsageTotal(entry.success),
+    failureCount: normalizeUsageTotal(entry.failed),
+    ...(statusMessage ? { statusMessage } : {}),
+    ...(modified > 0 ? { modified } : {}),
+    priority,
+    weight,
+    ...(note ? { note } : {}),
+    ...(email ? { email } : {}),
+    ...(projectId ? { projectId } : {}),
+  };
+};
+
+export const normalizeAuthFilesResponse = (payload: AuthFilesResponse): AuthFilesResponse => {
   const files = Array.isArray(payload?.files) ? payload.files : [];
   const grouped = new Map<string, AuthFileEntry[]>();
 
@@ -269,7 +330,9 @@ const dedupeAuthFilesResponse = (payload: AuthFilesResponse): AuthFilesResponse 
     grouped.set(key, [entry]);
   });
 
-  const normalizedFiles = Array.from(grouped.values()).map(mergeAuthFileEntries);
+  const normalizedFiles = Array.from(grouped.values()).map((entries) =>
+    normalizeAuthFileEntry(mergeAuthFileEntries(entries))
+  );
   normalizedFiles.sort((left, right) =>
     readTextField(left, 'name').localeCompare(readTextField(right, 'name'), undefined, {
       sensitivity: 'accent',
@@ -344,7 +407,7 @@ const mergeAuthQuotaSnapshots = (
   options: { includeSynthetic?: boolean } = {}
 ): AuthFilesResponse => {
   const includeSynthetic = options.includeSynthetic !== false;
-  const normalized = dedupeAuthFilesResponse(filesPayload);
+  const normalized = normalizeAuthFilesResponse(filesPayload);
   const quotaEntries = Array.isArray(quotasPayload?.auths) ? quotasPayload.auths : [];
   if (quotaEntries.length === 0) return normalized;
 
@@ -633,14 +696,18 @@ export const authFilesApi = {
 
   deleteAll: () => apiClient.delete('/auth-files', { params: { all: true } }),
 
-  downloadText: async (name: string): Promise<string> => {
+  download: async (name: string): Promise<Blob> => {
     const response = await apiClient.getRaw(
       `/auth-files/download?name=${encodeURIComponent(name)}`,
       {
         responseType: 'blob',
       }
     );
-    const blob = response.data as Blob;
+    return response.data as Blob;
+  },
+
+  downloadText: async (name: string): Promise<string> => {
+    const blob = await authFilesApi.download(name);
     return blob.text();
   },
 

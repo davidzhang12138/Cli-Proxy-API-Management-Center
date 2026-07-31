@@ -151,6 +151,8 @@ export interface CodexAdditionalRateLimit {
 export interface CodexRateLimitResetCredits {
   available_count?: number | string;
   availableCount?: number | string;
+  applicable_available_count?: number | string;
+  applicableAvailableCount?: number | string;
 }
 
 export interface CodexRateLimitResetCredit {
@@ -176,7 +178,21 @@ export interface CodexUsagePayload {
 // Claude API payload types
 export interface ClaudeUsageWindow {
   utilization: number;
-  resets_at: string;
+  resets_at: string | null;
+}
+
+export interface ClaudeUsageLimit {
+  kind?: string | null;
+  group?: string | null;
+  percent?: number | null;
+  resets_at?: string | null;
+  is_active?: boolean | null;
+  scope?: {
+    model?: {
+      id?: string | null;
+      display_name?: string | null;
+    } | null;
+  } | null;
 }
 
 export interface ClaudeExtraUsage {
@@ -194,6 +210,7 @@ export interface ClaudeUsagePayload {
   seven_day_sonnet?: ClaudeUsageWindow | null;
   seven_day_cowork?: ClaudeUsageWindow | null;
   iguana_necktie?: ClaudeUsageWindow | null;
+  limits?: ClaudeUsageLimit[] | null;
   extra_usage?: ClaudeExtraUsage | null;
 }
 
@@ -226,6 +243,14 @@ export interface ClaudeQuotaWindow {
   usedPercent: number | null;
   resetLabel: string;
   resetTime?: string;
+  /**
+   * Reset instant in epoch ms, kept alongside the display label so callers that
+   * need to compute (ordering, the timeline) aren't stuck comparing formatted
+   * strings. Null when the payload carried no parseable timestamp.
+   */
+  resetAtMs?: number | null;
+  /** Window length in hours — 5 for the rolling window, 168 for the weekly ones. */
+  periodHours?: number | null;
 }
 
 export interface ClaudeQuotaState {
@@ -247,7 +272,7 @@ export interface AntigravityQuotaGroup {
   remainingAmount?: number;
   minimumAmount?: number;
   resetTime?: string;
-  buckets?: AntigravityQuotaBucket[];
+  buckets: AntigravityQuotaBucket[];
 }
 
 export interface AntigravityQuotaSubscription {
@@ -265,6 +290,18 @@ export interface AntigravityQuotaBucket {
   minimumAmount?: number;
   resetTime?: string;
   description?: string;
+  /**
+   * Reset instant in epoch ms, parsed from `resetTime`. Kept alongside the raw
+   * string so the timeline can position a bar without re-parsing.
+   *
+   * Not corrected by `serverTimeOffsetMs`: that offset is applied to *now* when
+   * rendering the card countdown, and every other provider's `resetAtMs` is an
+   * uncorrected instant too. Keeping them consistent matters more than the few
+   * seconds of clock skew it represents.
+   */
+  resetAtMs?: number | null;
+  /** Window length in hours, from the bucket's `window` field. */
+  periodHours?: number | null;
 }
 
 export interface AntigravityQuotaState {
@@ -284,6 +321,10 @@ export interface CodexQuotaWindow {
   usedPercent: number | null;
   resetLabel: string;
   resetTime?: string;
+  /** Reset instant in epoch ms; null when the payload carried no timestamp. */
+  resetAtMs?: number | null;
+  /** Window length in hours, from the payload's limit_window_seconds. */
+  periodHours?: number | null;
 }
 
 export interface CodexQuotaState {
@@ -292,6 +333,7 @@ export interface CodexQuotaState {
   planType?: string | null;
   subscriptionActiveUntil?: string | number | null;
   rateLimitResetCreditsAvailableCount?: number | null;
+  rateLimitResetCreditsApplicableAvailableCount?: number | null;
   rateLimitResetCredits?: CodexRateLimitResetCredit[];
   rateLimitResetCreditsError?: string;
   error?: string;
@@ -350,6 +392,10 @@ export interface KimiQuotaRow {
   used: number;
   limit: number;
   resetHint?: string;
+  /** Reset instant in epoch ms; null when only a relative hint was available. */
+  resetAtMs?: number | null;
+  /** Window length in hours, inferred from the limit's daily/weekly/monthly scope. */
+  periodHours?: number | null;
 }
 
 export interface KimiQuotaState {
@@ -492,6 +538,16 @@ export interface XaiBillingSummary {
   billingPeriodStart?: string;
   billingPeriodEnd?: string;
   usedPercent: number | null;
+  /**
+   * Reset instant of the *active* period (`periodEnd`) in epoch ms.
+   *
+   * Only meaningful as a quota window when `periodType` is 'weekly' — for a
+   * monthly summary this is the billing cycle rollover, which is a spend cap
+   * resetting, not rate-limited capacity coming back.
+   */
+  resetAtMs?: number | null;
+  /** Active period length in hours, derived from `periodStart` → `periodEnd`. */
+  periodHours?: number | null;
 }
 
 export interface XaiRateLimitQuota {
