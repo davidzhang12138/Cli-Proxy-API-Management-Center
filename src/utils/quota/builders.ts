@@ -333,14 +333,31 @@ function kimiResetHint(data: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
+type KimiTimeUnit = 'second' | 'minute' | 'hour' | 'day' | 'week';
+
+/** Kimi currently sends protobuf-style values such as TIME_UNIT_MINUTE. */
+function normalizeKimiTimeUnit(rawTimeUnit: unknown): KimiTimeUnit | null {
+  const unit =
+    typeof rawTimeUnit === 'string'
+      ? rawTimeUnit
+          .trim()
+          .toUpperCase()
+          .replace(/^TIME_UNIT_/, '')
+      : '';
+  if (unit === 'SECONDS' || unit === 'SECOND') return 'second';
+  if (!unit || unit === 'MINUTES' || unit === 'MINUTE') return 'minute';
+  if (unit === 'HOURS' || unit === 'HOUR') return 'hour';
+  if (unit === 'DAYS' || unit === 'DAY') return 'day';
+  if (unit === 'WEEKS' || unit === 'WEEK') return 'week';
+  return null;
+}
+
 function kimiDurationToken(duration: number, rawTimeUnit: unknown): string {
-  const unit = typeof rawTimeUnit === 'string' ? rawTimeUnit.trim().toUpperCase() : '';
-  if (unit === 'SECONDS' || unit === 'SECOND') return `${duration}s`;
-  if (!unit || unit === 'MINUTES' || unit === 'MINUTE') {
-    return duration % 60 === 0 ? `${duration / 60}h` : `${duration}m`;
-  }
-  if (unit === 'HOURS' || unit === 'HOUR') return `${duration}h`;
-  if (unit === 'DAYS' || unit === 'DAY') return `${duration}d`;
+  const unit = normalizeKimiTimeUnit(rawTimeUnit);
+  if (unit === 'second') return `${duration}s`;
+  if (unit === 'hour') return `${duration}h`;
+  if (unit === 'day') return `${duration}d`;
+  if (unit === 'week') return `${duration}w`;
   return duration % 60 === 0 ? `${duration / 60}h` : `${duration}m`;
 }
 
@@ -400,26 +417,44 @@ function kimiResetMs(data: Record<string, unknown>): number | null {
   return null;
 }
 
-/** Window length in hours implied by a row's label/scope. */
-function kimiPeriodHours(label: string | undefined): number | null {
+/** Window length in hours from explicit duration metadata, then label/scope. */
+function kimiPeriodHours(
+  label: string | undefined,
+  duration: number | null = null,
+  rawTimeUnit?: unknown
+): number | null {
+  if (duration !== null && duration > 0) {
+    const unit = normalizeKimiTimeUnit(rawTimeUnit);
+    if (unit === 'second') return duration / 3600;
+    if (unit === 'hour') return duration;
+    if (unit === 'day') return duration * 24;
+    if (unit === 'week') return duration * 7 * 24;
+    // Match the card-label fallback: an absent or unknown unit is treated as minutes.
+    return duration / 60;
+  }
+
   const text = (label ?? '').toLowerCase();
   if (text.includes('daily') || text.includes('day')) return 24;
   if (text.includes('weekly') || text.includes('week')) return 24 * 7;
   if (text.includes('monthly') || text.includes('month')) return 24 * 30;
-  if (text.includes('hour')) return 5;
+  if (text.includes('5h') || text.includes('hour')) return 5;
   return null;
 }
 
 function toKimiUsageRow(
   data: Record<string, unknown>,
-  fallbackLabel: KimiRowLabel
-): (KimiRowLabel & {
-  used: number;
-  limit: number;
-  resetHint?: string;
-  resetAtMs?: number | null;
-  periodHours?: number | null;
-}) | null {
+  fallbackLabel: KimiRowLabel,
+  duration: number | null = null,
+  timeUnit?: unknown
+):
+  | (KimiRowLabel & {
+      used: number;
+      limit: number;
+      resetHint?: string;
+      resetAtMs?: number | null;
+      periodHours?: number | null;
+    })
+  | null {
   const limit = toInt(data.limit);
   let used = toInt(data.used);
   if (used === null) {
@@ -439,7 +474,11 @@ function toKimiUsageRow(
     limit: limit ?? 0,
     resetHint: kimiResetHint(data),
     resetAtMs: kimiResetMs(data),
-    periodHours: kimiPeriodHours(explicitLabel || fallbackLabel.label || fallbackLabel.labelKey),
+    periodHours: kimiPeriodHours(
+      explicitLabel || fallbackLabel.label || fallbackLabel.labelKey,
+      duration,
+      timeUnit
+    ),
   };
 }
 
@@ -455,7 +494,20 @@ export function buildKimiQuotaRows(payload: KimiUsagePayload): KimiQuotaRow[] {
         item.window && typeof item.window === 'object' ? item.window : {}
       ) as KimiLimitWindow;
       const fallbackLabel = kimiLimitLabel(item, detail, window, idx);
-      const row = toKimiUsageRow(detail as Record<string, unknown>, fallbackLabel);
+      const duration =
+        toInt(window.duration) ??
+        toInt((item as Record<string, unknown>).duration) ??
+        toInt((detail as Record<string, unknown>).duration);
+      const timeUnit =
+        (window as Record<string, unknown>).timeUnit ??
+        (item as Record<string, unknown>).timeUnit ??
+        (detail as Record<string, unknown>).timeUnit;
+      const row = toKimiUsageRow(
+        detail as Record<string, unknown>,
+        fallbackLabel,
+        duration,
+        timeUnit
+      );
       if (row) {
         rows.push({ id: `limit-${idx}`, ...row });
       }
