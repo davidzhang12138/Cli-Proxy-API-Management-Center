@@ -1724,6 +1724,8 @@
       "metrics": {
         "models": "Models",
         "keys": "Keys",
+        "availableKeys": "Available",
+        "disabledKeys": "Disabled",
         "headers": "Headers"
       },
       "websocketsTag": "WebSockets",
@@ -1860,6 +1862,7 @@
       "apiKeyDisabledBadge": "Disabled",
       "apiKeySearchPlaceholder": "Search keys or proxy URLs",
       "apiKeySearchEmpty": "No keys match your search",
+      "apiKeyFilterEmpty": "No keys are in this status group",
       "apiKeyAvailableStat": "Available",
       "apiKeyDisabledStat": "Disabled",
       "showApiKey": "Show API key",
@@ -1930,6 +1933,11 @@
     "connectivity": {
       "test": "Test",
       "testAll": "Test all",
+      "testScopeLabel": "Test range",
+      "testScopeAll": "All ({{count}})",
+      "testScopeAvailable": "Not disabled ({{count}})",
+      "testScopeDisabled": "Disabled ({{count}})",
+      "testSelectedCount": "Test {{count}}",
       "disableFailed": "Disable selected",
       "disableFailedCount": "Disable selected ({{count}})",
       "disableFailedHint": "Only keys matching the selected error groups are marked disabled; save the provider to apply.",

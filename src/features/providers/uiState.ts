@@ -33,6 +33,18 @@ export interface ProvidersWorkbenchUiState {
   filtersByBrand: Partial<Record<ProviderBrand, ProviderFilterState>>;
 }
 
+export const sortProviderGroupsByResourceCount = <T extends { resources: readonly unknown[] }>(
+  groups: readonly T[]
+): T[] =>
+  groups
+    .map((group, originalIndex) => ({ group, originalIndex }))
+    .sort(
+      (left, right) =>
+        right.group.resources.length - left.group.resources.length ||
+        left.originalIndex - right.originalIndex
+    )
+    .map(({ group }) => group);
+
 const isProviderBrand = (value: unknown): value is ProviderBrand =>
   typeof value === 'string' && PROVIDER_BRAND_SET.has(value as ProviderBrand);
 

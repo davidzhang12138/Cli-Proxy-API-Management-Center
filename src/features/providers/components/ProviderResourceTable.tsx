@@ -27,6 +27,7 @@ import {
 } from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
 import type { StatusBarData } from '@/utils/recentRequests';
+import { getApiKeyEntryAvailabilityStats } from '../apiKeyEntryStatus';
 import { isMultiProtocolSponsorBrand } from '../sponsorDefinitions';
 import type { ProviderResource } from '../types';
 import styles from './ProviderResourceTable.module.scss';
@@ -90,8 +91,22 @@ export function ProviderResourceTable({
 }: ProviderResourceTableProps) {
   const { t } = useTranslation();
 
-  const renderMetric = (key: string, label: string, value: number) => (
-    <span key={key} className={styles.metric}>
+  const renderMetric = (
+    key: string,
+    label: string,
+    value: number,
+    tone?: 'available' | 'disabled'
+  ) => (
+    <span
+      key={key}
+      className={`${styles.metric} ${
+        tone === 'available'
+          ? styles.metricAvailable
+          : tone === 'disabled'
+            ? styles.metricDisabled
+            : ''
+      }`}
+    >
       <span className={styles.metricLabel}>{label}</span>
       <span className={styles.metricValue}>{value}</span>
     </span>
@@ -117,9 +132,23 @@ export function ProviderResourceTable({
       return <div className={styles.metricsCell}>{items}</div>;
     }
     if (r.brand === 'openaiCompatibility') {
+      const availabilityStats = getApiKeyEntryAvailabilityStats(
+        (r.raw as OpenAIProviderConfig | undefined)?.apiKeyEntries ?? []
+      );
       items.push(
         renderMetric('models', t('providersPage.table.metrics.models'), r.modelCount),
-        renderMetric('keys', t('providersPage.table.metrics.keys'), r.apiKeyEntryCount),
+        renderMetric(
+          'availableKeys',
+          t('providersPage.table.metrics.availableKeys'),
+          availabilityStats.available,
+          'available'
+        ),
+        renderMetric(
+          'disabledKeys',
+          t('providersPage.table.metrics.disabledKeys'),
+          availabilityStats.disabled,
+          'disabled'
+        ),
         renderMetric('headers', t('providersPage.table.metrics.headers'), r.headerCount)
       );
     } else {

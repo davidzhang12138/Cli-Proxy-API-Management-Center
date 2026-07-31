@@ -1724,6 +1724,8 @@
       "metrics": {
         "models": "模型",
         "keys": "密钥",
+        "availableKeys": "可用",
+        "disabledKeys": "已封禁",
         "headers": "请求头"
       },
       "websocketsTag": "WebSockets",
@@ -1860,6 +1862,7 @@
       "apiKeyDisabledBadge": "已封禁",
       "apiKeySearchPlaceholder": "搜索 Key 或代理 URL",
       "apiKeySearchEmpty": "没有匹配的 Key",
+      "apiKeyFilterEmpty": "该状态下没有 Key",
       "apiKeyAvailableStat": "可用",
       "apiKeyDisabledStat": "已封禁",
       "showApiKey": "显示密钥",
@@ -1930,6 +1933,11 @@
     "connectivity": {
       "test": "测试",
       "testAll": "全部测试",
+      "testScopeLabel": "测试范围",
+      "testScopeAll": "全部（{{count}}）",
+      "testScopeAvailable": "未封禁（{{count}}）",
+      "testScopeDisabled": "已封禁（{{count}}）",
+      "testSelectedCount": "测试 {{count}} 个",
       "disableFailed": "封禁所选",
       "disableFailedCount": "封禁所选（{{count}}）",
       "disableFailedHint": "仅标记匹配所选错误分组的 Key，保存提供商后生效。",

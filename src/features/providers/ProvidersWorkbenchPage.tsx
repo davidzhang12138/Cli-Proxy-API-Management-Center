@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
@@ -25,6 +25,7 @@ import { useProviderWorkbench } from './useProviderWorkbench';
 import {
   getProviderFilterState,
   readProvidersWorkbenchUiState,
+  sortProviderGroupsByResourceCount,
   writeProvidersWorkbenchUiState,
   type ProviderFilterState,
   type ProvidersWorkbenchUiState,
@@ -153,14 +154,17 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
   );
 
   const allGroups = useMemo(() => workbench.snapshot?.groups ?? [], [workbench.snapshot]);
-  const groups = useMemo(
-    () =>
-      fixedBrand
-        ? allGroups.filter((group) => group.id === fixedBrand)
-        : allGroups.filter((group) => group.id !== 'apikeyFun'),
-    [allGroups, fixedBrand]
-  );
-  const firstVisibleBrand = groups[0]?.id ?? fixedBrand ?? 'gemini';
+  const groups = useMemo(() => {
+    const visibleGroups = fixedBrand
+      ? allGroups.filter((group) => group.id === fixedBrand)
+      : allGroups.filter((group) => group.id !== 'apikeyFun');
+    return fixedBrand ? visibleGroups : sortProviderGroupsByResourceCount(visibleGroups);
+  }, [allGroups, fixedBrand]);
+  const firstVisibleBrand =
+    groups.find((group) => group.resources.length > 0)?.id ??
+    groups[0]?.id ??
+    fixedBrand ??
+    'gemini';
   const activeBrand =
     fixedBrand ??
     (groups.some((group) => group.id === uiState.activeBrand)
@@ -171,6 +175,19 @@ export function ProvidersWorkbenchPage({ fixedBrand }: ProvidersWorkbenchPagePro
   const providerSortBy = activeFilterState.sortBy;
   const providerSortDir = activeFilterState.sortDir;
   const activeGroup = groups.find((g) => g.id === activeBrand) ?? groups[0] ?? null;
+  const initialActiveBrandResolvedRef = useRef(false);
+
+  useEffect(() => {
+    if (fixedBrand || initialActiveBrandResolvedRef.current || groups.length === 0) return;
+    const firstPopulatedGroup = groups.find((group) => group.resources.length > 0);
+    if (!firstPopulatedGroup) return;
+
+    const currentGroup = groups.find((group) => group.id === uiState.activeBrand);
+    if (!currentGroup || currentGroup.resources.length === 0) {
+      setActiveBrand(firstPopulatedGroup.id);
+    }
+    initialActiveBrandResolvedRef.current = true;
+  }, [fixedBrand, groups, setActiveBrand, uiState.activeBrand]);
 
   const updateActiveFilterState = useCallback(
     (patch: Partial<ProviderFilterState>) => {

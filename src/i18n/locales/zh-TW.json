@@ -1698,6 +1698,8 @@
       "metrics": {
         "models": "模型",
         "keys": "金鑰",
+        "availableKeys": "可用",
+        "disabledKeys": "已封禁",
         "headers": "請求標頭"
       },
       "websocketsTag": "WebSockets",
@@ -1834,6 +1836,7 @@
       "apiKeyDisabledBadge": "已封禁",
       "apiKeySearchPlaceholder": "搜尋 Key 或代理 URL",
       "apiKeySearchEmpty": "沒有符合的 Key",
+      "apiKeyFilterEmpty": "此狀態下沒有 Key",
       "apiKeyAvailableStat": "可用",
       "apiKeyDisabledStat": "已封禁",
       "showApiKey": "顯示金鑰",
@@ -1898,6 +1901,11 @@
     "connectivity": {
       "test": "測試",
       "testAll": "全部測試",
+      "testScopeLabel": "測試範圍",
+      "testScopeAll": "全部（{{count}}）",
+      "testScopeAvailable": "未封禁（{{count}}）",
+      "testScopeDisabled": "已封禁（{{count}}）",
+      "testSelectedCount": "測試 {{count}} 個",
       "disableFailed": "封禁所選",
       "disableFailedCount": "封禁所選（{{count}}）",
       "disableFailedHint": "僅標記符合所選錯誤分組的 Key，儲存提供商後生效。",

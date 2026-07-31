@@ -870,7 +870,7 @@ export function BaseProviderForm({
               )
             }
             onTest={(idx) => void connectivity.runOpenAIKey(idx)}
-            onTestAll={() => void connectivity.runOpenAIAllKeys()}
+            onTestAll={(scope) => void connectivity.runOpenAIAllKeys(scope)}
             onDisableFailed={(indexes) => {
               const failed = new Set(indexes);
               updateField(

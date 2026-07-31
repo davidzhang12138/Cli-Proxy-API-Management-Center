@@ -1702,6 +1702,8 @@
       "metrics": {
         "models": "Модели",
         "keys": "Ключи",
+        "availableKeys": "Доступны",
+        "disabledKeys": "Отключены",
         "headers": "Заголовки"
       },
       "websocketsTag": "WebSockets",
@@ -1838,6 +1840,7 @@
       "apiKeyDisabledBadge": "Отключён",
       "apiKeySearchPlaceholder": "Поиск по ключу или Proxy URL",
       "apiKeySearchEmpty": "Подходящие ключи не найдены",
+      "apiKeyFilterEmpty": "В этой группе статуса нет ключей",
       "apiKeyAvailableStat": "Доступны",
       "apiKeyDisabledStat": "Отключены",
       "showApiKey": "Показать ключ API",
@@ -1902,6 +1905,11 @@
     "connectivity": {
       "test": "Проверить",
       "testAll": "Проверить все",
+      "testScopeLabel": "Диапазон проверки",
+      "testScopeAll": "Все ({{count}})",
+      "testScopeAvailable": "Не отключены ({{count}})",
+      "testScopeDisabled": "Отключены ({{count}})",
+      "testSelectedCount": "Проверить: {{count}}",
       "disableFailed": "Отключить выбранные",
       "disableFailedCount": "Отключить выбранные ({{count}})",
       "disableFailedHint": "Будут отключены только ключи из выбранных групп ошибок; сохраните провайдера для применения.",

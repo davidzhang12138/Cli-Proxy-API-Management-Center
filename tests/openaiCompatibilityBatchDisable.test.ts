@@ -3,6 +3,7 @@ import { getApiKeyEntryAvailabilityStats } from '../src/features/providers/apiKe
 import {
   getOpenAIBulkDisableCandidateIndexes,
   getOpenAIBulkDisableGroups,
+  getOpenAITestCandidateIndexes,
   OTHER_FAILURE_GROUP_KEY,
 } from '../src/features/providers/sheets/forms/useConnectivityTest';
 import type { ApiKeyEntryInput } from '../src/features/providers/types';
@@ -93,5 +94,18 @@ describe('OpenAI compatibility key availability stats', () => {
         entry({ apiKey: 'new-key', existingApiKey: undefined }),
       ])
     ).toEqual({ available: 2, disabled: 1 });
+  });
+
+  test('selects configured keys by availability for scoped tests', () => {
+    const entries = [
+      entry(),
+      entry({ disabled: true }),
+      entry({ apiKey: '', existingApiKey: '' }),
+      entry({ apiKey: 'new-key', existingApiKey: undefined }),
+    ];
+
+    expect(getOpenAITestCandidateIndexes(entries, 'all')).toEqual([0, 1, 3]);
+    expect(getOpenAITestCandidateIndexes(entries, 'available')).toEqual([0, 3]);
+    expect(getOpenAITestCandidateIndexes(entries, 'disabled')).toEqual([1]);
   });
 });

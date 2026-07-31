@@ -11,12 +11,14 @@ import {
 } from '@/components/providers/utils';
 import { buildHeaderObject, hasHeader } from '@/utils/headers';
 import { getErrorMessage } from '@/utils/helpers';
+import { isConfiguredApiKeyEntry } from '../../apiKeyEntryStatus';
 import type { ApiKeyEntryInput, ModelEntryInput, ProviderBrand } from '../../types';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01';
 
 export type ConnectivityState = 'idle' | 'loading' | 'success' | 'error';
+export type OpenAITestScope = 'all' | 'available' | 'disabled';
 
 export interface ConnectivityStatus {
   state: ConnectivityState;
@@ -86,6 +88,17 @@ export const getOpenAIBulkDisableCandidateIndexes = (
     !selectedGroupKeys || selectedGroupKeys.has(group.key) ? group.indexes : []
   );
 
+export const getOpenAITestCandidateIndexes = (
+  entries: ApiKeyEntryInput[],
+  scope: OpenAITestScope
+): number[] =>
+  entries.flatMap((entry, index) => {
+    if (!isConfiguredApiKeyEntry(entry)) return [];
+    if (scope === 'available' && entry.disabled) return [];
+    if (scope === 'disabled' && !entry.disabled) return [];
+    return [index];
+  });
+
 const requestFailureMessage = (err: unknown, messages: ConnectivityErrorMessages): string => {
   const raw = getErrorMessage(err);
   const isTimeout =
@@ -144,7 +157,7 @@ export interface UseConnectivityTestResult {
   claudeStatus: ConnectivityStatus;
   isTestingAny: boolean;
   runOpenAIKey: (idx: number) => Promise<boolean>;
-  runOpenAIAllKeys: () => Promise<void>;
+  runOpenAIAllKeys: (scope?: OpenAITestScope) => Promise<void>;
   runCodex: () => Promise<void>;
   runGemini: () => Promise<void>;
   runClaude: () => Promise<void>;
@@ -355,14 +368,19 @@ export function useConnectivityTest(
     ]
   );
 
-  const runOpenAIAllKeys = useCallback(async (): Promise<void> => {
-    if (brand !== 'openaiCompatibility') return;
-    const entries = apiKeyEntries ?? [];
-    if (!entries.length) return;
-    setOpenaiBatchCompleted(false);
-    await Promise.all(entries.map((_, idx) => runOpenAIKey(idx)));
-    setOpenaiBatchCompleted(true);
-  }, [apiKeyEntries, brand, runOpenAIKey]);
+  const runOpenAIAllKeys = useCallback(
+    async (scope: OpenAITestScope = 'all'): Promise<void> => {
+      if (brand !== 'openaiCompatibility') return;
+      const entries = apiKeyEntries ?? [];
+      const indexes = getOpenAITestCandidateIndexes(entries, scope);
+      setOpenaiStatuses(entries.map(() => IDLE));
+      setOpenaiBatchCompleted(false);
+      if (!indexes.length) return;
+      await Promise.all(indexes.map((idx) => runOpenAIKey(idx)));
+      setOpenaiBatchCompleted(true);
+    },
+    [apiKeyEntries, brand, runOpenAIKey]
+  );
 
   const runCodex = useCallback(async (): Promise<void> => {
     if (brand !== 'codex' && brand !== 'xai') return;

@@ -90,6 +90,26 @@
   font-variant-numeric: tabular-nums;
 }
 
+.metricAvailable {
+  border-color: color-mix(in srgb, var(--success-badge-text) 28%, var(--border-color));
+  background: var(--success-badge-bg);
+
+  .metricLabel,
+  .metricValue {
+    color: var(--success-badge-text);
+  }
+}
+
+.metricDisabled {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+
+  .metricLabel,
+  .metricValue {
+    color: var(--warning-text);
+  }
+}
+
 .flagTag {
   display: inline-flex;
   align-items: center;

@@ -13,13 +13,15 @@ import {
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { maskApiKey } from '@/utils/format';
 import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
-import { getApiKeyEntryAvailabilityStats } from '../../apiKeyEntryStatus';
+import { getApiKeyEntryAvailabilityStats, isConfiguredApiKeyEntry } from '../../apiKeyEntryStatus';
 import type { ApiKeyEntryInput } from '../../types';
 import {
   getOpenAIBulkDisableCandidateIndexes,
   getOpenAIBulkDisableGroups,
+  getOpenAITestCandidateIndexes,
   type ConnectivityState,
   type ConnectivityStatus,
+  type OpenAITestScope,
 } from './useConnectivityTest';
 import { ConnectivityStatusIcon } from './ConnectivityStatusIcon';
 import styles from './sharedForm.module.scss';
@@ -43,7 +45,7 @@ interface ApiKeyEntriesEditorProps {
   onAdd: () => number;
   onRemove: (idx: number) => void;
   onTest: (idx: number) => void;
-  onTestAll: () => void;
+  onTestAll: (scope: OpenAITestScope) => void;
   onDisableFailed: (indexes: number[]) => void;
 }
 
@@ -68,6 +70,8 @@ export function ApiKeyEntriesEditor({
   const [showPasswords, setShowPasswords] = useState<Set<number>>(new Set());
   const [showAll, setShowAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [entryFilter, setEntryFilter] = useState<OpenAITestScope>('all');
+  const [testScope, setTestScope] = useState<OpenAITestScope>('all');
   const [selectedFailureGroupKeys, setSelectedFailureGroupKeys] = useState<Set<string>>(new Set());
 
   const togglePasswordVisibility = (idx: number) => {
@@ -84,6 +88,8 @@ export function ApiKeyEntriesEditor({
 
   const handleAdd = () => {
     const idx = onAdd();
+    setSearchQuery('');
+    setEntryFilter('all');
     setExpandedIdx(idx);
   };
 
@@ -110,17 +116,31 @@ export function ApiKeyEntriesEditor({
   // Newest entries first, matching the append-on-add order.
   const reversed = entries.map((entry, idx) => ({ entry, idx })).reverse();
   const normalizedQuery = searchQuery.trim().toLowerCase();
+  const availabilityFiltered = reversed.filter(({ entry }) => {
+    if (entryFilter === 'all') return true;
+    if (!isConfiguredApiKeyEntry(entry)) return false;
+    return entryFilter === 'disabled' ? entry.disabled : !entry.disabled;
+  });
   const filtered = normalizedQuery
-    ? reversed.filter(({ entry }) => {
+    ? availabilityFiltered.filter(({ entry }) => {
         const apiKey = entry.apiKey.trim() || entry.existingApiKey?.trim() || '';
         return (
           apiKey.toLowerCase().includes(normalizedQuery) ||
           entry.proxyUrl.trim().toLowerCase().includes(normalizedQuery)
         );
       })
-    : reversed;
-  const visible = normalizedQuery || showAll ? filtered : filtered.slice(0, COLLAPSED_LIMIT);
+    : availabilityFiltered;
+  const visible =
+    normalizedQuery || entryFilter !== 'all' || showAll
+      ? filtered
+      : filtered.slice(0, COLLAPSED_LIMIT);
   const availabilityStats = getApiKeyEntryAvailabilityStats(entries);
+  const testScopeCounts: Record<OpenAITestScope, number> = {
+    all: getOpenAITestCandidateIndexes(entries, 'all').length,
+    available: getOpenAITestCandidateIndexes(entries, 'available').length,
+    disabled: getOpenAITestCandidateIndexes(entries, 'disabled').length,
+  };
+  const selectedTestCount = testScopeCounts[testScope];
   const failedIndexes = statuses.flatMap((status, idx) =>
     status?.state === 'error' && status.canDisable ? [idx] : []
   );
@@ -160,6 +180,10 @@ export function ApiKeyEntriesEditor({
     });
   };
 
+  const toggleEntryFilter = (filter: Exclude<OpenAITestScope, 'all'>) => {
+    setEntryFilter((current) => (current === filter ? 'all' : filter));
+  };
+
   const batchSummary = batchCompleted
     ? actionableFailedIndexes.length > 0
       ? t('providersPage.connectivity.batchFailures', {
@@ -180,18 +204,48 @@ export function ApiKeyEntriesEditor({
           <span>{t('providersPage.form.addApiKeyEntry')}</span>
         </button>
         <div className={styles.entriesToolbarActions}>
+          <label className={styles.testScopePicker}>
+            <span className={styles.testScopeLabel}>
+              {t('providersPage.connectivity.testScopeLabel')}
+            </span>
+            <select
+              className={styles.testScopeSelect}
+              value={testScope}
+              onChange={(event) => setTestScope(event.target.value as OpenAITestScope)}
+              disabled={mutating || isTestingAny}
+              aria-label={t('providersPage.connectivity.testScopeLabel')}
+            >
+              <option value="all">
+                {t('providersPage.connectivity.testScopeAll', { count: testScopeCounts.all })}
+              </option>
+              <option value="available">
+                {t('providersPage.connectivity.testScopeAvailable', {
+                  count: testScopeCounts.available,
+                })}
+              </option>
+              <option value="disabled">
+                {t('providersPage.connectivity.testScopeDisabled', {
+                  count: testScopeCounts.disabled,
+                })}
+              </option>
+            </select>
+          </label>
           <button
             type="button"
             className={styles.connectivityBtn}
-            disabled={mutating || isTestingAny}
-            onClick={onTestAll}
+            disabled={mutating || isTestingAny || selectedTestCount === 0}
+            onClick={() => onTestAll(testScope)}
           >
             {isTestingAny ? (
               <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
                 <IconLoader2 size={14} />
               </span>
             ) : null}
-            <span>{t('providersPage.connectivity.testAll')}</span>
+            <span>
+              {t('providersPage.connectivity.testSelectedCount', {
+                count: selectedTestCount,
+              })}
+            </span>
           </button>
         </div>
       </div>
@@ -208,16 +262,28 @@ export function ApiKeyEntriesEditor({
           />
         </div>
         <div className={styles.entryAvailabilityStats}>
-          <span className={`${styles.entryAvailabilityStat} ${styles.entryAvailabilityStatActive}`}>
+          <button
+            type="button"
+            className={`${styles.entryAvailabilityStat} ${styles.entryAvailabilityStatButton} ${
+              styles.entryAvailabilityStatActive
+            } ${entryFilter === 'available' ? styles.entryAvailabilityStatSelected : ''}`}
+            aria-pressed={entryFilter === 'available'}
+            onClick={() => toggleEntryFilter('available')}
+          >
             <span>{t('providersPage.form.apiKeyAvailableStat')}</span>
             <strong>{availabilityStats.available}</strong>
-          </span>
-          <span
-            className={`${styles.entryAvailabilityStat} ${styles.entryAvailabilityStatDisabled}`}
+          </button>
+          <button
+            type="button"
+            className={`${styles.entryAvailabilityStat} ${styles.entryAvailabilityStatButton} ${
+              styles.entryAvailabilityStatDisabled
+            } ${entryFilter === 'disabled' ? styles.entryAvailabilityStatSelected : ''}`}
+            aria-pressed={entryFilter === 'disabled'}
+            onClick={() => toggleEntryFilter('disabled')}
           >
             <span>{t('providersPage.form.apiKeyDisabledStat')}</span>
             <strong>{availabilityStats.disabled}</strong>
-          </span>
+          </button>
         </div>
       </div>
       {batchCompleted && batchSummary ? (
@@ -449,10 +515,14 @@ export function ApiKeyEntriesEditor({
           </div>
         );
       })}
-      {normalizedQuery && visible.length === 0 ? (
-        <div className={styles.entrySearchEmpty}>{t('providersPage.form.apiKeySearchEmpty')}</div>
+      {(normalizedQuery || entryFilter !== 'all') && visible.length === 0 ? (
+        <div className={styles.entrySearchEmpty}>
+          {normalizedQuery
+            ? t('providersPage.form.apiKeySearchEmpty')
+            : t('providersPage.form.apiKeyFilterEmpty')}
+        </div>
       ) : null}
-      {!normalizedQuery && entries.length > COLLAPSED_LIMIT ? (
+      {!normalizedQuery && entryFilter === 'all' && entries.length > COLLAPSED_LIMIT ? (
         <button type="button" className={styles.showMoreBtn} onClick={() => setShowAll((v) => !v)}>
           {showAll
             ? t('providersPage.form.showFewerEntries')
