@@ -206,6 +206,11 @@
   background: var(--bg-secondary);
 }
 
+.entryCardDisabled {
+  border-color: var(--warning-border);
+  background: color-mix(in srgb, var(--warning-bg) 48%, var(--bg-secondary));
+}
+
 .entryCardHeader {
   display: flex;
   align-items: center;
@@ -250,6 +255,36 @@
   min-width: 0;
   flex-direction: column;
   gap: 10px;
+}
+
+.entryStatusRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
+.entryStatusCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.entryStatusLabel {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.entryStatusHint {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .entryCardIconBtn {
@@ -297,6 +332,77 @@
 
 .entriesToolbarSplit {
   justify-content: space-between;
+}
+
+.entriesToolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.batchDisableBtn {
+  color: var(--warning-text);
+
+  &:hover:not(:disabled) {
+    border-color: var(--warning-border);
+    background: var(--warning-bg);
+    color: var(--warning-text);
+  }
+}
+
+.entrySearchWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.entrySearchIcon {
+  position: absolute;
+  left: 10px;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.entrySearchInput {
+  width: 100%;
+  height: 32px;
+  padding: 6px 10px 6px 30px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  font-size: 12px;
+
+  &::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--primary-10);
+  }
+}
+
+.batchTestSummary {
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.entrySearchEmpty {
+  padding: 16px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  text-align: center;
 }
 
 .connectivityRow {
@@ -761,6 +867,12 @@
   flex-shrink: 0;
 }
 
+.entryBadgeDisabled {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
 .showMoreBtn {
   align-self: center;
   display: inline-flex;
@@ -905,6 +1017,11 @@
   font-size: 12px;
 }
 
+.apiKeyEntryCardDisabled {
+  border-color: var(--warning-border);
+  background: color-mix(in srgb, var(--warning-bg) 48%, var(--bg-secondary));
+}
+
 .apiKeyEntryIndex {
   display: inline-flex;
   align-items: center;
@@ -927,6 +1044,17 @@
   max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-all;
+}
+
+.apiKeyEntryDisabledBadge {
+  padding: 2px 7px;
+  border: 1px solid var(--warning-border);
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .apiKeyEntryProxy {

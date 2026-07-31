@@ -21,9 +21,23 @@ export type ConnectivityState = 'idle' | 'loading' | 'success' | 'error';
 export interface ConnectivityStatus {
   state: ConnectivityState;
   message: string;
+  /** True only when a real request was sent and this key can safely join a bulk disable action. */
+  canDisable?: boolean;
 }
 
 const IDLE: ConnectivityStatus = { state: 'idle', message: '' };
+
+export const getOpenAIBulkDisableCandidateIndexes = (
+  entries: ApiKeyEntryInput[],
+  statuses: ConnectivityStatus[]
+): number[] =>
+  statuses.flatMap((status, index) => {
+    const entry = entries[index];
+    const hasApiKey = Boolean(entry?.apiKey.trim() || entry?.existingApiKey?.trim());
+    return status?.state === 'error' && status.canDisable && entry && !entry.disabled && hasApiKey
+      ? [index]
+      : [];
+  });
 
 const requestFailureMessage = (err: unknown, messages: ConnectivityErrorMessages): string => {
   const raw = getErrorMessage(err);
@@ -77,6 +91,7 @@ export interface ConnectivityErrorMessages {
 
 export interface UseConnectivityTestResult {
   openaiStatuses: ConnectivityStatus[];
+  openaiBatchCompleted: boolean;
   codexStatus: ConnectivityStatus;
   geminiStatus: ConnectivityStatus;
   claudeStatus: ConnectivityStatus;
@@ -109,6 +124,7 @@ export function useConnectivityTest(
   const [openaiStatuses, setOpenaiStatuses] = useState<ConnectivityStatus[]>(() =>
     Array.from({ length: entriesCount }, () => IDLE)
   );
+  const [openaiBatchCompleted, setOpenaiBatchCompleted] = useState(false);
   const [codexStatus, setCodexStatus] = useState<ConnectivityStatus>(IDLE);
   const [geminiStatus, setGeminiStatus] = useState<ConnectivityStatus>(IDLE);
   const [claudeStatus, setClaudeStatus] = useState<ConnectivityStatus>(IDLE);
@@ -132,6 +148,8 @@ export function useConnectivityTest(
     const prev = lastEntrySignaturesRef.current;
     const curr = entrySignatures;
     lastEntrySignaturesRef.current = curr;
+    const signaturesChanged =
+      prev.length !== curr.length || prev.some((value, index) => value !== curr[index]);
 
     setOpenaiStatuses((statuses) => {
       const nextLen = curr.length;
@@ -146,6 +164,9 @@ export function useConnectivityTest(
       }
       return mutated ? next : statuses;
     });
+    if (signaturesChanged) {
+      setOpenaiBatchCompleted(false);
+    }
   }, [entrySignatures]);
 
   const signature = useMemo(() => {
@@ -167,6 +188,7 @@ export function useConnectivityTest(
     if (lastSignatureRef.current === signature) return;
     lastSignatureRef.current = signature;
     setOpenaiStatuses((prev) => prev.map(() => IDLE));
+    setOpenaiBatchCompleted(false);
     setCodexStatus(IDLE);
     setGeminiStatus(IDLE);
     setClaudeStatus(IDLE);
@@ -183,6 +205,7 @@ export function useConnectivityTest(
   const runOpenAIKey = useCallback(
     async (idx: number): Promise<boolean> => {
       if (brand !== 'openaiCompatibility') return false;
+      setOpenaiBatchCompleted(false);
 
       const trimmedBase = baseUrl.trim();
       if (!trimmedBase) {
@@ -259,6 +282,7 @@ export function useConnectivityTest(
         updateOpenaiStatus(idx, {
           state: 'error',
           message: requestFailureMessage(err, messages),
+          canDisable: true,
         });
         return false;
       } finally {
@@ -282,7 +306,9 @@ export function useConnectivityTest(
     if (brand !== 'openaiCompatibility') return;
     const entries = apiKeyEntries ?? [];
     if (!entries.length) return;
+    setOpenaiBatchCompleted(false);
     await Promise.all(entries.map((_, idx) => runOpenAIKey(idx)));
+    setOpenaiBatchCompleted(true);
   }, [apiKeyEntries, brand, runOpenAIKey]);
 
   const runCodex = useCallback(async (): Promise<void> => {
@@ -513,6 +539,7 @@ export function useConnectivityTest(
 
   return {
     openaiStatuses,
+    openaiBatchCompleted,
     codexStatus,
     geminiStatus,
     claudeStatus,

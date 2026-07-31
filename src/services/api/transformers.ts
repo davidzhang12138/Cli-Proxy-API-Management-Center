@@ -111,6 +111,7 @@ const normalizeApiKeyEntry = (entry: unknown): ApiKeyEntry | null => {
   if (!trimmed) return null;
 
   const proxyUrl = record?.['proxy-url'];
+  const disabled = normalizeBoolean(record?.disabled);
   const weight = readCredentialWeight(record?.weight);
   const authIndex = normalizeAuthIndex(record?.['auth-index']);
 
@@ -118,6 +119,7 @@ const normalizeApiKeyEntry = (entry: unknown): ApiKeyEntry | null => {
     apiKey: trimmed,
     proxyUrl: proxyUrl ? String(proxyUrl) : undefined,
   };
+  if (disabled !== undefined) result.disabled = disabled;
   if (weight !== undefined) result.weight = weight;
   if (authIndex) result.authIndex = authIndex;
   return result;

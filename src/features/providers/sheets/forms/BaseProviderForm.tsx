@@ -56,6 +56,7 @@ const emptyHeader = () => ({ key: '', value: '' });
 const emptyModel = (): ModelEntryInput => ({ name: '', alias: '' });
 const emptyApiKeyEntry = (): ApiKeyEntryInput => ({
   apiKey: '',
+  disabled: false,
   proxyUrl: '',
   weight: undefined,
 });
@@ -146,6 +147,7 @@ function buildInitialForm(
         ? cfg.apiKeyEntries.map((entry) => ({
             apiKey: '',
             existingApiKey: entry.apiKey,
+            disabled: entry.disabled === true,
             proxyUrl: entry.proxyUrl ?? '',
             weight: entry.weight,
             authIndex: entry.authIndex,
@@ -849,6 +851,7 @@ export function BaseProviderForm({
             mutating={mutating}
             statuses={connectivity.openaiStatuses}
             isTestingAny={connectivity.isTestingAny}
+            batchCompleted={connectivity.openaiBatchCompleted}
             onUpdate={(idx, patch) =>
               updateField(
                 'apiKeyEntries',
@@ -868,6 +871,15 @@ export function BaseProviderForm({
             }
             onTest={(idx) => void connectivity.runOpenAIKey(idx)}
             onTestAll={() => void connectivity.runOpenAIAllKeys()}
+            onDisableFailed={(indexes) => {
+              const failed = new Set(indexes);
+              updateField(
+                'apiKeyEntries',
+                apiKeyEntries.map((entry, idx) =>
+                  failed.has(idx) ? { ...entry, disabled: true } : entry
+                )
+              );
+            }}
           />
         </Collapsible>
       ) : null}

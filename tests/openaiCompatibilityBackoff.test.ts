@@ -19,7 +19,7 @@ const openAIFormInput = (
   models: [],
   headers: [],
   excludedModelsText: '',
-  apiKeyEntries: [{ apiKey: '', existingApiKey: 'existing-key', proxyUrl: '' }],
+  apiKeyEntries: [{ apiKey: '', existingApiKey: 'existing-key', disabled: false, proxyUrl: '' }],
   ...overrides,
 });
 
@@ -29,6 +29,31 @@ afterEach(() => {
 });
 
 describe('OpenAI compatibility quota backoff', () => {
+  test('keeps a masked existing key while changing its disabled state', () => {
+    const config = buildOpenAIConfig(
+      openAIFormInput({
+        apiKeyEntries: [
+          {
+            apiKey: '',
+            existingApiKey: 'existing-key',
+            disabled: true,
+            proxyUrl: '',
+          },
+        ],
+      })
+    );
+
+    expect(config.apiKeyEntries).toEqual([
+      {
+        apiKey: 'existing-key',
+        disabled: true,
+        proxyUrl: undefined,
+        weight: undefined,
+        authIndex: undefined,
+      },
+    ]);
+  });
+
   test('writes duration fields and removes deprecated seconds fields', async () => {
     let putData: unknown;
     apiClient.get = (async () => ({

@@ -6,12 +6,19 @@ import {
   IconEyeOff,
   IconLoader2,
   IconPlus,
+  IconSearch,
+  IconShield,
   IconX,
 } from '@/components/ui/icons';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { maskApiKey } from '@/utils/format';
 import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
 import type { ApiKeyEntryInput } from '../../types';
-import type { ConnectivityState, ConnectivityStatus } from './useConnectivityTest';
+import {
+  getOpenAIBulkDisableCandidateIndexes,
+  type ConnectivityState,
+  type ConnectivityStatus,
+} from './useConnectivityTest';
 import { ConnectivityStatusIcon } from './ConnectivityStatusIcon';
 import styles from './sharedForm.module.scss';
 
@@ -28,12 +35,14 @@ interface ApiKeyEntriesEditorProps {
   mutating: boolean;
   statuses: ConnectivityStatus[];
   isTestingAny: boolean;
+  batchCompleted: boolean;
   onUpdate: (idx: number, patch: Partial<ApiKeyEntryInput>) => void;
   /** Appends a new blank entry and returns its index. */
   onAdd: () => number;
   onRemove: (idx: number) => void;
   onTest: (idx: number) => void;
   onTestAll: () => void;
+  onDisableFailed: (indexes: number[]) => void;
 }
 
 export function ApiKeyEntriesEditor({
@@ -42,11 +51,13 @@ export function ApiKeyEntriesEditor({
   mutating,
   statuses,
   isTestingAny,
+  batchCompleted,
   onUpdate,
   onAdd,
   onRemove,
   onTest,
   onTestAll,
+  onDisableFailed,
 }: ApiKeyEntriesEditorProps) {
   const { t } = useTranslation();
   const [expandedIdx, setExpandedIdx] = useState<number | null>(() =>
@@ -54,6 +65,7 @@ export function ApiKeyEntriesEditor({
   );
   const [showPasswords, setShowPasswords] = useState<Set<number>>(new Set());
   const [showAll, setShowAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const togglePasswordVisibility = (idx: number) => {
     setShowPasswords((prev) => {
@@ -94,7 +106,36 @@ export function ApiKeyEntriesEditor({
 
   // Newest entries first, matching the append-on-add order.
   const reversed = entries.map((entry, idx) => ({ entry, idx })).reverse();
-  const visible = showAll ? reversed : reversed.slice(0, COLLAPSED_LIMIT);
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filtered = normalizedQuery
+    ? reversed.filter(({ entry }) => {
+        const apiKey = entry.apiKey.trim() || entry.existingApiKey?.trim() || '';
+        return (
+          apiKey.toLowerCase().includes(normalizedQuery) ||
+          entry.proxyUrl.trim().toLowerCase().includes(normalizedQuery)
+        );
+      })
+    : reversed;
+  const visible = normalizedQuery || showAll ? filtered : filtered.slice(0, COLLAPSED_LIMIT);
+  const failedIndexes = statuses.flatMap((status, idx) =>
+    status?.state === 'error' && status.canDisable ? [idx] : []
+  );
+  const actionableFailedIndexes = getOpenAIBulkDisableCandidateIndexes(entries, statuses);
+  const setupFailureCount = statuses.filter(
+    (status) => status?.state === 'error' && !status.canDisable
+  ).length;
+
+  const batchSummary = batchCompleted
+    ? actionableFailedIndexes.length > 0
+      ? t('providersPage.connectivity.batchFailures', {
+          count: actionableFailedIndexes.length,
+        })
+      : failedIndexes.length > 0
+        ? t('providersPage.connectivity.batchFailuresDisabled')
+        : setupFailureCount > 0
+          ? t('providersPage.connectivity.batchNeedsFix')
+          : t('providersPage.connectivity.batchNoFailures')
+    : '';
 
   return (
     <div className={styles.entriesList}>
@@ -103,26 +144,65 @@ export function ApiKeyEntriesEditor({
           <IconPlus size={12} />
           <span>{t('providersPage.form.addApiKeyEntry')}</span>
         </button>
-        <button
-          type="button"
-          className={styles.connectivityBtn}
-          disabled={mutating || isTestingAny}
-          onClick={onTestAll}
-        >
-          {isTestingAny ? (
-            <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
-              <IconLoader2 size={14} />
+        <div className={styles.entriesToolbarActions}>
+          <button
+            type="button"
+            className={styles.connectivityBtn}
+            disabled={mutating || isTestingAny}
+            onClick={onTestAll}
+          >
+            {isTestingAny ? (
+              <span className={`${styles.statusIcon} ${styles.statusIconLoading}`}>
+                <IconLoader2 size={14} />
+              </span>
+            ) : null}
+            <span>{t('providersPage.connectivity.testAll')}</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.connectivityBtn} ${styles.batchDisableBtn}`}
+            disabled={
+              mutating || isTestingAny || !batchCompleted || actionableFailedIndexes.length === 0
+            }
+            onClick={() => onDisableFailed(actionableFailedIndexes)}
+            title={
+              batchCompleted
+                ? t('providersPage.connectivity.disableFailedHint')
+                : t('providersPage.connectivity.disableFailedRequiresTest')
+            }
+          >
+            <IconShield size={14} />
+            <span>
+              {actionableFailedIndexes.length > 0
+                ? t('providersPage.connectivity.disableFailedCount', {
+                    count: actionableFailedIndexes.length,
+                  })
+                : t('providersPage.connectivity.disableFailed')}
             </span>
-          ) : null}
-          <span>{t('providersPage.connectivity.testAll')}</span>
-        </button>
+          </button>
+        </div>
       </div>
+      <div className={styles.entrySearchWrap}>
+        <IconSearch className={styles.entrySearchIcon} size={14} />
+        <input
+          className={styles.entrySearchInput}
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder={t('providersPage.form.apiKeySearchPlaceholder')}
+          aria-label={t('providersPage.form.apiKeySearchPlaceholder')}
+        />
+      </div>
+      {batchSummary ? <div className={styles.batchTestSummary}>{batchSummary}</div> : null}
       {visible.map(({ entry, idx }) => {
         const status = statuses[idx] ?? idleStatus;
         const expanded = expandedIdx === idx;
         const summaryKey = entry.apiKey.trim() || entry.existingApiKey?.trim() || '';
         return (
-          <div key={idx} className={styles.entryCard}>
+          <div
+            key={idx}
+            className={`${styles.entryCard} ${entry.disabled ? styles.entryCardDisabled : ''}`}
+          >
             <div className={styles.entryCardHeader}>
               <button
                 type="button"
@@ -135,6 +215,11 @@ export function ApiKeyEntriesEditor({
                   {entry.proxyUrl.trim() ? (
                     <span className={styles.entryBadge} title={entry.proxyUrl}>
                       {t('providersPage.form.proxyBadge')}
+                    </span>
+                  ) : null}
+                  {entry.disabled ? (
+                    <span className={`${styles.entryBadge} ${styles.entryBadgeDisabled}`}>
+                      {t('providersPage.form.apiKeyDisabledBadge')}
                     </span>
                   ) : null}
                   <span className={styles.entrySummaryKey}>
@@ -189,6 +274,22 @@ export function ApiKeyEntriesEditor({
             ) : null}
             {expanded ? (
               <div className={styles.entryCardBody}>
+                <div className={styles.entryStatusRow}>
+                  <span className={styles.entryStatusCopy}>
+                    <span className={styles.entryStatusLabel}>
+                      {t('providersPage.form.apiKeyEnabled')}
+                    </span>
+                    <span className={styles.entryStatusHint}>
+                      {t('providersPage.form.apiKeyEnabledHint')}
+                    </span>
+                  </span>
+                  <ToggleSwitch
+                    checked={!entry.disabled}
+                    onChange={(enabled) => onUpdate(idx, { disabled: !enabled })}
+                    disabled={mutating}
+                    ariaLabel={t('providersPage.form.apiKeyEnabled')}
+                  />
+                </div>
                 <div className={styles.field}>
                   <label className={styles.label}>{t('providersPage.form.apiKey')}</label>
                   <div className={styles.passwordField}>
@@ -261,7 +362,10 @@ export function ApiKeyEntriesEditor({
           </div>
         );
       })}
-      {entries.length > COLLAPSED_LIMIT ? (
+      {normalizedQuery && visible.length === 0 ? (
+        <div className={styles.entrySearchEmpty}>{t('providersPage.form.apiKeySearchEmpty')}</div>
+      ) : null}
+      {!normalizedQuery && entries.length > COLLAPSED_LIMIT ? (
         <button type="button" className={styles.showMoreBtn} onClick={() => setShowAll((v) => !v)}>
           {showAll
             ? t('providersPage.form.showFewerEntries')

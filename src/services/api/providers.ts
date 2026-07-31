@@ -76,7 +76,7 @@ const OPENAI_PROVIDER_FIELDS = [
 const MODEL_ALIAS_FIELDS = ['name', 'alias', 'priority', 'test-model', 'thinking'] as const;
 const OPENAI_MODEL_ALIAS_FIELDS = [...MODEL_ALIAS_FIELDS, 'image'] as const;
 
-const API_KEY_ENTRY_FIELDS = ['api-key', 'proxy-url', 'weight'] as const;
+const API_KEY_ENTRY_FIELDS = ['api-key', 'disabled', 'proxy-url', 'weight'] as const;
 
 const CLOAK_FIELDS = ['mode', 'strict-mode', 'sensitive-words', 'cache-user-id'] as const;
 
@@ -323,6 +323,7 @@ const serializeModelAliases = (models?: ModelAlias[], includeOpenAIFields = fals
 
 const serializeApiKeyEntry = (entry: ApiKeyEntry) => {
   const payload: Record<string, unknown> = { 'api-key': entry.apiKey };
+  if (entry.disabled) payload.disabled = true;
   if (entry.proxyUrl) payload['proxy-url'] = entry.proxyUrl;
   if (entry.weight !== undefined) payload.weight = entry.weight;
   return payload;

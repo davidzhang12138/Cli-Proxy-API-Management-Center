@@ -65,9 +65,19 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
                   )
                 : { success: 0, failure: 0 };
               return (
-                <div key={`${entry.apiKey}-${entryIndex}`} className={styles.apiKeyEntryCard}>
+                <div
+                  key={`${entry.apiKey}-${entryIndex}`}
+                  className={`${styles.apiKeyEntryCard} ${
+                    entry.disabled ? styles.apiKeyEntryCardDisabled : ''
+                  }`}
+                >
                   <span className={styles.apiKeyEntryIndex}>{entryIndex + 1}</span>
                   <span className={styles.apiKeyEntryKey}>{maskApiKey(entry.apiKey)}</span>
+                  {entry.disabled ? (
+                    <span className={styles.apiKeyEntryDisabledBadge}>
+                      {t('providersPage.form.apiKeyDisabledBadge')}
+                    </span>
+                  ) : null}
                   {entry.proxyUrl ? (
                     <span className={styles.apiKeyEntryProxy}>{entry.proxyUrl}</span>
                   ) : null}

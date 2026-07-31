@@ -32,6 +32,20 @@ describe('provider credential weight normalization', () => {
     expect(provider?.apiKeyEntries[1]?.weight).toBeUndefined();
   });
 
+  test('reads per-key disabled states for OpenAI-compatible providers', () => {
+    const provider = normalizeOpenAIProvider({
+      name: 'example',
+      'base-url': 'https://example.com/v1',
+      'api-key-entries': [
+        { 'api-key': 'key-a', disabled: true },
+        { 'api-key': 'key-b', disabled: false },
+      ],
+    });
+
+    expect(provider?.apiKeyEntries[0]?.disabled).toBe(true);
+    expect(provider?.apiKeyEntries[1]?.disabled).toBe(false);
+  });
+
   test('removes a cleared Vertex weight while preserving unknown fields', async () => {
     let written: unknown;
     apiClient.get = (async () => ({
@@ -99,6 +113,46 @@ describe('provider credential weight normalization', () => {
         'api-key-entries': [
           { 'api-key': 'key-a', custom: 'keep-a' },
           { 'api-key': 'key-b', custom: 'keep-b', weight: 4 },
+        ],
+      },
+    ]);
+  });
+
+  test('writes and clears nested OpenAI-compatible disabled states', async () => {
+    let written: unknown;
+    apiClient.get = (async () => ({
+      'openai-compatibility': [
+        {
+          name: 'example',
+          'base-url': 'https://example.com/v1',
+          'api-key-entries': [
+            { 'api-key': 'key-a', disabled: true, custom: 'keep-a' },
+            { 'api-key': 'key-b', custom: 'keep-b' },
+          ],
+        },
+      ],
+    })) as typeof apiClient.get;
+    apiClient.put = (async (_url: string, data?: unknown) => {
+      written = data;
+      return undefined;
+    }) as typeof apiClient.put;
+
+    await providersApi.updateOpenAIProvider('example', 0, {
+      name: 'example',
+      baseUrl: 'https://example.com/v1',
+      apiKeyEntries: [
+        { apiKey: 'key-a', disabled: false },
+        { apiKey: 'key-b', disabled: true },
+      ],
+    });
+
+    expect(written).toEqual([
+      {
+        name: 'example',
+        'base-url': 'https://example.com/v1',
+        'api-key-entries': [
+          { 'api-key': 'key-a', custom: 'keep-a' },
+          { 'api-key': 'key-b', disabled: true, custom: 'keep-b' },
         ],
       },
     ]);

@@ -391,10 +391,11 @@ function SponsorKeyEntryCard({
       {
         apiKey: entry.apiKey,
         existingApiKey: entry.existingApiKey,
+        disabled: entry.disabled,
         proxyUrl: entry.proxyUrl,
       },
     ],
-    [entry.apiKey, entry.existingApiKey, entry.proxyUrl]
+    [entry.apiKey, entry.disabled, entry.existingApiKey, entry.proxyUrl]
   );
   const discovery = useModelDiscovery({
     brand: discoveryBrandForSponsorProtocol(entry.protocol),

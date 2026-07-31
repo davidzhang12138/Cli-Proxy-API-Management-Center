@@ -170,6 +170,7 @@ export interface SponsorKeyEntryInput {
 export interface ApiKeyEntryInput {
   apiKey: string;
   existingApiKey?: string;
+  disabled: boolean;
   proxyUrl: string;
   weight?: number;
   authIndex?: string;
