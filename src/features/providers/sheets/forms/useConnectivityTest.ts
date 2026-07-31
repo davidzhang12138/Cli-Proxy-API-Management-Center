@@ -23,21 +23,68 @@ export interface ConnectivityStatus {
   message: string;
   /** True only when a real request was sent and this key can safely join a bulk disable action. */
   canDisable?: boolean;
+  /** Target HTTP status returned by the upstream endpoint; absent for network/transport failures. */
+  statusCode?: number;
 }
 
 const IDLE: ConnectivityStatus = { state: 'idle', message: '' };
 
-export const getOpenAIBulkDisableCandidateIndexes = (
+export const OTHER_FAILURE_GROUP_KEY = 'other';
+
+export interface OpenAIBulkDisableGroup {
+  key: string;
+  statusCode?: number;
+  count: number;
+  indexes: number[];
+}
+
+const isOpenAIBulkDisableCandidate = (
+  entry: ApiKeyEntryInput | undefined,
+  status: ConnectivityStatus | undefined
+): entry is ApiKeyEntryInput => {
+  const hasApiKey = Boolean(entry?.apiKey.trim() || entry?.existingApiKey?.trim());
+  return Boolean(
+    status?.state === 'error' && status.canDisable && entry && !entry.disabled && hasApiKey
+  );
+};
+
+const failureGroupKey = (status: ConnectivityStatus): string =>
+  status.statusCode ? `http:${status.statusCode}` : OTHER_FAILURE_GROUP_KEY;
+
+export const getOpenAIBulkDisableGroups = (
   entries: ApiKeyEntryInput[],
   statuses: ConnectivityStatus[]
-): number[] =>
-  statuses.flatMap((status, index) => {
+): OpenAIBulkDisableGroup[] => {
+  const groups = new Map<string, OpenAIBulkDisableGroup>();
+  statuses.forEach((status, index) => {
     const entry = entries[index];
-    const hasApiKey = Boolean(entry?.apiKey.trim() || entry?.existingApiKey?.trim());
-    return status?.state === 'error' && status.canDisable && entry && !entry.disabled && hasApiKey
-      ? [index]
-      : [];
+    if (!isOpenAIBulkDisableCandidate(entry, status)) return;
+    const key = failureGroupKey(status);
+    const group = groups.get(key) ?? {
+      key,
+      statusCode: status.statusCode,
+      count: 0,
+      indexes: [],
+    };
+    group.count += 1;
+    group.indexes.push(index);
+    groups.set(key, group);
   });
+  return [...groups.values()].sort((left, right) => {
+    if (left.statusCode === undefined) return 1;
+    if (right.statusCode === undefined) return -1;
+    return left.statusCode - right.statusCode;
+  });
+};
+
+export const getOpenAIBulkDisableCandidateIndexes = (
+  entries: ApiKeyEntryInput[],
+  statuses: ConnectivityStatus[],
+  selectedGroupKeys?: ReadonlySet<string>
+): number[] =>
+  getOpenAIBulkDisableGroups(entries, statuses).flatMap((group) =>
+    !selectedGroupKeys || selectedGroupKeys.has(group.key) ? group.indexes : []
+  );
 
 const requestFailureMessage = (err: unknown, messages: ConnectivityErrorMessages): string => {
   const raw = getErrorMessage(err);
@@ -274,7 +321,13 @@ export function useConnectivityTest(
           { timeout: DEFAULT_TIMEOUT_MS }
         );
         if (result.statusCode < 200 || result.statusCode >= 300) {
-          throw new Error(getApiCallErrorMessage(result));
+          updateOpenaiStatus(idx, {
+            state: 'error',
+            message: getApiCallErrorMessage(result),
+            canDisable: true,
+            statusCode: result.statusCode > 0 ? result.statusCode : undefined,
+          });
+          return false;
         }
         updateOpenaiStatus(idx, { state: 'success', message: '' });
         return true;

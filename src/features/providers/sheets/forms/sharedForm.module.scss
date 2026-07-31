@@ -354,7 +354,20 @@
 .entrySearchWrap {
   position: relative;
   display: flex;
+  min-width: 0;
+  flex: 1;
   align-items: center;
+}
+
+.entryFilterRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  @media (max-width: 520px) {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 .entrySearchIcon {
@@ -386,14 +399,144 @@
   }
 }
 
-.batchTestSummary {
-  padding: 8px 10px;
+.entryAvailabilityStats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.entryAvailabilityStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+
+  strong {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 520px) {
+    flex: 1;
+    justify-content: space-between;
+  }
+}
+
+.entryAvailabilityStatActive {
+  border-color: color-mix(in srgb, var(--success-badge-text) 28%, var(--border-color));
+  background: var(--success-badge-bg);
+  color: var(--success-badge-text);
+}
+
+.entryAvailabilityStatDisabled {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.batchTestPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-primary);
   color: var(--text-secondary);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.batchTestHeader,
+.batchTestFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.batchTestFilterLabel {
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.failureCodeGroups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.failureCodeGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    border-color $transition-fast,
+    background-color $transition-fast,
+    color $transition-fast;
+
+  strong {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--bg-tertiary);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &:hover {
+    border-color: var(--warning-border);
+    color: var(--text-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+}
+
+.failureCodeGroupSelected {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+
+  strong {
+    background: color-mix(in srgb, var(--warning-text) 12%, transparent);
+  }
+}
+
+.batchTestFooter {
+  padding-top: 2px;
+  color: var(--muted-foreground);
+
+  @media (max-width: 520px) {
+    align-items: stretch;
+    flex-direction: column;
+
+    .batchDisableBtn {
+      justify-content: center;
+    }
+  }
 }
 
 .entrySearchEmpty {
@@ -403,6 +546,21 @@
   color: var(--muted-foreground);
   font-size: 12px;
   text-align: center;
+}
+
+.entryErrorCodeBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--warning-border);
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-family: $font-mono;
+  font-size: 9px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .connectivityRow {
@@ -992,7 +1150,19 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
-  margin-bottom: 6px;
+}
+
+.apiKeyEntriesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+
+  @media (max-width: 520px) {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 .apiKeyEntryList {

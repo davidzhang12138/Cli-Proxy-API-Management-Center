@@ -4,6 +4,7 @@ import { IconCheck, IconX } from '@/components/ui/icons';
 import { getProviderTotalStats, type ProviderRecentUsageMap } from '@/components/providers/utils';
 import type { OpenAIProviderConfig } from '@/types';
 import { maskApiKey } from '@/utils/format';
+import { getApiKeyEntryAvailabilityStats } from '../apiKeyEntryStatus';
 import type { ProviderResource } from '../types';
 import styles from './forms/sharedForm.module.scss';
 
@@ -33,6 +34,7 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
   const openaiConfig =
     resource.brand === 'openaiCompatibility' ? (resource.raw as OpenAIProviderConfig) : null;
   const apiKeyEntries = openaiConfig?.apiKeyEntries ?? [];
+  const availabilityStats = getApiKeyEntryAvailabilityStats(apiKeyEntries);
 
   return (
     <div>
@@ -51,8 +53,24 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
 
       {openaiConfig && apiKeyEntries.length > 0 ? (
         <div className={styles.apiKeyEntriesSection}>
-          <div className={styles.apiKeyEntriesLabel}>
-            {t('providersPage.form.apiKeyEntriesSection')}: {apiKeyEntries.length}
+          <div className={styles.apiKeyEntriesHeader}>
+            <div className={styles.apiKeyEntriesLabel}>
+              {t('providersPage.form.apiKeyEntriesSection')}: {apiKeyEntries.length}
+            </div>
+            <div className={styles.entryAvailabilityStats}>
+              <span
+                className={`${styles.entryAvailabilityStat} ${styles.entryAvailabilityStatActive}`}
+              >
+                <span>{t('providersPage.form.apiKeyAvailableStat')}</span>
+                <strong>{availabilityStats.available}</strong>
+              </span>
+              <span
+                className={`${styles.entryAvailabilityStat} ${styles.entryAvailabilityStatDisabled}`}
+              >
+                <span>{t('providersPage.form.apiKeyDisabledStat')}</span>
+                <strong>{availabilityStats.disabled}</strong>
+              </span>
+            </div>
           </div>
           <div className={styles.apiKeyEntryList}>
             {apiKeyEntries.map((entry, entryIndex) => {

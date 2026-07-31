@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   IconChevronDown,
@@ -13,9 +13,11 @@ import {
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { maskApiKey } from '@/utils/format';
 import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
+import { getApiKeyEntryAvailabilityStats } from '../../apiKeyEntryStatus';
 import type { ApiKeyEntryInput } from '../../types';
 import {
   getOpenAIBulkDisableCandidateIndexes,
+  getOpenAIBulkDisableGroups,
   type ConnectivityState,
   type ConnectivityStatus,
 } from './useConnectivityTest';
@@ -66,6 +68,7 @@ export function ApiKeyEntriesEditor({
   const [showPasswords, setShowPasswords] = useState<Set<number>>(new Set());
   const [showAll, setShowAll] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFailureGroupKeys, setSelectedFailureGroupKeys] = useState<Set<string>>(new Set());
 
   const togglePasswordVisibility = (idx: number) => {
     setShowPasswords((prev) => {
@@ -117,13 +120,45 @@ export function ApiKeyEntriesEditor({
       })
     : reversed;
   const visible = normalizedQuery || showAll ? filtered : filtered.slice(0, COLLAPSED_LIMIT);
+  const availabilityStats = getApiKeyEntryAvailabilityStats(entries);
   const failedIndexes = statuses.flatMap((status, idx) =>
     status?.state === 'error' && status.canDisable ? [idx] : []
   );
+  const failureGroups = getOpenAIBulkDisableGroups(entries, statuses);
+  const failureGroupSignature = failureGroups.map((group) => group.key).join('|');
   const actionableFailedIndexes = getOpenAIBulkDisableCandidateIndexes(entries, statuses);
+  const selectedFailedIndexes = getOpenAIBulkDisableCandidateIndexes(
+    entries,
+    statuses,
+    selectedFailureGroupKeys
+  );
   const setupFailureCount = statuses.filter(
     (status) => status?.state === 'error' && !status.canDisable
   ).length;
+
+  useEffect(() => {
+    if (!batchCompleted) {
+      setSelectedFailureGroupKeys(new Set());
+      return;
+    }
+    const availableKeys = new Set(failureGroupSignature ? failureGroupSignature.split('|') : []);
+    setSelectedFailureGroupKeys((previous) => {
+      if (previous.size === 0) return availableKeys;
+      return new Set([...previous].filter((key) => availableKeys.has(key)));
+    });
+  }, [batchCompleted, failureGroupSignature]);
+
+  const toggleFailureGroup = (key: string) => {
+    setSelectedFailureGroupKeys((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const batchSummary = batchCompleted
     ? actionableFailedIndexes.length > 0
@@ -158,42 +193,89 @@ export function ApiKeyEntriesEditor({
             ) : null}
             <span>{t('providersPage.connectivity.testAll')}</span>
           </button>
-          <button
-            type="button"
-            className={`${styles.connectivityBtn} ${styles.batchDisableBtn}`}
-            disabled={
-              mutating || isTestingAny || !batchCompleted || actionableFailedIndexes.length === 0
-            }
-            onClick={() => onDisableFailed(actionableFailedIndexes)}
-            title={
-              batchCompleted
-                ? t('providersPage.connectivity.disableFailedHint')
-                : t('providersPage.connectivity.disableFailedRequiresTest')
-            }
-          >
-            <IconShield size={14} />
-            <span>
-              {actionableFailedIndexes.length > 0
-                ? t('providersPage.connectivity.disableFailedCount', {
-                    count: actionableFailedIndexes.length,
-                  })
-                : t('providersPage.connectivity.disableFailed')}
-            </span>
-          </button>
         </div>
       </div>
-      <div className={styles.entrySearchWrap}>
-        <IconSearch className={styles.entrySearchIcon} size={14} />
-        <input
-          className={styles.entrySearchInput}
-          type="search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder={t('providersPage.form.apiKeySearchPlaceholder')}
-          aria-label={t('providersPage.form.apiKeySearchPlaceholder')}
-        />
+      <div className={styles.entryFilterRow}>
+        <div className={styles.entrySearchWrap}>
+          <IconSearch className={styles.entrySearchIcon} size={14} />
+          <input
+            className={styles.entrySearchInput}
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={t('providersPage.form.apiKeySearchPlaceholder')}
+            aria-label={t('providersPage.form.apiKeySearchPlaceholder')}
+          />
+        </div>
+        <div className={styles.entryAvailabilityStats}>
+          <span className={`${styles.entryAvailabilityStat} ${styles.entryAvailabilityStatActive}`}>
+            <span>{t('providersPage.form.apiKeyAvailableStat')}</span>
+            <strong>{availabilityStats.available}</strong>
+          </span>
+          <span
+            className={`${styles.entryAvailabilityStat} ${styles.entryAvailabilityStatDisabled}`}
+          >
+            <span>{t('providersPage.form.apiKeyDisabledStat')}</span>
+            <strong>{availabilityStats.disabled}</strong>
+          </span>
+        </div>
       </div>
-      {batchSummary ? <div className={styles.batchTestSummary}>{batchSummary}</div> : null}
+      {batchCompleted && batchSummary ? (
+        <div className={styles.batchTestPanel}>
+          <div className={styles.batchTestHeader}>
+            <span>{batchSummary}</span>
+            {failureGroups.length > 0 ? (
+              <span className={styles.batchTestFilterLabel}>
+                {t('providersPage.connectivity.failureCodeFilter')}
+              </span>
+            ) : null}
+          </div>
+          {failureGroups.length > 0 ? (
+            <>
+              <div className={styles.failureCodeGroups}>
+                {failureGroups.map((group) => {
+                  const selected = selectedFailureGroupKeys.has(group.key);
+                  const label = group.statusCode
+                    ? t('providersPage.connectivity.httpStatus', { code: group.statusCode })
+                    : t('providersPage.connectivity.failureCodeOther');
+                  return (
+                    <button
+                      key={group.key}
+                      type="button"
+                      className={`${styles.failureCodeGroup} ${
+                        selected ? styles.failureCodeGroupSelected : ''
+                      }`}
+                      aria-pressed={selected}
+                      onClick={() => toggleFailureGroup(group.key)}
+                    >
+                      <span>{label}</span>
+                      <strong>{group.count}</strong>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className={styles.batchTestFooter}>
+                <span>{t('providersPage.connectivity.disableFailedHint')}</span>
+                <button
+                  type="button"
+                  className={`${styles.connectivityBtn} ${styles.batchDisableBtn}`}
+                  disabled={mutating || isTestingAny || selectedFailedIndexes.length === 0}
+                  onClick={() => onDisableFailed(selectedFailedIndexes)}
+                >
+                  <IconShield size={14} />
+                  <span>
+                    {selectedFailedIndexes.length > 0
+                      ? t('providersPage.connectivity.disableFailedCount', {
+                          count: selectedFailedIndexes.length,
+                        })
+                      : t('providersPage.connectivity.disableFailed')}
+                  </span>
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : null}
       {visible.map(({ entry, idx }) => {
         const status = statuses[idx] ?? idleStatus;
         const expanded = expandedIdx === idx;
@@ -228,6 +310,11 @@ export function ApiKeyEntriesEditor({
                 </span>
               </button>
               <div className={styles.entryCardHeaderRight}>
+                {status.statusCode ? (
+                  <span className={styles.entryErrorCodeBadge}>
+                    {t('providersPage.connectivity.httpStatus', { code: status.statusCode })}
+                  </span>
+                ) : null}
                 <ConnectivityStatusIcon state={status.state} />
                 <button
                   type="button"
