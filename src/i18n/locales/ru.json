@@ -421,9 +421,9 @@
     "excluded_models_label": "Исключённые модели (excluded_models)",
     "excluded_models_placeholder": "Через запятую или с новой строки, например: model-a, gpt-5-*, *-preview",
     "excluded_models_hint": "Сохраняется как массив; значения trim/нижний регистр/без дублей/с сортировкой.",
-    "disable_cooling_label": "Отключение охлаждения (disable_cooling)",
+    "disable_cooling_label": "Отключить экспоненциальный cooldown (disable_cooling)",
     "disable_cooling_placeholder": "например: true / false / 1 / 0",
-    "disable_cooling_hint": "Поддерживает boolean, числа 0/не 0 и строки true/false/1/0; непарсируемые значения игнорируются.",
+    "disable_cooling_hint": "Отключает cooldown после ошибок и экспоненциальную задержку только для этих учётных данных; остальные не затрагиваются.",
     "card_tools_title": "Инструменты",
     "meta_total": "{{count}} учётных данных",
     "meta_active": "{{count}} активно",
@@ -1690,6 +1690,7 @@
       "code0": "Code0",
       "fennoAI": "FennoAI",
       "qiniuCloud": "Qiniu Cloud",
+      "lmuAI": "LMU AI (Lingmou AI)",
       "kimi": "Kimi"
     },
     "table": {

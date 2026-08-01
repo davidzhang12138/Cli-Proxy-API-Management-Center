@@ -428,9 +428,9 @@
     "excluded_models_label": "Excluded models (excluded_models)",
     "excluded_models_placeholder": "Comma or newline separated, e.g. model-a, gpt-5-*, *-preview",
     "excluded_models_hint": "Saved as an array and normalized by trim/lowercase/dedup/sort.",
-    "disable_cooling_label": "Disable cooling (disable_cooling)",
+    "disable_cooling_label": "Disable exponential cooldown (disable_cooling)",
     "disable_cooling_placeholder": "e.g. true / false / 1 / 0",
-    "disable_cooling_hint": "Supports booleans, numeric 0/non-0, and strings like true/false/1/0; unparseable values are ignored.",
+    "disable_cooling_hint": "Skip failure cooldown and exponential backoff only for this credential; other credentials are unaffected.",
     "meta_total": "{{count}} credentials",
     "meta_active": "{{count}} active",
     "meta_problem": "{{count}} problem",
@@ -1712,6 +1712,7 @@
       "code0": "Code0",
       "fennoAI": "FennoAI",
       "qiniuCloud": "Qiniu Cloud",
+      "lmuAI": "LMU AI (Lingmou AI)",
       "kimi": "Kimi"
     },
     "table": {

@@ -428,9 +428,9 @@
     "excluded_models_label": "排除模型（excluded_models）",
     "excluded_models_placeholder": "用逗号或换行分隔，例如: model-a, gpt-5-*, *-preview",
     "excluded_models_hint": "保存为数组；会自动 trim、小写、去重并排序。",
-    "disable_cooling_label": "禁用冷却（disable_cooling）",
+    "disable_cooling_label": "禁用指数冷却（disable_cooling）",
     "disable_cooling_placeholder": "例如: true / false / 1 / 0",
-    "disable_cooling_hint": "支持布尔值、0/非0 数字或字符串 true/false/1/0；无法解析时忽略。",
+    "disable_cooling_hint": "开启后，仅当前凭证跳过失败后的冷却与指数退避；其他凭证不受影响。",
     "meta_total": "{{count}} 个凭证",
     "meta_active": "{{count}} 个启用",
     "meta_problem": "{{count}} 个异常",
@@ -1712,6 +1712,7 @@
       "code0": "Code0",
       "fennoAI": "FennoAI",
       "qiniuCloud": "七牛云",
+      "lmuAI": "LMU AI（灵眸AI）",
       "kimi": "Kimi"
     },
     "table": {
