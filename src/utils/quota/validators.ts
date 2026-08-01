@@ -31,6 +31,14 @@ export function isKimiFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'kimi';
 }
 
+export function isFreebuffFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'freebuff';
+}
+
+export function isHyperFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'hyper';
+}
+
 export function isXaiFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'xai';
 }

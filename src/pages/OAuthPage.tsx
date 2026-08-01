@@ -26,11 +26,15 @@ import iconVertex from '@/assets/icons/vertex.svg';
 import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
+import iconHyper from '@/assets/icons/hyper.svg';
 
 interface ProviderState {
   url?: string;
   state?: string;
   userCode?: string;
+  deviceName?: string;
+  deviceHostname?: string;
+  expiresIn?: number;
   status?: 'idle' | 'waiting' | 'success' | 'error';
   error?: string;
   polling?: boolean;
@@ -134,6 +138,12 @@ const PROVIDERS: BuiltInOAuthProviderCard[] = [
     id: 'xai',
     titleKey: 'auth_login.xai_oauth_title',
     icon: { light: iconGrok, dark: iconGrokDark },
+  },
+  {
+    kind: 'builtin',
+    id: 'hyper',
+    titleKey: 'auth_login.hyper_oauth_title',
+    icon: iconHyper,
   },
 ];
 
@@ -350,6 +360,9 @@ export function OAuthPage() {
       url: undefined,
       state: undefined,
       userCode: undefined,
+      deviceName: undefined,
+      deviceHostname: undefined,
+      expiresIn: undefined,
       status: 'success',
       error: undefined,
       polling: false,
@@ -434,6 +447,9 @@ export function OAuthPage() {
       url: undefined,
       state: undefined,
       userCode: undefined,
+      deviceName: undefined,
+      deviceHostname: undefined,
+      expiresIn: undefined,
       status: 'waiting',
       polling: true,
       error: undefined,
@@ -486,10 +502,11 @@ export function OAuthPage() {
       const res = await oauthApi.startAuth(provider as OAuthProvider, {
         ...(proxyUrl ? { proxyUrl } : {}),
       });
+      const authUrl = res.url || res.verification_uri || '';
       if (!res.state) {
         const message = t('auth_login.missing_state');
         updateProviderState(provider, {
-          url: res.url,
+          url: authUrl,
           state: undefined,
           status: 'error',
           error: message,
@@ -499,9 +516,13 @@ export function OAuthPage() {
         return;
       }
       updateProviderState(provider, {
-        url: res.url,
+        url: authUrl,
         state: res.state,
         userCode: res.user_code,
+        deviceName: res.device_name,
+        deviceHostname: res.device_hostname,
+        expiresIn:
+          typeof res.expires_in === 'number' && res.expires_in > 0 ? res.expires_in : undefined,
         status: 'waiting',
         polling: true,
       });
@@ -775,11 +796,43 @@ export function OAuthPage() {
                     </div>
                   )}
                   {state.userCode && (
-                    <div className={styles.authUrlBox}>
+                    <div className={`${styles.authUrlBox} ${styles.deviceCodeBox}`}>
                       <div className={styles.authUrlLabel}>
-                        {t('auth_login.xai_device_code_label')}
+                        {t('auth_login.oauth_device_code_label')}
                       </div>
-                      <div className={styles.authUrlValue}>{state.userCode}</div>
+                      <div className={styles.deviceCodeValue}>{state.userCode}</div>
+                    </div>
+                  )}
+                  {(state.deviceName || state.deviceHostname || state.expiresIn) && (
+                    <div className={styles.deviceMetaPanel}>
+                      {state.deviceName && (
+                        <div className={styles.deviceMetaItem}>
+                          <span className={styles.deviceMetaLabel}>
+                            {t('auth_login.oauth_device_name_label')}
+                          </span>
+                          <span className={styles.deviceMetaValue}>{state.deviceName}</span>
+                        </div>
+                      )}
+                      {state.deviceHostname && (
+                        <div className={styles.deviceMetaItem}>
+                          <span className={styles.deviceMetaLabel}>
+                            {t('auth_login.oauth_device_hostname_label')}
+                          </span>
+                          <span className={styles.deviceMetaValue}>{state.deviceHostname}</span>
+                        </div>
+                      )}
+                      {state.expiresIn && (
+                        <div className={styles.deviceMetaItem}>
+                          <span className={styles.deviceMetaLabel}>
+                            {t('auth_login.oauth_device_expires_label')}
+                          </span>
+                          <span className={styles.deviceMetaValue}>
+                            {t('auth_login.oauth_device_expires_value', {
+                              seconds: state.expiresIn,
+                            })}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                   {canSubmitCallback && (

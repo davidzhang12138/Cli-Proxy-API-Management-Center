@@ -208,6 +208,12 @@ export const parseUsageQuotaSnapshot = (value: unknown): UsageQuotaSnapshot | nu
   };
 };
 
+export const resolveUsageQuotaResourceResetAt = (
+  snapshot: { nextReset?: string; resources: readonly unknown[] },
+  resource: { resetAt?: string }
+): string | undefined =>
+  resource.resetAt ?? (snapshot.resources.length <= 1 ? snapshot.nextReset : undefined);
+
 export const hasKnownUsageQuotaSnapshot = (value: unknown): boolean => {
   const snapshot = parseUsageQuotaSnapshot(value);
   return Boolean(snapshot?.known && !snapshot.error);

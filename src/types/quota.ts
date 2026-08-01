@@ -118,6 +118,17 @@ export interface UsageQuotaResource {
   exhausted: boolean;
 }
 
+/** Unified management quota snapshots used by providers without a public quota API. */
+export interface UsageQuotaProviderState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  snapshot: UsageQuotaSnapshot | null;
+  error?: string;
+  errorStatus?: number;
+}
+
+export type FreebuffQuotaState = UsageQuotaProviderState;
+export type HyperQuotaState = UsageQuotaProviderState;
+
 export interface CodexUsageWindow {
   used_percent?: number | string;
   usedPercent?: number | string;

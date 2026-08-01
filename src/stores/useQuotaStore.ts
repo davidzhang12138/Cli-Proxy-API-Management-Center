@@ -8,6 +8,8 @@ import type {
   AntigravityQuotaState,
   ClaudeQuotaState,
   CodexQuotaState,
+  FreebuffQuotaState,
+  HyperQuotaState,
   KimiQuotaState,
   KiroQuotaState,
   XaiQuotaState,
@@ -27,19 +29,30 @@ interface QuotaStoreState {
   kiroQuota: Record<string, KiroQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
+  freebuffQuota: Record<string, FreebuffQuotaState>;
+  hyperQuota: Record<string, HyperQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
   setKiroQuota: (updater: QuotaUpdater<Record<string, KiroQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
+  setFreebuffQuota: (updater: QuotaUpdater<Record<string, FreebuffQuotaState>>) => void;
+  setHyperQuota: (updater: QuotaUpdater<Record<string, HyperQuotaState>>) => void;
   clearQuotaCache: () => void;
   purgeStaleEntries: () => void;
 }
 
 type PersistedQuotaStoreState = Pick<
   QuotaStoreState,
-  'antigravityQuota' | 'claudeQuota' | 'codexQuota' | 'kiroQuota' | 'kimiQuota' | 'xaiQuota'
+  | 'antigravityQuota'
+  | 'claudeQuota'
+  | 'codexQuota'
+  | 'kiroQuota'
+  | 'kimiQuota'
+  | 'xaiQuota'
+  | 'freebuffQuota'
+  | 'hyperQuota'
 >;
 
 const resolveUpdater = <T>(updater: QuotaUpdater<T>, prev: T): T => {
@@ -133,6 +146,8 @@ const sanitizePersistedQuotaState = (
   kiroQuota: sanitizeQuotaMap(state.kiroQuota ?? {}),
   kimiQuota: sanitizeQuotaMap(state.kimiQuota ?? {}),
   xaiQuota: sanitizeQuotaMap(state.xaiQuota ?? {}),
+  freebuffQuota: sanitizeQuotaMap(state.freebuffQuota ?? {}),
+  hyperQuota: sanitizeQuotaMap(state.hyperQuota ?? {}),
 });
 
 export const useQuotaStore = create<QuotaStoreState>()(
@@ -145,6 +160,8 @@ export const useQuotaStore = create<QuotaStoreState>()(
       kiroQuota: {},
       kimiQuota: {},
       xaiQuota: {},
+      freebuffQuota: {},
+      hyperQuota: {},
       setAntigravityQuota: (updater) =>
         set((state) => ({
           antigravityQuota: stampQuotaMap(
@@ -172,6 +189,17 @@ export const useQuotaStore = create<QuotaStoreState>()(
         set((state) => ({
           xaiQuota: stampQuotaMap(resolveUpdater(updater, state.xaiQuota), state.xaiQuota),
         })),
+      setFreebuffQuota: (updater) =>
+        set((state) => ({
+          freebuffQuota: stampQuotaMap(
+            resolveUpdater(updater, state.freebuffQuota),
+            state.freebuffQuota
+          ),
+        })),
+      setHyperQuota: (updater) =>
+        set((state) => ({
+          hyperQuota: stampQuotaMap(resolveUpdater(updater, state.hyperQuota), state.hyperQuota),
+        })),
       clearQuotaCache: () =>
         set((state) => ({
           cacheGeneration: state.cacheGeneration + 1,
@@ -181,6 +209,8 @@ export const useQuotaStore = create<QuotaStoreState>()(
           kiroQuota: {},
           kimiQuota: {},
           xaiQuota: {},
+          freebuffQuota: {},
+          hyperQuota: {},
         })),
       purgeStaleEntries: () =>
         set((state) =>
@@ -191,6 +221,8 @@ export const useQuotaStore = create<QuotaStoreState>()(
             kiroQuota: state.kiroQuota,
             kimiQuota: state.kimiQuota,
             xaiQuota: state.xaiQuota,
+            freebuffQuota: state.freebuffQuota,
+            hyperQuota: state.hyperQuota,
           })
         ),
     }),
@@ -204,6 +236,8 @@ export const useQuotaStore = create<QuotaStoreState>()(
           kiroQuota: state.kiroQuota,
           kimiQuota: state.kimiQuota,
           xaiQuota: state.xaiQuota,
+          freebuffQuota: state.freebuffQuota,
+          hyperQuota: state.hyperQuota,
         }),
       merge: (persistedState, currentState) => ({
         ...currentState,

@@ -73,6 +73,58 @@
   padding: 6px 4px;
 }
 
+/* ---------- 无总量余额（Hyper credits） ---------- */
+
+.quotaBalance {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'label state'
+    'value value';
+  gap: 5px 10px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--bg-secondary) 84%, transparent), transparent),
+    color-mix(in srgb, var(--primary-color) 5%, var(--bg-primary));
+}
+
+.quotaBalanceLabel {
+  grid-area: label;
+  min-width: 0;
+  font-family: $font-mono;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.quotaBalanceValue {
+  grid-area: value;
+  font-family: $font-mono;
+  font-size: clamp(28px, 5vw, 36px);
+  font-weight: 720;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.quotaBalanceValueExhausted {
+  color: var(--viz-failure);
+}
+
+.quotaBalanceState {
+  grid-area: state;
+  align-self: start;
+  font-family: $font-mono;
+  font-size: 10.5px;
+  font-weight: 650;
+  color: var(--text-tertiary);
+}
+
 /* ---------- 水位条（QuotaMeter）----------
  * 轨道退居背景（8% 墨色），填充按剩余量三档着色；
  * percent === null 时宽度为 0 —— 未知不着色。 */

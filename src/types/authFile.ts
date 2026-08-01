@@ -18,6 +18,7 @@ export type AuthFileType =
   | 'iflow'
   | 'vertex'
   | 'freebuff'
+  | 'hyper'
   | 'empty'
   | 'unknown';
 

@@ -113,6 +113,55 @@ button.quotaMessageAction {
   color: var(--text-secondary);
 }
 
+/* ---------- 无总量余额（Hyper credits） ---------- */
+
+.quotaBalance {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'label state'
+    'value value';
+  gap: 4px 8px;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary-color) 4%, var(--bg-primary));
+}
+
+.quotaBalanceLabel {
+  grid-area: label;
+  min-width: 0;
+  font-family: $font-mono;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.quotaBalanceValue {
+  grid-area: value;
+  font-family: $font-mono;
+  font-size: 25px;
+  font-weight: 720;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.quotaBalanceValueExhausted {
+  color: var(--viz-failure);
+}
+
+.quotaBalanceState {
+  grid-area: state;
+  font-family: $font-mono;
+  font-size: 9.5px;
+  font-weight: 650;
+  color: var(--text-tertiary);
+}
+
 /* ---------- 进度条（QuotaProgressBar 注入，Meter 风 6px 轨道） ---------- */
 
 .quotaBar {

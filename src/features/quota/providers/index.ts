@@ -23,6 +23,10 @@ import { KIMI_CONFIG } from './kimi/data';
 import { KimiQuotaBody } from './kimi/KimiQuotaBody';
 import { XAI_CONFIG } from './xai/data';
 import { XaiQuotaBody } from './xai/XaiQuotaBody';
+import { FREEBUFF_CONFIG } from './freebuff/data';
+import { FreebuffQuotaBody } from './freebuff/FreebuffQuotaBody';
+import { HYPER_CONFIG } from './hyper/data';
+import { HyperQuotaBody } from './hyper/HyperQuotaBody';
 
 /** 所有 provider 额度状态的公共骨架（各 *QuotaState 的结构子集）。 */
 export interface QuotaCardState {
@@ -57,6 +61,8 @@ export const QUOTA_ADAPTERS: Record<QuotaProviderType, QuotaAdapter> = {
   kiro: { ...KIRO_CONFIG, Body: KiroQuotaBody } as unknown as QuotaAdapter,
   kimi: { ...KIMI_CONFIG, Body: KimiQuotaBody } as unknown as QuotaAdapter,
   xai: { ...XAI_CONFIG, Body: XaiQuotaBody } as unknown as QuotaAdapter,
+  freebuff: { ...FREEBUFF_CONFIG, Body: FreebuffQuotaBody } as unknown as QuotaAdapter,
+  hyper: { ...HYPER_CONFIG, Body: HyperQuotaBody } as unknown as QuotaAdapter,
 };
 
 export type QuotaMapUpdater = (

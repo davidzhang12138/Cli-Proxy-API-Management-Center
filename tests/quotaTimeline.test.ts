@@ -13,8 +13,7 @@ import {
 } from '../src/features/quota/quotaTimelineModel';
 import type { TimelineLane } from '../src/features/quota/quotaTimelineModel';
 
-const at = (y: number, m: number, d: number, h = 0, min = 0) =>
-  new Date(y, m, d, h, min).getTime();
+const at = (y: number, m: number, d: number, h = 0, min = 0) => new Date(y, m, d, h, min).getTime();
 
 describe('windowsIn', () => {
   test('projects backwards and forwards from the anchor', () => {
@@ -230,7 +229,10 @@ describe('buildTimelineLane', () => {
 
     // Fortnight view: the weekly window, even though the 5-hour resets sooner.
     const weekly = buildTimelineLane({
-      ...base, provider: 'claude', quota, maxPeriodHours: 14 * 24,
+      ...base,
+      provider: 'claude',
+      quota,
+      maxPeriodHours: 14 * 24,
     });
     expect(weekly.anchorMs).toBe(later);
     expect(weekly.periodHours).toBe(168);
@@ -238,7 +240,10 @@ describe('buildTimelineLane', () => {
 
     // Three-day view: the weekly window doesn't fit, so the short one is used.
     const session = buildTimelineLane({
-      ...base, provider: 'claude', quota, maxPeriodHours: 3 * 24,
+      ...base,
+      provider: 'claude',
+      quota,
+      maxPeriodHours: 3 * 24,
     });
     expect(session.anchorMs).toBe(soon);
     expect(session.periodHours).toBe(5);
@@ -370,6 +375,85 @@ describe('buildTimelineLane', () => {
     expect(lane.periodHours).toBe(24 * 7);
   });
 
+  test('freebuff projects its model session reset windows', () => {
+    const resetAt = at(2026, 7, 2, 0);
+    const lane = buildTimelineLane({
+      ...base,
+      provider: 'freebuff',
+      quota: {
+        status: 'success',
+        snapshot: {
+          resources: [
+            {
+              resourceType: 'deepseek-v4-pro',
+              totalLimit: 5,
+              currentUsage: 2,
+              remaining: 3,
+              resetAt: new Date(resetAt).toISOString(),
+              windowSeconds: 86_400,
+              exhausted: false,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(lane.anchorMs).toBe(resetAt);
+    expect(lane.periodHours).toBe(24);
+    expect(lane.remaining).toBe(60);
+    expect(lane.limits).toEqual([{ label: 'deepseek-v4-pro', remaining: 60 }]);
+  });
+
+  test('freebuff does not project a missing model reset from another resource', () => {
+    const dailyReset = at(2026, 7, 2, 0);
+    const lane = buildTimelineLane({
+      ...base,
+      provider: 'freebuff',
+      maxPeriodHours: 14 * 24,
+      quota: {
+        status: 'success',
+        snapshot: {
+          nextReset: new Date(dailyReset).toISOString(),
+          resources: [
+            {
+              resourceType: 'daily-model',
+              totalLimit: 5,
+              currentUsage: 2,
+              remaining: 3,
+              resetAt: new Date(dailyReset).toISOString(),
+              windowSeconds: 86_400,
+              exhausted: false,
+            },
+            {
+              resourceType: 'weekly-model',
+              totalLimit: 10,
+              currentUsage: 1,
+              remaining: 9,
+              windowSeconds: 604_800,
+              exhausted: false,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(lane.anchorMs).toBe(dailyReset);
+    expect(lane.periodHours).toBe(24);
+    expect(lane.limits).toEqual([{ label: 'daily-model', remaining: 60 }]);
+  });
+
+  test('hyper balance has no reset window and stays off the timeline', () => {
+    const lane = buildTimelineLane({
+      ...base,
+      provider: 'hyper',
+      quota: {
+        status: 'success',
+        snapshot: { remaining: 37, resources: [] },
+      },
+    });
+    expect(laneHasWindow(lane)).toBe(false);
+  });
+
   test('laneHasWindow drops only lanes that can never draw a bar', () => {
     const drawable = buildTimelineLane({
       ...base,
@@ -381,9 +465,9 @@ describe('buildTimelineLane', () => {
     });
     expect(laneHasWindow(drawable)).toBe(true);
     // Unloaded quota has nothing to show yet, so it takes no row.
-    expect(laneHasWindow(buildTimelineLane({ ...base, provider: 'claude', quota: undefined }))).toBe(
-      false
-    );
+    expect(
+      laneHasWindow(buildTimelineLane({ ...base, provider: 'claude', quota: undefined }))
+    ).toBe(false);
   });
 
   test('providers with no usable reset produce an empty lane, not a dropped one', () => {
@@ -402,7 +486,9 @@ describe('buildTimelineLane', () => {
   });
 
   test('unloaded or errored quota produces an empty lane', () => {
-    expect(buildTimelineLane({ ...base, provider: 'claude', quota: undefined }).anchorMs).toBeNull();
+    expect(
+      buildTimelineLane({ ...base, provider: 'claude', quota: undefined }).anchorMs
+    ).toBeNull();
     expect(
       buildTimelineLane({ ...base, provider: 'claude', quota: { status: 'error' } }).anchorMs
     ).toBeNull();

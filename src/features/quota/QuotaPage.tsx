@@ -30,6 +30,7 @@ import {
 } from './constants';
 import {
   buildTabCounts,
+  buildVisibleTabIds,
   classifyQuotaFiles,
   filterEntriesByTab,
   paginate,
@@ -42,7 +43,6 @@ import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
 import { readQuotaUiState, writeQuotaUiState } from './uiState';
 import styles from './QuotaPage.module.scss';
 
-const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
 const SKELETON_CARD_COUNT = 6;
 
 /**
@@ -87,7 +87,9 @@ export function QuotaPage() {
       snapshotsByType.forEach((snapshots, type) => {
         getQuotaSetter(QUOTA_ADAPTERS[type])((prev) => {
           const missingEntries = Object.entries(snapshots).filter(([name]) => !prev[name]);
-          return missingEntries.length > 0 ? { ...prev, ...Object.fromEntries(missingEntries) } : prev;
+          return missingEntries.length > 0
+            ? { ...prev, ...Object.fromEntries(missingEntries) }
+            : prev;
         });
       });
     } catch (err: unknown) {
@@ -108,6 +110,7 @@ export function QuotaPage() {
 
   const entries = useMemo(() => classifyQuotaFiles(files), [files]);
   const tabCounts = useMemo(() => buildTabCounts(entries), [entries]);
+  const visibleTabIds = useMemo(() => buildVisibleTabIds(tabCounts), [tabCounts]);
   const filteredEntries = useMemo(() => filterEntriesByTab(entries, tab), [entries, tab]);
   const { pageItems, currentPage, totalPages } = useMemo(
     () => paginate(filteredEntries, page, QUOTA_PAGE_SIZE),
@@ -120,6 +123,14 @@ export function QuotaPage() {
     writeQuotaUiState({ tab: next as QuotaTabId });
   }, []);
 
+  // 本地记住的 tab 如果已没有凭证，回到“全部”，避免落在一个已隐藏的空分区。
+  useEffect(() => {
+    if (loading || tab === 'all' || visibleTabIds.includes(tab)) return;
+    setTab('all');
+    setPage(1);
+    writeQuotaUiState({ tab: 'all' });
+  }, [loading, tab, visibleTabIds]);
+
   /* ---------- 额度缓存 ---------- */
 
   const antigravityQuota = useQuotaStore((state) => state.antigravityQuota);
@@ -128,6 +139,8 @@ export function QuotaPage() {
   const kiroQuota = useQuotaStore((state) => state.kiroQuota);
   const kimiQuota = useQuotaStore((state) => state.kimiQuota);
   const xaiQuota = useQuotaStore((state) => state.xaiQuota);
+  const freebuffQuota = useQuotaStore((state) => state.freebuffQuota);
+  const hyperQuota = useQuotaStore((state) => state.hyperQuota);
 
   const quotaByType = useMemo<Record<QuotaProviderType, Record<string, QuotaCardState>>>(
     () =>
@@ -138,8 +151,19 @@ export function QuotaPage() {
         kiro: kiroQuota,
         kimi: kimiQuota,
         xai: xaiQuota,
+        freebuff: freebuffQuota,
+        hyper: hyperQuota,
       }) as unknown as Record<QuotaProviderType, Record<string, QuotaCardState>>,
-    [antigravityQuota, claudeQuota, codexQuota, kiroQuota, kimiQuota, xaiQuota]
+    [
+      antigravityQuota,
+      claudeQuota,
+      codexQuota,
+      freebuffQuota,
+      hyperQuota,
+      kiroQuota,
+      kimiQuota,
+      xaiQuota,
+    ]
   );
 
   const getQuota = useCallback(
@@ -244,7 +268,7 @@ export function QuotaPage() {
         {/* tabs 作为一个整体入场（不做逐 tab 级差 —— 克制优先） */}
         <div data-reveal>
           <ProviderTabs
-            types={TAB_IDS}
+            types={visibleTabIds}
             counts={tabCounts}
             active={tab}
             resolvedTheme={resolvedTheme}

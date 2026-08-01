@@ -10,6 +10,7 @@ import iconKiro from '@/assets/icons/kiro.svg';
 import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
+import iconHyper from '@/assets/icons/hyper.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
@@ -27,12 +28,7 @@ export type AuthFileIconAsset = string | { light: string; dark: string };
 export type OAuthConfigLoadError = 'loading' | 'unsupported' | 'load' | null;
 
 export type QuotaProviderType =
-  | 'antigravity'
-  | 'claude'
-  | 'codex'
-  | 'kiro'
-  | 'kimi'
-  | 'xai';
+  'antigravity' | 'claude' | 'codex' | 'kiro' | 'kimi' | 'xai' | 'freebuff' | 'hyper';
 
 export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'antigravity',
@@ -41,6 +37,8 @@ export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'kiro',
   'kimi',
   'xai',
+  'freebuff',
+  'hyper',
 ]);
 
 export const OAUTH_PROVIDER_PRESETS = [
@@ -48,6 +46,7 @@ export const OAUTH_PROVIDER_PRESETS = [
   'aistudio',
   'antigravity',
   'xai',
+  'hyper',
   'claude',
   'codex',
   'kimi',
@@ -85,6 +84,7 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   kiro: iconKiro,
   kimi: { light: iconKimiLight, dark: iconKimiDark },
   freebuff: iconFreebuff,
+  hyper: iconHyper,
   vertex: iconVertex,
 };
 

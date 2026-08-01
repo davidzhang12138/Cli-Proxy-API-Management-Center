@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { QUOTA_PAGE_SIZE } from '@/features/quota/constants';
 import {
   buildTabCounts,
+  buildVisibleTabIds,
   classifyQuotaFiles,
   filterEntriesByTab,
   isQuotaRefreshDisabled,
@@ -19,6 +20,8 @@ const FILES: AuthFileItem[] = [
   file('kimi-a.json', 'kimi'),
   file('codex-b.json', 'codex'),
   file('grok-a.json', 'grok'), // 别名归一到 xai
+  file('freebuff-a.json', 'freebuff'),
+  file('hyper-a.json', 'hyper'),
   file('gemini-a.json', 'gemini'), // 不支持额度
   file('claude-off.json', 'claude', { disabled: true }), // 停用
 ];
@@ -27,6 +30,8 @@ describe('resolveQuotaProviderType', () => {
   test('maps provider aliases and rejects unsupported or disabled files', () => {
     expect(resolveQuotaProviderType(file('a', 'grok'))).toBe('xai');
     expect(resolveQuotaProviderType(file('a', 'antigravity'))).toBe('antigravity');
+    expect(resolveQuotaProviderType(file('a', 'freebuff'))).toBe('freebuff');
+    expect(resolveQuotaProviderType(file('a', 'hyper'))).toBe('hyper');
     expect(resolveQuotaProviderType(file('a', 'gemini'))).toBeNull();
     expect(resolveQuotaProviderType(file('a', 'claude', { disabled: true }))).toBeNull();
   });
@@ -37,26 +42,49 @@ describe('classifyQuotaFiles', () => {
     const entries = classifyQuotaFiles(FILES);
     expect(entries.map((entry) => entry.file.name)).not.toContain('gemini-a.json');
     expect(entries.map((entry) => entry.file.name)).not.toContain('claude-off.json');
-    expect(entries).toHaveLength(5);
+    expect(entries).toHaveLength(7);
   });
 
   test('orders entries by provider tab order', () => {
     const entries = classifyQuotaFiles(FILES);
-    expect(entries.map((entry) => entry.type)).toEqual(['claude', 'codex', 'codex', 'xai', 'kimi']);
+    expect(entries.map((entry) => entry.type)).toEqual([
+      'claude',
+      'codex',
+      'codex',
+      'xai',
+      'kimi',
+      'freebuff',
+      'hyper',
+    ]);
   });
 });
 
 describe('buildTabCounts', () => {
   test('counts per provider plus an all total, zero-filling empty tabs', () => {
     expect(buildTabCounts(classifyQuotaFiles(FILES))).toEqual({
-      all: 5,
+      all: 7,
       claude: 1,
       antigravity: 0,
       codex: 2,
       kiro: 0,
       xai: 1,
       kimi: 1,
+      freebuff: 1,
+      hyper: 1,
     });
+  });
+
+  test('builds a compact tab list without empty providers', () => {
+    const counts = buildTabCounts(classifyQuotaFiles(FILES));
+    expect(buildVisibleTabIds(counts)).toEqual([
+      'all',
+      'claude',
+      'codex',
+      'xai',
+      'kimi',
+      'freebuff',
+      'hyper',
+    ]);
   });
 });
 
@@ -64,7 +92,7 @@ describe('filterEntriesByTab', () => {
   const entries = classifyQuotaFiles(FILES);
 
   test("passes everything through on the 'all' tab", () => {
-    expect(filterEntriesByTab(entries, 'all')).toHaveLength(5);
+    expect(filterEntriesByTab(entries, 'all')).toHaveLength(7);
   });
 
   test('filters to a single provider', () => {

@@ -10,6 +10,7 @@
  * week, and no per-card percentage shows that.
  */
 
+import { resolveUsageQuotaResourceResetAt } from '@/utils/quota';
 import type { QuotaProviderType } from './providers/types';
 
 export const HOUR_MS = 3_600_000;
@@ -188,10 +189,9 @@ export function projectLane(
  * With nothing under the bound, the shortest available window is used rather
  * than drawing nothing.
  */
-export function pickLaneWindow<T extends { resetAtMs?: number | null; periodHours?: number | null }>(
-  windows: readonly T[],
-  maxPeriodHours?: number
-): T | null {
+export function pickLaneWindow<
+  T extends { resetAtMs?: number | null; periodHours?: number | null },
+>(windows: readonly T[], maxPeriodHours?: number): T | null {
   const usable = windows.filter(
     (window) => typeof window.resetAtMs === 'number' && Number.isFinite(window.resetAtMs)
   );
@@ -262,6 +262,16 @@ interface AntigravityBucketLike {
   remainingFraction?: number | null;
   resetAtMs?: number | null;
   periodHours?: number | null;
+}
+
+interface UsageQuotaResourceLike {
+  resourceType?: string;
+  totalLimit?: number | null;
+  currentUsage?: number | null;
+  remaining?: number | null;
+  resetAt?: string;
+  windowSeconds?: number | null;
+  exhausted?: boolean;
 }
 
 export interface TimelineLaneInput {
@@ -404,6 +414,69 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
       limits: rows
         .map((row) => ({ label: row.label ?? '', remaining: remainingOf(row) }))
         .filter((limit): limit is TimelineLimit => limit.remaining !== null),
+    };
+  }
+
+  if (provider === 'freebuff') {
+    const snapshot = (
+      quota as {
+        snapshot?: {
+          nextReset?: string;
+          resources?: UsageQuotaResourceLike[];
+        } | null;
+      }
+    ).snapshot;
+    const resources = snapshot?.resources ?? [];
+    const resetSnapshot = { nextReset: snapshot?.nextReset, resources };
+    const windows = resources
+      .map((resource) => {
+        const resetAt = resolveUsageQuotaResourceResetAt(resetSnapshot, resource);
+        const resetAtMs = resetAt ? Date.parse(resetAt) : Number.NaN;
+        const periodHours =
+          typeof resource.windowSeconds === 'number' && resource.windowSeconds > 0
+            ? resource.windowSeconds / 3600
+            : null;
+        const limit =
+          resource.totalLimit ??
+          (typeof resource.currentUsage === 'number' && typeof resource.remaining === 'number'
+            ? resource.currentUsage + resource.remaining
+            : null);
+        const remaining =
+          resource.remaining ??
+          (limit !== null && typeof resource.currentUsage === 'number'
+            ? Math.max(0, limit - resource.currentUsage)
+            : resource.exhausted
+              ? 0
+              : null);
+        const remainingPercent =
+          limit !== null && limit > 0 && remaining !== null
+            ? clampPercent(Math.round((remaining / limit) * 100))
+            : resource.exhausted
+              ? 0
+              : null;
+
+        return {
+          label: resource.resourceType ?? '',
+          resetAtMs: Number.isFinite(resetAtMs) ? resetAtMs : null,
+          periodHours,
+          remainingPercent,
+        };
+      })
+      .filter((window) => window.resetAtMs !== null && window.periodHours !== null);
+    const chosen = pickLaneWindow(windows, maxPeriodHours);
+    if (!chosen) return empty;
+
+    return {
+      ...empty,
+      anchorMs: chosen.resetAtMs,
+      periodHours: chosen.periodHours,
+      remaining: chosen.remainingPercent,
+      limits: windows
+        .filter(
+          (window): window is typeof window & { remainingPercent: number } =>
+            window.remainingPercent !== null
+        )
+        .map((window) => ({ label: window.label, remaining: window.remainingPercent })),
     };
   }
 
