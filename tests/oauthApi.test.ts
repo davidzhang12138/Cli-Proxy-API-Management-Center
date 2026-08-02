@@ -61,6 +61,39 @@ describe('OAuth management API', () => {
     });
   });
 
+  test('starts KeelCode device OAuth with proxy support and complete verification metadata', async () => {
+    let request: { url: string; config?: unknown } | undefined;
+    apiClient.get = (async (url: string, config?: unknown) => {
+      request = { url, config };
+      return {
+        status: 'ok',
+        url: 'https://keelcode.ai/device?code=ABCD-EFGH',
+        verification_uri: 'https://keelcode.ai/device',
+        verification_uri_complete: 'https://keelcode.ai/device?code=ABCD-EFGH',
+        user_code: 'ABCD-EFGH',
+        state: 'keel-123',
+        flow: 'device',
+        expires_in: 600,
+      };
+    }) as typeof apiClient.get;
+
+    const response = await oauthApi.startAuth('keelcode', {
+      proxyUrl: '  http://127.0.0.1:7890  ',
+    });
+
+    expect(request).toEqual({
+      url: '/keelcode-auth-url',
+      config: { params: { 'proxy-url': 'http://127.0.0.1:7890' } },
+    });
+    expect(response).toMatchObject({
+      state: 'keel-123',
+      flow: 'device',
+      user_code: 'ABCD-EFGH',
+      verification_uri_complete: 'https://keelcode.ai/device?code=ABCD-EFGH',
+      expires_in: 600,
+    });
+  });
+
   test('keeps the existing Freebuff start and dedicated status contracts intact', async () => {
     const calls: Array<{ method: string; url: string; data?: unknown; config?: unknown }> = [];
     apiClient.get = (async (url: string, config?: unknown) => {

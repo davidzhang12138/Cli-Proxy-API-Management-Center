@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <title>KeelCode</title>
+  <rect x="2" y="2" width="20" height="20" rx="5" fill="#FFD43B" />
+  <path
+    fill="#171714"
+    d="M7.1 6.3h2.5v4.2l4.2-4.2h3.3l-4.9 4.9 5.2 6.5h-3.2l-3.8-4.8-.8.8v4H7.1V6.3Z"
+  />
+  <path fill="#171714" d="M16.2 15.5h1.7v2.2h-1.7z" opacity=".7" />
+</svg>

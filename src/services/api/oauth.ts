@@ -8,7 +8,8 @@ import {
   normalizeManagementOAuthProviderKey,
 } from '@/utils/providerKeys';
 
-export type BuiltInOAuthProvider = 'codex' | 'anthropic' | 'antigravity' | 'kimi' | 'xai' | 'hyper';
+export type BuiltInOAuthProvider =
+  'codex' | 'anthropic' | 'antigravity' | 'kimi' | 'xai' | 'hyper' | 'keelcode';
 
 export type OAuthProvider = BuiltInOAuthProvider | 'freebuff';
 
@@ -19,6 +20,7 @@ export interface OAuthStartResponse {
   flow?: 'device';
   user_code?: string;
   verification_uri?: string;
+  verification_uri_complete?: string;
   device_name?: string;
   device_hostname?: string;
   expires_in?: number;

@@ -9,6 +9,7 @@ import iconIflow from '@/assets/icons/iflow.svg';
 import iconKiro from '@/assets/icons/kiro.svg';
 import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
+import iconKeelCode from '@/assets/icons/keelcode.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
 import iconHyper from '@/assets/icons/hyper.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
@@ -50,6 +51,7 @@ export const OAUTH_PROVIDER_PRESETS = [
   'claude',
   'codex',
   'kimi',
+  'keelcode',
 ];
 
 const OAUTH_PROVIDER_EXCLUDES = new Set(['all', 'unknown', 'empty']);
@@ -83,6 +85,7 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   iflow: iconIflow,
   kiro: iconKiro,
   kimi: { light: iconKimiLight, dark: iconKimiDark },
+  keelcode: iconKeelCode,
   freebuff: iconFreebuff,
   hyper: iconHyper,
   vertex: iconVertex,

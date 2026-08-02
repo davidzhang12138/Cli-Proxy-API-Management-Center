@@ -54,6 +54,10 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#e6f3ff', text: '#075fae', border: '1px solid #b9dcfb' },
     dark: { bg: '#0a355d', text: '#8dccff', border: '1px solid #17649f' },
   },
+  keelcode: {
+    light: { bg: '#fff5bf', text: '#554500', border: '1px solid #ead36a' },
+    dark: { bg: '#4d4108', text: '#ffe46b', border: '1px solid #7a6814' },
+  },
   empty: {
     light: { bg: '#f5f5f5', text: '#616161' },
     dark: { bg: '#424242', text: '#bdbdbd' },
