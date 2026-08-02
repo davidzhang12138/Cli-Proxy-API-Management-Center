@@ -596,7 +596,7 @@
   "freebuff_quota": {
     "title": "Квота FreeBuff",
     "empty_title": "Нет учётных данных FreeBuff",
-    "empty_desc": "Войдите через FreeBuff OAuth, чтобы увидеть квоты сессий по моделям.",
+    "empty_desc": "Войдите через FreeBuff OAuth, чтобы увидеть пулы квот сессий и доступные модели.",
     "idle": "Нажмите, чтобы обновить квоту",
     "loading": "Загрузка квоты...",
     "load_failed": "Не удалось загрузить квоту: {{message}}",
@@ -611,6 +611,8 @@
     "resource_limited_sessions": "Сеансы моделей с лимитом",
     "resource_unlimited_models": "Модели без лимита",
     "resource_provider_spend": "Общий лимит расходов",
+    "models": "Модели: {{models}}",
+    "shared_models": "Общий пул: {{models}}",
     "limit_hint": "Лимит {{limit}}",
     "usage_unknown": "Текущий расход не сообщается",
     "unlimited": "Без лимита",

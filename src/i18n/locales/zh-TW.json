@@ -606,7 +606,7 @@
   "freebuff_quota": {
     "title": "FreeBuff 配額",
     "empty_title": "暫無 FreeBuff 認證",
-    "empty_desc": "使用 FreeBuff OAuth 登入後即可查看模型工作階段配額。",
+    "empty_desc": "使用 FreeBuff OAuth 登入後即可查看工作階段配額池及適用模型。",
     "idle": "點擊此處重新整理配額",
     "loading": "正在載入配額...",
     "load_failed": "配額取得失敗：{{message}}",
@@ -621,6 +621,8 @@
     "resource_limited_sessions": "限量模型工作階段",
     "resource_unlimited_models": "不限量模型",
     "resource_provider_spend": "全域消費限制",
+    "models": "適用模型：{{models}}",
+    "shared_models": "共用模型：{{models}}",
     "limit_hint": "配額上限 {{limit}}",
     "usage_unknown": "目前用量未回報",
     "unlimited": "不限量",

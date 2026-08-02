@@ -64,6 +64,15 @@
   color: var(--text-secondary);
 }
 
+.quotaScope {
+  min-width: 0;
+  font-family: $font-mono;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--text-quaternary);
+  overflow-wrap: anywhere;
+}
+
 .quotaMessage {
   font-family: $font-mono;
   font-size: 11.5px;

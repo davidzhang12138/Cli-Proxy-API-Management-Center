@@ -16,6 +16,7 @@ export interface QuotaClassMap {
   quotaPercent: string;
   quotaReset: string;
   quotaAmount: string;
+  quotaScope: string;
   quotaMessage: string;
   // No-total balance telemetry (Hyper credits)
   quotaBalance: string;
@@ -59,6 +60,7 @@ export const QUOTA_CLASS_KEYS: readonly (keyof QuotaClassMap)[] = [
   'quotaPercent',
   'quotaReset',
   'quotaAmount',
+  'quotaScope',
   'quotaMessage',
   'quotaBalance',
   'quotaBalanceLabel',

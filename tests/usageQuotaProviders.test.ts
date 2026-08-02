@@ -85,9 +85,11 @@ describe('FreeBuff unified quota adapter', () => {
         resources: [
           {
             resource_type: 'freebuff_limited_sessions',
+            models: ['deepseek-v4-flash', 'mimo-v2.5'],
+            shared: true,
             limit_hint: 8,
             usage_unknown: true,
-            model_scoped: false,
+            model_scoped: true,
             window_seconds: 86_400,
             reset_at: '2026-08-03T07:00:00Z',
           },
@@ -102,9 +104,11 @@ describe('FreeBuff unified quota adapter', () => {
       resources: [
         expect.objectContaining({
           resourceType: 'freebuff_limited_sessions',
+          models: ['deepseek-v4-flash', 'mimo-v2.5'],
+          shared: true,
           limitHint: 8,
           usageUnknown: true,
-          modelScoped: false,
+          modelScoped: true,
           windowSeconds: 86_400,
         }),
       ],
@@ -223,6 +227,8 @@ describe('FreeBuff unified quota adapter', () => {
         resources: [
           {
             resource_type: 'freebuff_limited_sessions',
+            models: ['deepseek-v4-flash', 'mimo-v2.5'],
+            shared: true,
             limit_hint: 8,
             usage_unknown: true,
             window_seconds: 86_400,
@@ -239,6 +245,7 @@ describe('FreeBuff unified quota adapter', () => {
     );
 
     expect(markup).toContain('限量模型会话');
+    expect(markup).toContain('共享模型：deepseek-v4-flash, mimo-v2.5');
     expect(markup).toContain('额度上限 8');
     expect(markup).toContain('当前用量未上报');
     expect(markup).toContain('>--<');
@@ -259,10 +266,13 @@ describe('FreeBuff unified quota adapter', () => {
         resources: [
           {
             resource_type: 'freebuff_unlimited_models',
+            models: ['deepseek-v4-flash', 'mimo-v2.5'],
             unlimited: true,
           },
           {
             resource_type: 'freebuff_premium_sessions',
+            models: ['deepseek-v4-pro', 'gpt-5.6-luna', 'minimax-m3'],
+            shared: true,
             limit_hint: 6,
             usage_unknown: true,
             window_seconds: 86_400,
@@ -270,6 +280,7 @@ describe('FreeBuff unified quota adapter', () => {
           },
           {
             resource_type: 'glm-5.2',
+            models: ['glm-5.2'],
             exhausted: true,
             model_scoped: true,
             usage_unknown: true,
@@ -289,7 +300,9 @@ describe('FreeBuff unified quota adapter', () => {
     expect(markup).toContain('不限量模型');
     expect(markup).toContain('>∞<');
     expect(markup).toContain('高级模型会话');
+    expect(markup).toContain('共享模型：deepseek-v4-pro, gpt-5.6-luna, minimax-m3');
     expect(markup).toContain('额度上限 6');
+    expect(markup).toContain('适用模型：deepseek-v4-flash, mimo-v2.5');
     expect(markup).toContain('glm-5.2');
     expect(markup).not.toContain('暂无配额数据');
   });

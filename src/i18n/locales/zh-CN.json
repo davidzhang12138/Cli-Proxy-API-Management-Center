@@ -608,7 +608,7 @@
   "freebuff_quota": {
     "title": "FreeBuff 配额",
     "empty_title": "暂无 FreeBuff 认证",
-    "empty_desc": "使用 FreeBuff OAuth 登录后即可查看模型会话配额。",
+    "empty_desc": "使用 FreeBuff OAuth 登录后即可查看会话配额池及适用模型。",
     "idle": "点击此处刷新配额",
     "loading": "正在加载配额...",
     "load_failed": "配额获取失败：{{message}}",
@@ -623,6 +623,8 @@
     "resource_limited_sessions": "限量模型会话",
     "resource_unlimited_models": "不限量模型",
     "resource_provider_spend": "全局消费限制",
+    "models": "适用模型：{{models}}",
+    "shared_models": "共享模型：{{models}}",
     "limit_hint": "额度上限 {{limit}}",
     "usage_unknown": "当前用量未上报",
     "unlimited": "不限量",

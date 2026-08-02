@@ -87,6 +87,8 @@ export interface UsageQuotaSnapshotPayload {
 export interface UsageQuotaResourcePayload {
   resource_type?: string | null;
   resourceType?: string | null;
+  models?: string[] | null;
+  shared?: boolean | string | number | null;
   total_limit?: number | string | null;
   totalLimit?: number | string | null;
   limit_hint?: number | string | null;
@@ -127,6 +129,8 @@ export interface UsageQuotaSnapshot {
 
 export interface UsageQuotaResource {
   resourceType?: string;
+  models?: string[];
+  shared?: boolean;
   totalLimit: number | null;
   limitHint?: number | null;
   currentUsage: number | null;

@@ -24,6 +24,20 @@ const normalizeBooleanValue = (value: unknown): boolean | null => {
   return null;
 };
 
+const normalizeStringList = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const item of value) {
+    const model = normalizeStringValue(item);
+    if (!model || seen.has(model)) continue;
+    seen.add(model);
+    normalized.push(model);
+  }
+  return normalized;
+};
+
 const normalizeIsoTimestamp = (value: unknown): string | undefined => {
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -80,6 +94,8 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
   const payload = value as UsageQuotaResourcePayload;
   const resourceType =
     normalizeStringValue(payload.resource_type ?? payload.resourceType) ?? undefined;
+  const models = normalizeStringList(payload.models);
+  const shared = normalizeBooleanValue(payload.shared) ?? false;
   const totalLimit = normalizeNumberValue(payload.total_limit ?? payload.totalLimit);
   const limitHint = normalizeNumberValue(payload.limit_hint ?? payload.limitHint);
   const currentUsage = normalizeNumberValue(payload.current_usage ?? payload.currentUsage);
@@ -102,6 +118,8 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
 
   return {
     resourceType,
+    models,
+    shared,
     totalLimit,
     limitHint,
     currentUsage,
@@ -139,7 +157,7 @@ const usageQuotaResourceToAntigravityGroup = (
   const group: AntigravityQuotaGroup = {
     id: usageQuotaResourceId(resourceType),
     label: usageQuotaResourceLabel(resourceType),
-    models: resourceType ? [resourceType] : [],
+    models: resource.models?.length ? [...resource.models] : resourceType ? [resourceType] : [],
     remainingFraction,
     resetTime,
     buckets: [

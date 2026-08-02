@@ -121,12 +121,24 @@ export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuo
           resource.resourceType || snapshot.resourceType || 'freebuff_sessions';
         const labelKey = RESOURCE_LABEL_KEYS[rawResourceType.toLowerCase()];
         const label = labelKey ? t(labelKey) : rawResourceType;
+        const models = resource.models ?? [];
+        const modelList = models.join(', ');
+        const showModelScope =
+          models.length > 0 &&
+          (resource.shared ||
+            models.length > 1 ||
+            models[0].toLowerCase() !== rawResourceType.toLowerCase());
+        const modelScopeLabel = showModelScope
+          ? t(resource.shared ? 'freebuff_quota.shared_models' : 'freebuff_quota.models', {
+              models: modelList,
+            })
+          : null;
         const showUsageUnknown = resource.usageUnknown && !resource.exhausted && remaining === null;
 
         return (
           <div key={`${rawResourceType}-${index}`} className={classes.quotaRow}>
             <div className={classes.quotaRowHeader}>
-              <span className={classes.quotaModel} title={rawResourceType}>
+              <span className={classes.quotaModel} title={modelList || rawResourceType}>
                 {label}
               </span>
               <div className={classes.quotaMeta}>
@@ -171,6 +183,11 @@ export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuo
                 ) : null}
               </div>
             </div>
+            {modelScopeLabel ? (
+              <div className={classes.quotaScope} title={modelList}>
+                {modelScopeLabel}
+              </div>
+            ) : null}
             {percent !== null ? (
               <QuotaMeter percent={percent} classes={classes} index={index} />
             ) : null}

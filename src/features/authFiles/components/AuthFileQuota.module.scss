@@ -113,6 +113,15 @@ button.quotaMessageAction {
   color: var(--text-secondary);
 }
 
+.quotaScope {
+  min-width: 0;
+  font-family: $font-mono;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--text-quaternary);
+  overflow-wrap: anywhere;
+}
+
 /* ---------- 无总量余额（Hyper credits） ---------- */
 
 .quotaBalance {
