@@ -616,7 +616,14 @@
     "remaining_only": "剩餘 {{remaining}}",
     "reset_at": "重設 {{time}}",
     "window": "{{duration}} 視窗",
+    "resource_sessions": "模型工作階段",
+    "resource_premium_sessions": "進階模型工作階段",
+    "resource_limited_sessions": "限量模型工作階段",
+    "resource_unlimited_models": "不限量模型",
     "resource_provider_spend": "全域消費限制",
+    "limit_hint": "配額上限 {{limit}}",
+    "usage_unknown": "目前用量未回報",
+    "unlimited": "不限量",
     "exhausted": "已耗盡"
   },
   "hyper_quota": {

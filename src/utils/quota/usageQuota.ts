@@ -81,6 +81,7 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
   const resourceType =
     normalizeStringValue(payload.resource_type ?? payload.resourceType) ?? undefined;
   const totalLimit = normalizeNumberValue(payload.total_limit ?? payload.totalLimit);
+  const limitHint = normalizeNumberValue(payload.limit_hint ?? payload.limitHint);
   const currentUsage = normalizeNumberValue(payload.current_usage ?? payload.currentUsage);
   const remaining = normalizeNumberValue(payload.remaining);
   const minimumCreditAmountForUsage = normalizeNumberValue(
@@ -94,16 +95,24 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
       ? remaining < minimumCreditAmountForUsage
       : remaining !== null && remaining <= 0) ??
     false;
+  const modelScoped = normalizeBooleanValue(payload.model_scoped ?? payload.modelScoped) ?? false;
+  const usageUnknown =
+    normalizeBooleanValue(payload.usage_unknown ?? payload.usageUnknown) ?? false;
+  const unlimited = normalizeBooleanValue(payload.unlimited) ?? false;
 
   return {
     resourceType,
     totalLimit,
+    limitHint,
     currentUsage,
     remaining,
     minimumCreditAmountForUsage,
     windowSeconds,
     resetAt,
     exhausted,
+    modelScoped,
+    usageUnknown,
+    unlimited,
   };
 };
 
@@ -179,10 +188,16 @@ export const parseUsageQuotaSnapshot = (value: unknown): UsageQuotaSnapshot | nu
 
   const known = normalizeBooleanValue(payload.known) ?? false;
   const totalLimit = normalizeNumberValue(payload.total_limit ?? payload.totalLimit);
+  const limitHint = normalizeNumberValue(payload.limit_hint ?? payload.limitHint);
   const currentUsage = normalizeNumberValue(payload.current_usage ?? payload.currentUsage);
   const remaining = normalizeNumberValue(payload.remaining);
   const exhausted =
     normalizeBooleanValue(payload.exhausted) ?? (remaining !== null && remaining <= 0) ?? false;
+  const globalExhausted =
+    normalizeBooleanValue(payload.global_exhausted ?? payload.globalExhausted) ?? false;
+  const usageUnknown =
+    normalizeBooleanValue(payload.usage_unknown ?? payload.usageUnknown) ?? false;
+  const unlimited = normalizeBooleanValue(payload.unlimited) ?? false;
   const resourceType =
     normalizeStringValue(payload.resource_type ?? payload.resourceType) ?? undefined;
   const nextReset = normalizeIsoTimestamp(payload.next_reset ?? payload.nextReset);
@@ -197,9 +212,13 @@ export const parseUsageQuotaSnapshot = (value: unknown): UsageQuotaSnapshot | nu
   return {
     known,
     totalLimit,
+    limitHint,
     currentUsage,
     remaining,
     exhausted,
+    globalExhausted,
+    usageUnknown,
+    unlimited,
     resourceType,
     nextReset,
     checkedAt,
@@ -254,9 +273,7 @@ export const buildKiroQuotaDataFromUsageQuota = (value: unknown): KiroQuotaData 
     currentUsage,
     usageLimit: normalizedLimit,
     remainingCredits: normalizedRemaining,
-    nextReset: toFutureKiroResetIso(
-      snapshot.nextReset ? Date.parse(snapshot.nextReset) : null
-    ),
+    nextReset: toFutureKiroResetIso(snapshot.nextReset ? Date.parse(snapshot.nextReset) : null),
     subscriptionType: snapshot.resourceType,
   };
 };

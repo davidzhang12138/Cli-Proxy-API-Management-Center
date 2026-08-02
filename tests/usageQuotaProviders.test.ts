@@ -72,6 +72,45 @@ describe('FreeBuff unified quota adapter', () => {
     ]);
   });
 
+  test('preserves FreeBuff quota hints and scope flags from management snapshots', () => {
+    const state = FREEBUFF_CONFIG.buildSnapshotState?.({
+      name: 'freebuff-limited.json',
+      type: 'freebuff',
+      usage_quota: {
+        known: true,
+        resource_type: 'freebuff_limited_sessions',
+        limit_hint: 8,
+        usage_unknown: true,
+        next_reset: '2026-08-03T07:00:00Z',
+        resources: [
+          {
+            resource_type: 'freebuff_limited_sessions',
+            limit_hint: 8,
+            usage_unknown: true,
+            model_scoped: false,
+            window_seconds: 86_400,
+            reset_at: '2026-08-03T07:00:00Z',
+          },
+        ],
+      },
+    });
+
+    expect(state?.snapshot).toMatchObject({
+      resourceType: 'freebuff_limited_sessions',
+      limitHint: 8,
+      usageUnknown: true,
+      resources: [
+        expect.objectContaining({
+          resourceType: 'freebuff_limited_sessions',
+          limitHint: 8,
+          usageUnknown: true,
+          modelScoped: false,
+          windowSeconds: 86_400,
+        }),
+      ],
+    });
+  });
+
   test('refreshes only the requested auth index and selects its provider snapshot', async () => {
     let request: unknown;
     authFilesApi.refreshAuthQuotas = (async (payload) => {
@@ -169,6 +208,124 @@ describe('FreeBuff unified quota adapter', () => {
 
     expect(markup).toContain('>60%<');
     expect(markup).toContain('3 / 5');
+  });
+
+  test('renders a limited-tier hint without inventing current usage', () => {
+    const state = FREEBUFF_CONFIG.buildSnapshotState?.({
+      name: 'freebuff-limited.json',
+      type: 'freebuff',
+      usage_quota: {
+        known: true,
+        resource_type: 'freebuff_limited_sessions',
+        limit_hint: 8,
+        usage_unknown: true,
+        next_reset: '2026-08-03T07:00:00Z',
+        resources: [
+          {
+            resource_type: 'freebuff_limited_sessions',
+            limit_hint: 8,
+            usage_unknown: true,
+            window_seconds: 86_400,
+            reset_at: '2026-08-03T07:00:00Z',
+          },
+        ],
+      },
+    });
+    const markup = renderToStaticMarkup(
+      createElement(FreebuffQuotaBody, {
+        classes: quotaClasses,
+        quota: state!,
+      })
+    );
+
+    expect(markup).toContain('限量模型会话');
+    expect(markup).toContain('额度上限 8');
+    expect(markup).toContain('当前用量未上报');
+    expect(markup).toContain('>--<');
+    expect(markup).not.toContain('暂无配额数据');
+    expect(markup).not.toContain('quotaBar');
+  });
+
+  test('renders full-tier unlimited models alongside the session hint', () => {
+    const state = FREEBUFF_CONFIG.buildSnapshotState?.({
+      name: 'freebuff-full.json',
+      type: 'freebuff',
+      usage_quota: {
+        known: true,
+        resource_type: 'freebuff_sessions',
+        limit_hint: 6,
+        usage_unknown: true,
+        unlimited: true,
+        resources: [
+          {
+            resource_type: 'freebuff_unlimited_models',
+            unlimited: true,
+          },
+          {
+            resource_type: 'freebuff_premium_sessions',
+            limit_hint: 6,
+            usage_unknown: true,
+            window_seconds: 86_400,
+            reset_at: '2026-08-03T07:00:00Z',
+          },
+          {
+            resource_type: 'glm-5.2',
+            exhausted: true,
+            model_scoped: true,
+            usage_unknown: true,
+            window_seconds: 86_400,
+            reset_at: '2026-08-03T07:00:00Z',
+          },
+        ],
+      },
+    });
+    const markup = renderToStaticMarkup(
+      createElement(FreebuffQuotaBody, {
+        classes: quotaClasses,
+        quota: state!,
+      })
+    );
+
+    expect(markup).toContain('不限量模型');
+    expect(markup).toContain('>∞<');
+    expect(markup).toContain('高级模型会话');
+    expect(markup).toContain('额度上限 6');
+    expect(markup).toContain('glm-5.2');
+    expect(markup).not.toContain('暂无配额数据');
+  });
+
+  test('preserves global exhaustion and synthesizes its provider-spend row when needed', () => {
+    const state = FREEBUFF_CONFIG.buildSnapshotState?.({
+      name: 'freebuff-spend.json',
+      type: 'freebuff',
+      usage_quota: {
+        known: true,
+        exhausted: true,
+        global_exhausted: true,
+        resource_type: 'provider_spend',
+        next_reset: '2026-08-03T07:00:00Z',
+        resources: [
+          {
+            resource_type: 'deepseek-v4-pro',
+            total_limit: 6,
+            current_usage: 1,
+            remaining: 5,
+            model_scoped: true,
+          },
+        ],
+      },
+    });
+    const markup = renderToStaticMarkup(
+      createElement(FreebuffQuotaBody, {
+        classes: quotaClasses,
+        quota: state!,
+      })
+    );
+
+    expect(state?.snapshot?.globalExhausted).toBe(true);
+    expect(state?.snapshot?.resources[0]?.modelScoped).toBe(true);
+    expect(markup).toContain('全局消费限制');
+    expect(markup).toContain('已耗尽');
   });
 
   test("does not assign another model's reset time to a resource without one", () => {

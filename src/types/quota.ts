@@ -63,10 +63,17 @@ export interface UsageQuotaSnapshotPayload {
   known?: boolean | string | number;
   total_limit?: number | string | null;
   totalLimit?: number | string | null;
+  limit_hint?: number | string | null;
+  limitHint?: number | string | null;
   current_usage?: number | string | null;
   currentUsage?: number | string | null;
   remaining?: number | string | null;
   exhausted?: boolean | string | number | null;
+  global_exhausted?: boolean | string | number | null;
+  globalExhausted?: boolean | string | number | null;
+  usage_unknown?: boolean | string | number | null;
+  usageUnknown?: boolean | string | number | null;
+  unlimited?: boolean | string | number | null;
   resource_type?: string | null;
   resourceType?: string | null;
   next_reset?: string | number | null;
@@ -82,6 +89,8 @@ export interface UsageQuotaResourcePayload {
   resourceType?: string | null;
   total_limit?: number | string | null;
   totalLimit?: number | string | null;
+  limit_hint?: number | string | null;
+  limitHint?: number | string | null;
   current_usage?: number | string | null;
   currentUsage?: number | string | null;
   remaining?: number | string | null;
@@ -92,14 +101,23 @@ export interface UsageQuotaResourcePayload {
   reset_at?: string | number | null;
   resetAt?: string | number | null;
   exhausted?: boolean | string | number | null;
+  model_scoped?: boolean | string | number | null;
+  modelScoped?: boolean | string | number | null;
+  usage_unknown?: boolean | string | number | null;
+  usageUnknown?: boolean | string | number | null;
+  unlimited?: boolean | string | number | null;
 }
 
 export interface UsageQuotaSnapshot {
   known: boolean;
   totalLimit: number | null;
+  limitHint?: number | null;
   currentUsage: number | null;
   remaining: number | null;
   exhausted: boolean;
+  globalExhausted?: boolean;
+  usageUnknown?: boolean;
+  unlimited?: boolean;
   resourceType?: string;
   nextReset?: string;
   checkedAt?: string;
@@ -110,12 +128,16 @@ export interface UsageQuotaSnapshot {
 export interface UsageQuotaResource {
   resourceType?: string;
   totalLimit: number | null;
+  limitHint?: number | null;
   currentUsage: number | null;
   remaining: number | null;
   minimumCreditAmountForUsage: number | null;
   windowSeconds: number | null;
   resetAt?: string;
   exhausted: boolean;
+  modelScoped?: boolean;
+  usageUnknown?: boolean;
+  unlimited?: boolean;
 }
 
 /** Unified management quota snapshots used by providers without a public quota API. */

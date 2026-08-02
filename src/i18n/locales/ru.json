@@ -606,7 +606,14 @@
     "remaining_only": "Осталось {{remaining}}",
     "reset_at": "Сброс {{time}}",
     "window": "Окно {{duration}}",
+    "resource_sessions": "Сеансы моделей",
+    "resource_premium_sessions": "Сеансы премиум-моделей",
+    "resource_limited_sessions": "Сеансы моделей с лимитом",
+    "resource_unlimited_models": "Модели без лимита",
     "resource_provider_spend": "Общий лимит расходов",
+    "limit_hint": "Лимит {{limit}}",
+    "usage_unknown": "Текущий расход не сообщается",
+    "unlimited": "Без лимита",
     "exhausted": "Исчерпано"
   },
   "hyper_quota": {

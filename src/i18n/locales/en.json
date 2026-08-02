@@ -618,7 +618,14 @@
     "remaining_only": "{{remaining}} remaining",
     "reset_at": "Resets {{time}}",
     "window": "{{duration}} window",
+    "resource_sessions": "Model sessions",
+    "resource_premium_sessions": "Premium model sessions",
+    "resource_limited_sessions": "Limited model sessions",
+    "resource_unlimited_models": "Unlimited models",
     "resource_provider_spend": "Provider spending limit",
+    "limit_hint": "Limit {{limit}}",
+    "usage_unknown": "Usage not reported",
+    "unlimited": "Unlimited",
     "exhausted": "Exhausted"
   },
   "hyper_quota": {

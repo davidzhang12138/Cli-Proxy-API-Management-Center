@@ -28,6 +28,14 @@ const resourceRemaining = (resource: UsageQuotaResource, limit: number | null): 
       ? 0
       : null);
 
+const RESOURCE_LABEL_KEYS: Record<string, string> = {
+  freebuff_sessions: 'freebuff_quota.resource_sessions',
+  freebuff_premium_sessions: 'freebuff_quota.resource_premium_sessions',
+  freebuff_limited_sessions: 'freebuff_quota.resource_limited_sessions',
+  freebuff_unlimited_models: 'freebuff_quota.resource_unlimited_models',
+  provider_spend: 'freebuff_quota.resource_provider_spend',
+};
+
 export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuotaState>) {
   const { t } = useTranslation();
   const snapshot = quota.snapshot;
@@ -35,28 +43,54 @@ export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuo
     return <div className={classes.quotaMessage}>{t('freebuff_quota.empty_data')}</div>;
   }
 
-  const sourceResources =
+  const baseResources =
     snapshot.resources.length > 0
       ? snapshot.resources
       : [
           {
             resourceType: snapshot.resourceType,
             totalLimit: snapshot.totalLimit,
+            limitHint: snapshot.limitHint ?? null,
             currentUsage: snapshot.currentUsage,
             remaining: snapshot.remaining,
             minimumCreditAmountForUsage: null,
             windowSeconds: null,
             resetAt: snapshot.nextReset,
-            exhausted: snapshot.exhausted,
+            exhausted: snapshot.globalExhausted || snapshot.exhausted,
+            usageUnknown: snapshot.usageUnknown,
+            unlimited: snapshot.unlimited,
           },
         ];
+  const hasProviderSpend = baseResources.some(
+    (resource) => resource.resourceType?.toLowerCase() === 'provider_spend'
+  );
+  const sourceResources =
+    snapshot.globalExhausted && !hasProviderSpend
+      ? [
+          ...baseResources,
+          {
+            resourceType: 'provider_spend',
+            totalLimit: null,
+            limitHint: null,
+            currentUsage: null,
+            remaining: null,
+            minimumCreditAmountForUsage: null,
+            windowSeconds: null,
+            resetAt: snapshot.nextReset,
+            exhausted: true,
+          },
+        ]
+      : baseResources;
   const resources = sourceResources
     .filter(
       (resource) =>
         resource.totalLimit !== null ||
+        (resource.limitHint !== null && resource.limitHint !== undefined) ||
         resource.currentUsage !== null ||
         resource.remaining !== null ||
-        resource.exhausted
+        resource.exhausted ||
+        resource.usageUnknown ||
+        resource.unlimited
     )
     .sort((left, right) => {
       const leftSpend = left.resourceType?.toLowerCase() === 'provider_spend' ? 1 : 0;
@@ -85,10 +119,9 @@ export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuo
         const windowDuration = formatWindowDuration(resource.windowSeconds);
         const rawResourceType =
           resource.resourceType || snapshot.resourceType || 'freebuff_sessions';
-        const label =
-          rawResourceType.toLowerCase() === 'provider_spend'
-            ? t('freebuff_quota.resource_provider_spend')
-            : rawResourceType;
+        const labelKey = RESOURCE_LABEL_KEYS[rawResourceType.toLowerCase()];
+        const label = labelKey ? t(labelKey) : rawResourceType;
+        const showUsageUnknown = resource.usageUnknown && !resource.exhausted && remaining === null;
 
         return (
           <div key={`${rawResourceType}-${index}`} className={classes.quotaRow}>
@@ -98,23 +131,34 @@ export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuo
               </span>
               <div className={classes.quotaMeta}>
                 <span className={classes.quotaPercent}>
-                  {percent === null ? '--' : `${percent}%`}
+                  {resource.unlimited ? '∞' : percent === null ? '--' : `${percent}%`}
                 </span>
-                {remaining !== null && limit !== null ? (
+                {resource.unlimited ? (
+                  <span className={classes.quotaAmount}>{t('freebuff_quota.unlimited')}</span>
+                ) : remaining !== null && limit !== null ? (
                   <span className={classes.quotaAmount}>
                     {t('freebuff_quota.remaining_amount', {
                       remaining: formatNumber(remaining),
                       total: formatNumber(limit),
                     })}
                   </span>
+                ) : resource.exhausted ? (
+                  <span className={classes.quotaAmount}>{t('freebuff_quota.exhausted')}</span>
                 ) : remaining !== null ? (
                   <span className={classes.quotaAmount}>
                     {t('freebuff_quota.remaining_only', {
                       remaining: formatNumber(remaining),
                     })}
                   </span>
-                ) : resource.exhausted ? (
-                  <span className={classes.quotaAmount}>{t('freebuff_quota.exhausted')}</span>
+                ) : resource.limitHint !== null && resource.limitHint !== undefined ? (
+                  <span className={classes.quotaAmount}>
+                    {t('freebuff_quota.limit_hint', {
+                      limit: formatNumber(resource.limitHint),
+                    })}
+                  </span>
+                ) : null}
+                {showUsageUnknown ? (
+                  <span className={classes.quotaAmount}>{t('freebuff_quota.usage_unknown')}</span>
                 ) : null}
                 {resetLabel !== '-' ? (
                   <span className={classes.quotaReset}>
@@ -127,7 +171,9 @@ export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuo
                 ) : null}
               </div>
             </div>
-            <QuotaMeter percent={percent} classes={classes} index={index} />
+            {percent !== null ? (
+              <QuotaMeter percent={percent} classes={classes} index={index} />
+            ) : null}
           </div>
         );
       })}
