@@ -641,6 +641,22 @@
     "available": "可用",
     "exhausted": "已耗盡"
   },
+  "keelcode_quota": {
+    "title": "KeelCode 配額",
+    "empty_title": "暫無 KeelCode 認證",
+    "empty_desc": "使用 KeelCode OAuth 登入後即可查看各配額池的剩餘量。",
+    "idle": "點擊此處重新整理配額",
+    "loading": "正在載入配額...",
+    "load_failed": "配額取得失敗：{{message}}",
+    "missing_auth_index": "認證檔案缺少 auth_index",
+    "empty_data": "暫無配額資料",
+    "remaining_amount": "剩餘 {{remaining}} / {{total}}",
+    "remaining_only": "剩餘 {{remaining}}",
+    "reset_at": "重設 {{time}}",
+    "resource_premium": "Premium 配額池",
+    "resource_oss": "OSS 配額池",
+    "exhausted": "已耗盡"
+  },
   "vertex_import": {
     "title": "Vertex JSON 登入",
     "description": "上傳 Google 服務帳號 JSON，使用 CLI vertex-import 同步規則寫入 auth-dir/vertex-<project>.json。",

@@ -631,6 +631,22 @@
     "available": "Доступно",
     "exhausted": "Исчерпано"
   },
+  "keelcode_quota": {
+    "title": "Квота KeelCode",
+    "empty_title": "Нет учётных данных KeelCode",
+    "empty_desc": "Войдите через KeelCode OAuth, чтобы увидеть остаток каждого пула квоты.",
+    "idle": "Нажмите, чтобы обновить квоту",
+    "loading": "Загрузка квоты...",
+    "load_failed": "Не удалось загрузить квоту: {{message}}",
+    "missing_auth_index": "В учётных данных отсутствует auth_index",
+    "empty_data": "Нет данных о квоте",
+    "remaining_amount": "Осталось {{remaining}} / {{total}}",
+    "remaining_only": "Осталось {{remaining}}",
+    "reset_at": "Сбросится {{time}}",
+    "resource_premium": "Пул Premium",
+    "resource_oss": "Пул OSS",
+    "exhausted": "Исчерпано"
+  },
   "vertex_import": {
     "title": "Вход с Vertex JSON",
     "description": "Загрузите JSON ключа сервисного аккаунта Google, чтобы сохранить его как auth-dir/vertex-<project>.json по тем же правилам, что и помощник CLI vertex-import.",

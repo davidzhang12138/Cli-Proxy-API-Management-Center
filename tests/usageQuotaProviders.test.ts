@@ -7,6 +7,8 @@ import { FreebuffQuotaBody } from '@/features/quota/providers/freebuff/FreebuffQ
 import { FREEBUFF_CONFIG } from '@/features/quota/providers/freebuff/data';
 import { HyperQuotaBody } from '@/features/quota/providers/hyper/HyperQuotaBody';
 import { HYPER_CONFIG } from '@/features/quota/providers/hyper/data';
+import { KeelCodeQuotaBody } from '@/features/quota/providers/keelcode/KeelCodeQuotaBody';
+import { KEELCODE_CONFIG } from '@/features/quota/providers/keelcode/data';
 import { QUOTA_CLASS_KEYS, type QuotaClassMap } from '@/features/quota/types';
 import { authFilesApi } from '@/services/api';
 import type { AuthFileItem } from '@/types';
@@ -447,5 +449,107 @@ describe('Charm Hyper unified quota adapter', () => {
     expect(markup).toContain('quotaBalanceValueExhausted');
     expect(markup).toContain('>0<');
     expect(markup).not.toContain('%');
+  });
+});
+
+describe('KeelCode unified quota adapter', () => {
+  test('hydrates multiple quota pools from a management snapshot', () => {
+    const state = KEELCODE_CONFIG.buildSnapshotState?.({
+      name: 'keelcode.json',
+      type: 'keelcode',
+      usage_quota: {
+        known: true,
+        resource_type: 'keelcode',
+        next_reset: '2026-08-10T00:00:00Z',
+        resources: [
+          {
+            resource_type: 'premium',
+            total_limit: 1,
+            current_usage: 0.3,
+            remaining: 0.7,
+            reset_at: '2026-08-10T00:00:00Z',
+          },
+          {
+            resource_type: 'oss',
+            total_limit: 2,
+            current_usage: 2,
+            remaining: 0,
+            reset_at: '2026-08-10T00:00:00Z',
+            exhausted: true,
+          },
+        ],
+      },
+    });
+
+    expect(state?.status).toBe('success');
+    expect(state?.snapshot?.resources).toEqual([
+      expect.objectContaining({ resourceType: 'premium', remaining: 0.7 }),
+      expect.objectContaining({ resourceType: 'oss', remaining: 0, exhausted: true }),
+    ]);
+  });
+
+  test('refreshes the selected KeelCode credential through management API', async () => {
+    let request: unknown;
+    authFilesApi.refreshAuthQuotas = (async (payload) => {
+      request = payload;
+      return {
+        refreshed: 1,
+        auths: [
+          {
+            id: 'keelcode-1',
+            auth_index: 'keelcode:1',
+            provider: 'keelcode',
+            usage_quota: {
+              known: true,
+              resources: [{ resource_type: 'premium', total_limit: 1, remaining: 0.7 }],
+            },
+          },
+        ],
+      };
+    }) as typeof authFilesApi.refreshAuthQuotas;
+
+    const snapshot = await KEELCODE_CONFIG.fetchQuota(
+      { name: 'keelcode.json', type: 'keelcode', auth_index: 'keelcode:1' },
+      t
+    );
+
+    expect(request).toEqual({ auth_indexes: ['keelcode:1'] });
+    expect(snapshot.resources[0]).toMatchObject({ resourceType: 'premium', remaining: 0.7 });
+  });
+
+  test('renders each pool with its remaining percentage and reset time', () => {
+    const markup = renderToStaticMarkup(
+      createElement(KeelCodeQuotaBody, {
+        classes: quotaClasses,
+        quota: {
+          status: 'success',
+          snapshot: {
+            known: true,
+            totalLimit: 3,
+            currentUsage: 2.3,
+            remaining: 0.7,
+            exhausted: false,
+            nextReset: '2026-08-10T00:00:00Z',
+            resources: [
+              {
+                resourceType: 'premium',
+                totalLimit: 1,
+                currentUsage: 0.3,
+                remaining: 0.7,
+                minimumCreditAmountForUsage: null,
+                windowSeconds: null,
+                resetAt: '2026-08-10T00:00:00Z',
+                exhausted: false,
+              },
+            ],
+          },
+        },
+      })
+    );
+
+    expect(markup).toContain('Premium 配额池');
+    expect(markup).toContain('>70%<');
+    expect(markup).toContain('剩余 0.7 / 1');
+    expect(markup).toContain('重置');
   });
 });

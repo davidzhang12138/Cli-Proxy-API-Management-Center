@@ -10,6 +10,7 @@ import type {
   CodexQuotaState,
   FreebuffQuotaState,
   HyperQuotaState,
+  KeelCodeQuotaState,
   KimiQuotaState,
   KiroQuotaState,
   XaiQuotaState,
@@ -31,6 +32,7 @@ interface QuotaStoreState {
   xaiQuota: Record<string, XaiQuotaState>;
   freebuffQuota: Record<string, FreebuffQuotaState>;
   hyperQuota: Record<string, HyperQuotaState>;
+  keelcodeQuota: Record<string, KeelCodeQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
@@ -39,6 +41,7 @@ interface QuotaStoreState {
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
   setFreebuffQuota: (updater: QuotaUpdater<Record<string, FreebuffQuotaState>>) => void;
   setHyperQuota: (updater: QuotaUpdater<Record<string, HyperQuotaState>>) => void;
+  setKeelCodeQuota: (updater: QuotaUpdater<Record<string, KeelCodeQuotaState>>) => void;
   clearQuotaCache: () => void;
   purgeStaleEntries: () => void;
 }
@@ -53,6 +56,7 @@ type PersistedQuotaStoreState = Pick<
   | 'xaiQuota'
   | 'freebuffQuota'
   | 'hyperQuota'
+  | 'keelcodeQuota'
 >;
 
 const resolveUpdater = <T>(updater: QuotaUpdater<T>, prev: T): T => {
@@ -148,6 +152,7 @@ const sanitizePersistedQuotaState = (
   xaiQuota: sanitizeQuotaMap(state.xaiQuota ?? {}),
   freebuffQuota: sanitizeQuotaMap(state.freebuffQuota ?? {}),
   hyperQuota: sanitizeQuotaMap(state.hyperQuota ?? {}),
+  keelcodeQuota: sanitizeQuotaMap(state.keelcodeQuota ?? {}),
 });
 
 export const useQuotaStore = create<QuotaStoreState>()(
@@ -162,6 +167,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
       xaiQuota: {},
       freebuffQuota: {},
       hyperQuota: {},
+      keelcodeQuota: {},
       setAntigravityQuota: (updater) =>
         set((state) => ({
           antigravityQuota: stampQuotaMap(
@@ -200,6 +206,13 @@ export const useQuotaStore = create<QuotaStoreState>()(
         set((state) => ({
           hyperQuota: stampQuotaMap(resolveUpdater(updater, state.hyperQuota), state.hyperQuota),
         })),
+      setKeelCodeQuota: (updater) =>
+        set((state) => ({
+          keelcodeQuota: stampQuotaMap(
+            resolveUpdater(updater, state.keelcodeQuota),
+            state.keelcodeQuota
+          ),
+        })),
       clearQuotaCache: () =>
         set((state) => ({
           cacheGeneration: state.cacheGeneration + 1,
@@ -211,6 +224,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
           xaiQuota: {},
           freebuffQuota: {},
           hyperQuota: {},
+          keelcodeQuota: {},
         })),
       purgeStaleEntries: () =>
         set((state) =>
@@ -223,6 +237,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
             xaiQuota: state.xaiQuota,
             freebuffQuota: state.freebuffQuota,
             hyperQuota: state.hyperQuota,
+            keelcodeQuota: state.keelcodeQuota,
           })
         ),
     }),
@@ -238,6 +253,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
           xaiQuota: state.xaiQuota,
           freebuffQuota: state.freebuffQuota,
           hyperQuota: state.hyperQuota,
+          keelcodeQuota: state.keelcodeQuota,
         }),
       merge: (persistedState, currentState) => ({
         ...currentState,

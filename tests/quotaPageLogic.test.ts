@@ -22,6 +22,7 @@ const FILES: AuthFileItem[] = [
   file('grok-a.json', 'grok'), // 别名归一到 xai
   file('freebuff-a.json', 'freebuff'),
   file('hyper-a.json', 'hyper'),
+  file('keelcode-a.json', 'keelcode'),
   file('gemini-a.json', 'gemini'), // 不支持额度
   file('claude-off.json', 'claude', { disabled: true }), // 停用
 ];
@@ -32,6 +33,7 @@ describe('resolveQuotaProviderType', () => {
     expect(resolveQuotaProviderType(file('a', 'antigravity'))).toBe('antigravity');
     expect(resolveQuotaProviderType(file('a', 'freebuff'))).toBe('freebuff');
     expect(resolveQuotaProviderType(file('a', 'hyper'))).toBe('hyper');
+    expect(resolveQuotaProviderType(file('a', 'keelcode'))).toBe('keelcode');
     expect(resolveQuotaProviderType(file('a', 'gemini'))).toBeNull();
     expect(resolveQuotaProviderType(file('a', 'claude', { disabled: true }))).toBeNull();
   });
@@ -42,7 +44,7 @@ describe('classifyQuotaFiles', () => {
     const entries = classifyQuotaFiles(FILES);
     expect(entries.map((entry) => entry.file.name)).not.toContain('gemini-a.json');
     expect(entries.map((entry) => entry.file.name)).not.toContain('claude-off.json');
-    expect(entries).toHaveLength(7);
+    expect(entries).toHaveLength(8);
   });
 
   test('orders entries by provider tab order', () => {
@@ -55,6 +57,7 @@ describe('classifyQuotaFiles', () => {
       'kimi',
       'freebuff',
       'hyper',
+      'keelcode',
     ]);
   });
 });
@@ -62,7 +65,7 @@ describe('classifyQuotaFiles', () => {
 describe('buildTabCounts', () => {
   test('counts per provider plus an all total, zero-filling empty tabs', () => {
     expect(buildTabCounts(classifyQuotaFiles(FILES))).toEqual({
-      all: 7,
+      all: 8,
       claude: 1,
       antigravity: 0,
       codex: 2,
@@ -71,6 +74,7 @@ describe('buildTabCounts', () => {
       kimi: 1,
       freebuff: 1,
       hyper: 1,
+      keelcode: 1,
     });
   });
 
@@ -84,6 +88,7 @@ describe('buildTabCounts', () => {
       'kimi',
       'freebuff',
       'hyper',
+      'keelcode',
     ]);
   });
 });
@@ -92,7 +97,7 @@ describe('filterEntriesByTab', () => {
   const entries = classifyQuotaFiles(FILES);
 
   test("passes everything through on the 'all' tab", () => {
-    expect(filterEntriesByTab(entries, 'all')).toHaveLength(7);
+    expect(filterEntriesByTab(entries, 'all')).toHaveLength(8);
   });
 
   test('filters to a single provider', () => {

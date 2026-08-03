@@ -141,6 +141,7 @@ export function QuotaPage() {
   const xaiQuota = useQuotaStore((state) => state.xaiQuota);
   const freebuffQuota = useQuotaStore((state) => state.freebuffQuota);
   const hyperQuota = useQuotaStore((state) => state.hyperQuota);
+  const keelcodeQuota = useQuotaStore((state) => state.keelcodeQuota);
 
   const quotaByType = useMemo<Record<QuotaProviderType, Record<string, QuotaCardState>>>(
     () =>
@@ -153,6 +154,7 @@ export function QuotaPage() {
         xai: xaiQuota,
         freebuff: freebuffQuota,
         hyper: hyperQuota,
+        keelcode: keelcodeQuota,
       }) as unknown as Record<QuotaProviderType, Record<string, QuotaCardState>>,
     [
       antigravityQuota,
@@ -160,6 +162,7 @@ export function QuotaPage() {
       codexQuota,
       freebuffQuota,
       hyperQuota,
+      keelcodeQuota,
       kiroQuota,
       kimiQuota,
       xaiQuota,

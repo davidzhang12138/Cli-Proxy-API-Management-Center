@@ -643,6 +643,22 @@
     "available": "Available",
     "exhausted": "Exhausted"
   },
+  "keelcode_quota": {
+    "title": "KeelCode quota",
+    "empty_title": "No KeelCode credentials",
+    "empty_desc": "Sign in with KeelCode OAuth to view each quota pool's remaining balance.",
+    "idle": "Click to refresh quota",
+    "loading": "Loading quota...",
+    "load_failed": "Failed to load quota: {{message}}",
+    "missing_auth_index": "The credential is missing auth_index",
+    "empty_data": "No quota data",
+    "remaining_amount": "{{remaining}} / {{total}} remaining",
+    "remaining_only": "{{remaining}} remaining",
+    "reset_at": "Resets {{time}}",
+    "resource_premium": "Premium pool",
+    "resource_oss": "OSS pool",
+    "exhausted": "Exhausted"
+  },
   "vertex_import": {
     "title": "Vertex JSON Login",
     "description": "Upload a Google service account JSON to store it as auth-dir/vertex-<project>.json using the same rules as the CLI vertex-import helper.",

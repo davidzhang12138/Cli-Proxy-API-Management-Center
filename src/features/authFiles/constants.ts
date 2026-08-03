@@ -29,7 +29,15 @@ export type AuthFileIconAsset = string | { light: string; dark: string };
 export type OAuthConfigLoadError = 'loading' | 'unsupported' | 'load' | null;
 
 export type QuotaProviderType =
-  'antigravity' | 'claude' | 'codex' | 'kiro' | 'kimi' | 'xai' | 'freebuff' | 'hyper';
+  | 'antigravity'
+  | 'claude'
+  | 'codex'
+  | 'kiro'
+  | 'kimi'
+  | 'xai'
+  | 'freebuff'
+  | 'hyper'
+  | 'keelcode';
 
 export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'antigravity',
@@ -40,6 +48,7 @@ export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'xai',
   'freebuff',
   'hyper',
+  'keelcode',
 ]);
 
 export const OAUTH_PROVIDER_PRESETS = [

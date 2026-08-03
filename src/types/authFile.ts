@@ -19,6 +19,7 @@ export type AuthFileType =
   | 'vertex'
   | 'freebuff'
   | 'hyper'
+  | 'keelcode'
   | 'empty'
   | 'unknown';
 

@@ -12,6 +12,7 @@ import { KIMI_CONFIG } from './providers/kimi/data';
 import { XAI_CONFIG } from './providers/xai/data';
 import { FREEBUFF_CONFIG } from './providers/freebuff/data';
 import { HYPER_CONFIG } from './providers/hyper/data';
+import { KEELCODE_CONFIG } from './providers/keelcode/data';
 import type { QuotaProviderType } from './providers/types';
 import { QUOTA_TAB_ORDER, type QuotaTabId } from './constants';
 
@@ -24,6 +25,7 @@ const QUOTA_FILTER_MAP: Record<QuotaProviderType, (file: AuthFileItem) => boolea
   xai: XAI_CONFIG.filterFn,
   freebuff: FREEBUFF_CONFIG.filterFn,
   hyper: HYPER_CONFIG.filterFn,
+  keelcode: KEELCODE_CONFIG.filterFn,
 };
 
 export interface QuotaFileEntry {

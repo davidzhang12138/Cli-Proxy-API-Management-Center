@@ -154,6 +154,7 @@ export interface UsageQuotaProviderState {
 
 export type FreebuffQuotaState = UsageQuotaProviderState;
 export type HyperQuotaState = UsageQuotaProviderState;
+export type KeelCodeQuotaState = UsageQuotaProviderState;
 
 export interface CodexUsageWindow {
   used_percent?: number | string;
