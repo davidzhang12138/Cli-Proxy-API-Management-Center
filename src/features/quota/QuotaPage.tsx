@@ -13,8 +13,10 @@ import { useTranslation } from 'react-i18next';
 import { authFilesApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useNow } from '@/hooks/useNow';
 import { useRevealGroup } from '@/hooks/motion';
 import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, ResolvedTheme } from '@/types';
@@ -25,7 +27,9 @@ import { QuotaTimeline } from './components/QuotaTimeline';
 import {
   CARD_ENTRANCE_BUDGET_MS,
   QUOTA_PAGE_SIZE,
+  QUOTA_SORT_MODES,
   QUOTA_TAB_ORDER,
+  type QuotaSortMode,
   type QuotaTabId,
 } from './constants';
 import {
@@ -34,8 +38,10 @@ import {
   classifyQuotaFiles,
   filterEntriesByTab,
   paginate,
+  sortQuotaEntries,
   type QuotaFileEntry,
 } from './logic';
+import { nextRecoveryMs } from './resetSchedule';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
 import { useQuotaActions } from './hooks/useQuotaActions';
@@ -60,6 +66,9 @@ export function QuotaPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<QuotaTabId>(() => readQuotaUiState()?.tab ?? 'all');
+  const [sortMode, setSortMode] = useState<QuotaSortMode>(
+    () => readQuotaUiState()?.sortMode ?? 'default'
+  );
   const [page, setPage] = useState(1);
   // 页头 + tabs 的入场级联（标题 → meta → 动作 → tabs，级差 70ms）
   const revealRef = useRevealGroup<HTMLDivElement>();
@@ -106,32 +115,8 @@ export function QuotaPage() {
     void loadFiles();
   }, [loadFiles]);
 
-  /* ---------- 归类 / 过滤 / 分页 ---------- */
-
-  const entries = useMemo(() => classifyQuotaFiles(files), [files]);
-  const tabCounts = useMemo(() => buildTabCounts(entries), [entries]);
-  const visibleTabIds = useMemo(() => buildVisibleTabIds(tabCounts), [tabCounts]);
-  const filteredEntries = useMemo(() => filterEntriesByTab(entries, tab), [entries, tab]);
-  const { pageItems, currentPage, totalPages } = useMemo(
-    () => paginate(filteredEntries, page, QUOTA_PAGE_SIZE),
-    [filteredEntries, page]
-  );
-
-  const handleTabChange = useCallback((next: string) => {
-    setTab(next as QuotaTabId);
-    setPage(1);
-    writeQuotaUiState({ tab: next as QuotaTabId });
-  }, []);
-
-  // 本地记住的 tab 如果已没有凭证，回到“全部”，避免落在一个已隐藏的空分区。
-  useEffect(() => {
-    if (loading || tab === 'all' || visibleTabIds.includes(tab)) return;
-    setTab('all');
-    setPage(1);
-    writeQuotaUiState({ tab: 'all' });
-  }, [loading, tab, visibleTabIds]);
-
-  /* ---------- 额度缓存 ---------- */
+  /* ---------- 额度缓存 ----------
+   * 排在归类/排序之前：「最快恢复优先」要读它算排序键。 */
 
   const antigravityQuota = useQuotaStore((state) => state.antigravityQuota);
   const claudeQuota = useQuotaStore((state) => state.claudeQuota);
@@ -172,6 +157,59 @@ export function QuotaPage() {
   const getQuota = useCallback(
     (entry: QuotaFileEntry): QuotaCardState | undefined => quotaByType[entry.type][entry.file.name],
     [quotaByType]
+  );
+
+  /* ---------- 归类 / 过滤 / 排序 / 分页 ---------- */
+
+  // 只在「最快恢复优先」下订阅分钟时钟。默认序下不门控的话，pageItems 每分钟
+  // 换一次身份，会反复空转下面那个「刷新全部」的 loading 下降沿 effect。
+  const tick = useNow(sortMode !== 'default');
+  const sortNow = sortMode === 'default' ? 0 : tick;
+
+  const entries = useMemo(() => classifyQuotaFiles(files), [files]);
+  const tabCounts = useMemo(() => buildTabCounts(entries), [entries]);
+  const visibleTabIds = useMemo(() => buildVisibleTabIds(tabCounts), [tabCounts]);
+  const filteredEntries = useMemo(() => filterEntriesByTab(entries, tab), [entries, tab]);
+
+  const resolveNextRecovery = useCallback(
+    (entry: QuotaFileEntry) => nextRecoveryMs(entry.type, getQuota(entry), sortNow),
+    [getQuota, sortNow]
+  );
+  // 排序在分页之前：否则「最快恢复」只在当前页内成立。
+  const sortedEntries = useMemo(
+    () => sortQuotaEntries(filteredEntries, sortMode, resolveNextRecovery),
+    [filteredEntries, sortMode, resolveNextRecovery]
+  );
+
+  const { pageItems, currentPage, totalPages } = useMemo(
+    () => paginate(sortedEntries, page, QUOTA_PAGE_SIZE),
+    [sortedEntries, page]
+  );
+
+  const handleTabChange = useCallback((next: string) => {
+    setTab(next as QuotaTabId);
+    setPage(1);
+    writeQuotaUiState({ tab: next as QuotaTabId });
+  }, []);
+
+  // 本地记住的 tab 如果已没有凭证，回到“全部”，避免落在一个已隐藏的空分区。
+  useEffect(() => {
+    if (loading || tab === 'all' || visibleTabIds.includes(tab)) return;
+    setTab('all');
+    setPage(1);
+    writeQuotaUiState({ tab: 'all' });
+  }, [loading, tab, visibleTabIds]);
+
+  const handleSortModeChange = useCallback((next: string) => {
+    setSortMode(next as QuotaSortMode);
+    setPage(1);
+    writeQuotaUiState({ sortMode: next as QuotaSortMode });
+  }, []);
+
+  const sortOptions = useMemo(
+    () =>
+      QUOTA_SORT_MODES.map((mode) => ({ value: mode, label: t(`quota_management.sort_${mode}`) })),
+    [t]
   );
 
   const { loadedCount, attentionCount } = useMemo(() => {
@@ -268,8 +306,9 @@ export function QuotaPage() {
       />
 
       <section className={styles.workbench}>
-        {/* tabs 作为一个整体入场（不做逐 tab 级差 —— 克制优先） */}
-        <div data-reveal>
+        {/* tabs + 排序作为一个整体入场（useRevealGroup 会给每个 [data-reveal]
+            后代加一级级差，所以排序控件放在同一个节点里而不是做兄弟） */}
+        <div className={styles.tabsRow} data-reveal>
           <ProviderTabs
             types={visibleTabIds}
             counts={tabCounts}
@@ -277,6 +316,15 @@ export function QuotaPage() {
             resolvedTheme={resolvedTheme}
             onChange={handleTabChange}
           />
+          <div className={styles.sort}>
+            <Select
+              value={sortMode}
+              options={sortOptions}
+              onChange={handleSortModeChange}
+              ariaLabel={t('quota_management.sort_label')}
+              size="sm"
+            />
+          </div>
         </div>
 
         {error && (

@@ -15,6 +15,8 @@ export interface QuotaClassMap {
   quotaMeta: string;
   quotaPercent: string;
   quotaReset: string;
+  quotaResetRelative: string;
+  quotaResetRelativeSoon: string;
   quotaAmount: string;
   quotaScope: string;
   quotaMessage: string;
@@ -36,6 +38,7 @@ export interface QuotaClassMap {
   codexResetCredits: string;
   codexResetCreditsTitle: string;
   codexResetCreditRow: string;
+  codexResetCreditRowSoon: string;
   codexResetCreditLabel: string;
   codexResetCreditTime: string;
   codexResetCreditsError: string;
@@ -59,6 +62,8 @@ export const QUOTA_CLASS_KEYS: readonly (keyof QuotaClassMap)[] = [
   'quotaMeta',
   'quotaPercent',
   'quotaReset',
+  'quotaResetRelative',
+  'quotaResetRelativeSoon',
   'quotaAmount',
   'quotaScope',
   'quotaMessage',
@@ -76,6 +81,7 @@ export const QUOTA_CLASS_KEYS: readonly (keyof QuotaClassMap)[] = [
   'codexResetCredits',
   'codexResetCreditsTitle',
   'codexResetCreditRow',
+  'codexResetCreditRowSoon',
   'codexResetCreditLabel',
   'codexResetCreditTime',
   'codexResetCreditsError',
