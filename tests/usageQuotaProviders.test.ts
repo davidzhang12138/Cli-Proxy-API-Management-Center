@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeAll, describe, expect, test } from 'bun:test';
 import type { TFunction } from 'i18next';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import i18n from '@/i18n';
 import '@/i18n/index';
 import { FreebuffQuotaBody } from '@/features/quota/providers/freebuff/FreebuffQuotaBody';
 import { FREEBUFF_CONFIG } from '@/features/quota/providers/freebuff/data';
@@ -18,6 +19,10 @@ const originalRefreshAuthQuotas = authFilesApi.refreshAuthQuotas;
 const quotaClasses = Object.fromEntries(
   QUOTA_CLASS_KEYS.map((key) => [key, key])
 ) as unknown as QuotaClassMap;
+
+beforeAll(async () => {
+  await i18n.changeLanguage('zh-CN');
+});
 
 afterEach(() => {
   authFilesApi.refreshAuthQuotas = originalRefreshAuthQuotas;
