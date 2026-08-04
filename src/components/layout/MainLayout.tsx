@@ -331,6 +331,7 @@ export function MainLayout() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [brandExpanded, setBrandExpanded] = useState(true);
   const [pluginResources, setPluginResources] = useState<PluginResourceEntry[]>([]);
+  const [pluginsEnabled, setPluginsEnabled] = useState<boolean | null>(null);
   const [expandedPluginResourceIDs, setExpandedPluginResourceIDs] = useState<Set<string>>(
     () => new Set()
   );
@@ -347,6 +348,7 @@ export function MainLayout() {
   const abbrBrandName = t('title.abbr');
   const isLogsPage = location.pathname.startsWith('/logs');
   const isPluginResourcePage = location.pathname.startsWith('/plugin-pages');
+  const pluginsAvailable = supportsPlugin && pluginsEnabled === true;
   const showSidebarLabels = !sidebarCollapsed || sidebarOpen;
 
   // Keep floating header height available to sticky mobile elements and overlays.
@@ -514,14 +516,19 @@ export function MainLayout() {
   const loadPluginResources = useCallback(async () => {
     if (connectionStatus !== 'connected' || !supportsPlugin) {
       setPluginResources([]);
+      setPluginsEnabled(false);
       return;
     }
 
     try {
       const plugins = await pluginsApi.list();
-      setPluginResources(collectPluginResourceEntries(plugins.plugins));
+      setPluginsEnabled(plugins.pluginsEnabled);
+      setPluginResources(
+        plugins.pluginsEnabled ? collectPluginResourceEntries(plugins.plugins) : []
+      );
     } catch {
       setPluginResources([]);
+      setPluginsEnabled(false);
     }
   }, [connectionStatus, supportsPlugin]);
 
@@ -576,7 +583,7 @@ export function MainLayout() {
     return groups;
   }, []);
 
-  const pluginPageNavItems: SidebarNavItem[] = supportsPlugin
+  const pluginPageNavItems: SidebarNavItem[] = pluginsAvailable
     ? pluginResourceGroups.flatMap((group): SidebarNavItem[] => {
         if (group.entries.length === 1) {
           const resource = group.entries[0];
@@ -692,7 +699,7 @@ export function MainLayout() {
           metaKey: 'nav_meta.config_management',
           icon: sidebarIcons.config,
         },
-        ...(supportsPlugin
+        ...(pluginsAvailable
           ? [
               {
                 path: '/plugins',

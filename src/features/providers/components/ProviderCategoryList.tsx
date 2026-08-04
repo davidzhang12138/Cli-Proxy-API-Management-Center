@@ -9,35 +9,15 @@ interface ProviderCategoryListProps {
   onSelect: (brand: ProviderBrand) => void;
 }
 
-const QUICK_FILL_BRAND_ORDER: readonly ProviderBrand[] = [
-  'code0',
-  'fennoAI',
-  'qiniuCloud',
-  'claudeApi',
-  'lmuAI',
-];
-
-const QUICK_FILL_BRANDS: ReadonlySet<ProviderBrand> = new Set(QUICK_FILL_BRAND_ORDER);
-
 export function ProviderCategoryList({ groups, activeBrand, onSelect }: ProviderCategoryListProps) {
   const { t } = useTranslation();
 
-  const quickFillGroups = groups
-    .filter((g) => QUICK_FILL_BRANDS.has(g.id))
-    .sort(
-      (left, right) =>
-        QUICK_FILL_BRAND_ORDER.indexOf(left.id) - QUICK_FILL_BRAND_ORDER.indexOf(right.id)
-    );
-  const providerGroups = groups.filter((g) => !QUICK_FILL_BRANDS.has(g.id));
-
-  const renderGroups = (items: ProviderGroup[]) => (
-    <div className={styles.list}>
-      {items.map((group) => {
+  return (
+    <nav className={styles.tabs} role="tablist" aria-label={t('providersPage.categories.title')}>
+      {groups.map((group) => {
         const active = group.id === activeBrand;
         const total = group.resources.length;
-        const activeCount = group.resources.filter((r) => !r.disabled).length;
         const logo = PROVIDER_LOGOS[group.id];
-        const itemClass = `${styles.item} ${active ? styles.active : ''}`;
         const logoClassName = [
           styles.logo,
           logo?.transparent ? styles.logoTransparent : '',
@@ -60,57 +40,27 @@ export function ProviderCategoryList({ groups, activeBrand, onSelect }: Provider
           <button
             key={group.id}
             type="button"
-            className={itemClass}
+            role="tab"
+            className={`${styles.tab} ${active ? styles.tabActive : ''}`}
+            aria-selected={active}
             onClick={() => onSelect(group.id)}
-            aria-current={active ? 'page' : undefined}
+            title={t(`providersPage.providerNames.${group.id}`)}
           >
-            <span className={styles.itemLeft}>
+            <span className={styles.tabIconWrap} aria-hidden="true">
               {logo ? (
                 <>
-                  <img src={logo.src} alt="" aria-hidden="true" className={logoClassName} />
+                  <img src={logo.src} alt="" className={logoClassName} />
                   {logo.darkSrc ? (
-                    <img
-                      src={logo.darkSrc}
-                      alt=""
-                      aria-hidden="true"
-                      className={darkLogoClassName}
-                    />
+                    <img src={logo.darkSrc} alt="" className={darkLogoClassName} />
                   ) : null}
                 </>
               ) : null}
-              <span className={styles.itemText}>
-                <span className={styles.itemTitle}>
-                  {t(`providersPage.providerNames.${group.id}`)}
-                </span>
-                <span className={styles.itemSubtitle}>
-                  {t('providersPage.categories.activeCount', {
-                    active: activeCount,
-                    total,
-                  })}
-                </span>
-              </span>
             </span>
-            <span className={`${styles.badge} ${total === 0 ? styles.badgeAmber : ''}`}>
-              {total}
-            </span>
+            <span className={styles.tabLabel}>{t(`providersPage.providerNames.${group.id}`)}</span>
+            <span className={styles.tabCount}>{total}</span>
           </button>
         );
       })}
-    </div>
-  );
-
-  return (
-    <div className={styles.stack}>
-      <aside className={styles.aside}>
-        <p className={styles.eyebrow}>{t('providersPage.categories.title')}</p>
-        {renderGroups(providerGroups)}
-      </aside>
-      {quickFillGroups.length > 0 && (
-        <aside className={styles.aside}>
-          <p className={styles.eyebrow}>{t('providersPage.categories.quickFill')}</p>
-          {renderGroups(quickFillGroups)}
-        </aside>
-      )}
-    </div>
+    </nav>
   );
 }

@@ -59,50 +59,14 @@
   flex-direction: column;
 }
 
-.railHeading {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: $spacing-sm;
-  padding: 0 4px $spacing-sm;
-}
-
-.railEyebrow {
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 780;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.railResultCount {
-  display: inline-flex;
-  min-width: 26px;
-  height: 22px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 8px;
-  border-radius: $radius-full;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
 .providerList {
   display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 2px;
+  min-width: 0;
+  align-items: stretch;
+  gap: 2px;
   overflow-x: auto;
-  overflow-y: hidden;
   border-bottom: 1px solid var(--border-color);
-  overscroll-behavior-x: contain;
-  scroll-padding-inline: $spacing-md;
-  scroll-snap-type: x proximity;
   scrollbar-width: none;
-  touch-action: pan-x;
 
   &::-webkit-scrollbar {
     display: none;
@@ -112,68 +76,75 @@
 .methodButton {
   position: relative;
   display: inline-flex;
-  min-height: 56px;
+  min-height: 0;
   flex: 0 0 auto;
-  gap: $spacing-sm;
+  gap: 7px;
   align-items: center;
-  padding: 10px 14px 12px;
-  overflow: hidden;
+  padding: 8px 12px 11px;
   border: 0;
-  border-radius: $radius-md $radius-md 0 0;
-  background: transparent;
-  color: var(--text-primary);
+  border-radius: 8px 8px 0 0;
+  background: none;
+  color: var(--text-secondary);
   cursor: pointer;
   font: inherit;
+  font-size: 13px;
+  font-weight: 550;
   scroll-snap-align: center;
-  text-align: left;
   transition:
-    transform var(--dur-press) var(--ease-out-strong),
-    color var(--dur-hover) var(--ease-out-strong),
-    background var(--dur-hover) var(--ease-out-strong);
+    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
+    background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
 
-  &::before {
+  &::after {
     position: absolute;
     right: 10px;
     bottom: -1px;
     left: 10px;
-    height: 3px;
-    border-radius: $radius-full $radius-full 0 0;
-    background: var(--text-primary);
+    height: 2px;
+    border-radius: $radius-full;
+    background: transparent;
     content: '';
-    transform: scaleX(0);
-    transform-origin: center;
-    transition: transform var(--dur-hover) var(--ease-out-strong);
-  }
-
-  &:hover {
-    background: color-mix(in srgb, var(--bg-tertiary) 72%, transparent);
-  }
-
-  &:active {
-    transform: scale(0.985);
+    transition: background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
   }
 
   &:focus-visible {
-    box-shadow: inset 0 0 0 2px color-mix(in srgb, #1783ff 60%, transparent);
-    outline: none;
+    outline: 2px solid var(--primary-color);
+    outline-offset: -1px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .methodButton:hover {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--bg-tertiary) 55%, transparent);
   }
 }
 
 .methodButtonActive {
-  background: color-mix(in srgb, var(--bg-tertiary) 56%, transparent);
+  color: var(--text-primary);
+  font-weight: 650;
 
-  &::before {
-    transform: scaleX(1);
+  &::after {
+    background: var(--text-primary);
   }
 }
 
 .methodIconShell {
   display: inline-flex;
-  width: 28px;
-  height: 28px;
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
+
+  .cardTitleIcon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .cardTitleIconFallback {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .methodCopy {
@@ -184,18 +155,18 @@
 }
 
 .methodTitle {
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 700;
+  color: inherit;
+  font-size: 13px;
+  font-weight: inherit;
   line-height: 1.3;
   white-space: nowrap;
 }
 
 .methodIndicator {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   flex: 0 0 auto;
-  border: 1.5px solid var(--text-quaternary);
+  border: 1.5px solid var(--text-tertiary);
   border-radius: 50%;
   background: transparent;
 
@@ -271,6 +242,13 @@
 .cardTitleIcon {
   width: 24px;
   height: 24px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.methodIcon {
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
   object-fit: contain;
 }
@@ -608,7 +586,7 @@
   }
 
   .methodButton {
-    min-height: 54px;
+    min-height: 0;
     padding-inline: 12px;
   }
 

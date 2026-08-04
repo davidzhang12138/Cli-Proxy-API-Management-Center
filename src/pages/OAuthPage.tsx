@@ -1199,11 +1199,6 @@ export function OAuthPage() {
 
       <div className={styles.workbench}>
         <nav className={styles.providerRail} aria-label={t('auth_login.provider_directory')}>
-          <div className={styles.railHeading}>
-            <div className={styles.railEyebrow}>{t('auth_login.provider_directory')}</div>
-            <div className={styles.railResultCount}>{loginMethods.length}</div>
-          </div>
-
           <div
             className={styles.providerList}
             onWheel={(event) => {
@@ -1244,7 +1239,7 @@ export function OAuthPage() {
                       <img
                         src={method.kind === 'kiro' ? iconKiro : iconVertex}
                         alt=""
-                        className={styles.cardTitleIcon}
+                        className={styles.methodIcon}
                       />
                     )}
                   </span>
