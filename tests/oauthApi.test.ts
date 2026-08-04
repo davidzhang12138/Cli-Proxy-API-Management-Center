@@ -94,6 +94,39 @@ describe('OAuth management API', () => {
     });
   });
 
+  test('starts Cline device OAuth with proxy support', async () => {
+    let request: { url: string; config?: unknown } | undefined;
+    apiClient.get = (async (url: string, config?: unknown) => {
+      request = { url, config };
+      return {
+        status: 'ok',
+        url: 'https://cline.bot/device?code=ABCD-EFGH',
+        verification_uri: 'https://cline.bot/device',
+        verification_uri_complete: 'https://cline.bot/device?code=ABCD-EFGH',
+        user_code: 'ABCD-EFGH',
+        state: 'cline-123',
+        flow: 'device',
+        expires_in: 900,
+      };
+    }) as typeof apiClient.get;
+
+    const response = await oauthApi.startAuth('cline', {
+      proxyUrl: '  socks5://127.0.0.1:1080  ',
+    });
+
+    expect(request).toEqual({
+      url: '/cline-auth-url',
+      config: { params: { 'proxy-url': 'socks5://127.0.0.1:1080' } },
+    });
+    expect(response).toMatchObject({
+      state: 'cline-123',
+      flow: 'device',
+      user_code: 'ABCD-EFGH',
+      verification_uri_complete: 'https://cline.bot/device?code=ABCD-EFGH',
+      expires_in: 900,
+    });
+  });
+
   test('keeps the existing Freebuff start and dedicated status contracts intact', async () => {
     const calls: Array<{ method: string; url: string; data?: unknown; config?: unknown }> = [];
     apiClient.get = (async (url: string, config?: unknown) => {

@@ -12,6 +12,7 @@ import iconKimiLight from '@/assets/icons/kimi-light.svg';
 import iconKeelCode from '@/assets/icons/keelcode.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
 import iconHyper from '@/assets/icons/hyper.svg';
+import iconCline from '@/assets/icons/cline.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
@@ -61,6 +62,8 @@ export const OAUTH_PROVIDER_PRESETS = [
   'codex',
   'kimi',
   'keelcode',
+  'cline',
+  'cline-pass',
 ];
 
 const OAUTH_PROVIDER_EXCLUDES = new Set(['all', 'unknown', 'empty']);
@@ -95,6 +98,8 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   kiro: iconKiro,
   kimi: { light: iconKimiLight, dark: iconKimiDark },
   keelcode: iconKeelCode,
+  cline: iconCline,
+  'cline-pass': iconCline,
   freebuff: iconFreebuff,
   hyper: iconHyper,
   vertex: iconVertex,

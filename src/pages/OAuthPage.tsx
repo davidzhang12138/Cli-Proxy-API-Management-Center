@@ -28,6 +28,7 @@ import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
 import iconHyper from '@/assets/icons/hyper.svg';
 import iconKeelCode from '@/assets/icons/keelcode.svg';
+import iconCline from '@/assets/icons/cline.svg';
 
 interface ProviderState {
   url?: string;
@@ -169,6 +170,12 @@ const PROVIDERS: BuiltInOAuthProviderCard[] = [
     titleKey: 'auth_login.keelcode_oauth_title',
     icon: iconKeelCode,
   },
+  {
+    kind: 'builtin',
+    id: 'cline',
+    titleKey: 'auth_login.cline_oauth_title',
+    icon: iconCline,
+  },
 ];
 
 const BUILTIN_PROVIDER_IDS = new Set<string>(PROVIDERS.map((provider) => provider.id));
@@ -181,6 +188,7 @@ const BUILTIN_PROVIDER_TAB_TITLES: Record<BuiltInOAuthProvider, string> = {
   xai: 'xAI',
   hyper: 'Charm Hyper',
   keelcode: 'KeelCode',
+  cline: 'Cline',
 };
 
 const FREEBUFF_PROVIDER: FreebuffOAuthProviderCard = {

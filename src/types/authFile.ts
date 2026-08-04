@@ -20,6 +20,8 @@ export type AuthFileType =
   | 'freebuff'
   | 'hyper'
   | 'keelcode'
+  | 'cline'
+  | 'cline-pass'
   | 'empty'
   | 'unknown';
 
