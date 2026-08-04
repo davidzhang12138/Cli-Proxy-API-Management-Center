@@ -26,7 +26,7 @@ import iconVertex from '@/assets/icons/vertex.svg';
 import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
-import iconHyper from '@/assets/icons/hyper.svg';
+import iconCrush from '@/assets/icons/crush.png';
 import iconKeelCode from '@/assets/icons/keelcode.svg';
 import iconCline from '@/assets/icons/cline.svg';
 
@@ -162,7 +162,7 @@ const PROVIDERS: BuiltInOAuthProviderCard[] = [
     kind: 'builtin',
     id: 'hyper',
     titleKey: 'auth_login.hyper_oauth_title',
-    icon: iconHyper,
+    icon: iconCrush,
   },
   {
     kind: 'builtin',

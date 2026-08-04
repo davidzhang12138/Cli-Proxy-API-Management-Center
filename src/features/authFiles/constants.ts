@@ -11,7 +11,7 @@ import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
 import iconKeelCode from '@/assets/icons/keelcode.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
-import iconHyper from '@/assets/icons/hyper.svg';
+import iconCrush from '@/assets/icons/crush.png';
 import iconCline from '@/assets/icons/cline.svg';
 import iconVertex from '@/assets/icons/vertex.svg';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
@@ -101,7 +101,7 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   cline: iconCline,
   'cline-pass': iconCline,
   freebuff: iconFreebuff,
-  hyper: iconHyper,
+  hyper: iconCrush,
   vertex: iconVertex,
 };
 
