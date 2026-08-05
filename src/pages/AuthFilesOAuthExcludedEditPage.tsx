@@ -21,12 +21,18 @@ import {
   getTypeLabel,
   normalizeProviderKey,
 } from '@/features/authFiles/constants';
+import { mergeAuthFileModels } from '@/features/authFiles/modelCatalog';
 import { getStringSetSignature, isOAuthEditorDirty } from '@/features/authFiles/oauthEditorState';
 import type { AuthFileItem, OAuthModelAliasEntry } from '@/types';
 import { getErrorMessage } from '@/utils/helpers';
 import styles from './AuthFilesOAuthExcludedEditPage.module.scss';
 
-type AuthFileModelItem = { id: string; display_name?: string; type?: string; owned_by?: string };
+type AuthFileModelItem = {
+  id: string;
+  display_name?: string;
+  type?: string;
+  owned_by?: string;
+};
 
 type LocationState = { fromAuthFiles?: boolean } | null;
 
@@ -95,8 +101,14 @@ export function AuthFilesOAuthExcludedEditPage() {
   );
   const contentDirty = baselineModelsSignature !== effectiveRulesSignature;
   const candidates = useMemo(
-    () => modelsList.map((model) => ({ id: model.id, displayName: model.display_name })),
-    [modelsList]
+    () =>
+      mergeAuthFileModels(
+        modelsList,
+        effectiveRules
+          .filter((rule) => !rule.includes('*'))
+          .map((id) => ({ id }))
+      ).map((model) => ({ id: model.id, displayName: model.display_name })),
+    [effectiveRules, modelsList]
   );
   const catalogState: ExcludedModelsCatalogState = modelsLoading
     ? 'loading'
@@ -232,37 +244,68 @@ export function AuthFilesOAuthExcludedEditPage() {
     setModelsLoading(true);
     setModelsError(null);
 
-    authFilesApi
-      .getModelDefinitions(resolvedProviderKey)
-      .then((models) => {
-        if (cancelled) return;
-        setModelsList(models);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        const status =
-          typeof err === 'object' && err !== null && 'status' in err
-            ? (err as { status?: unknown }).status
-            : undefined;
+    const loadModels = async () => {
+      const providerAuthFileNames =
+        resolvedProviderKey === 'keelcode'
+          ? Array.from(
+              new Set(
+                files
+                  .filter(
+                    (file) =>
+                      normalizeProviderKey(String(file.type ?? file.provider ?? '')) ===
+                      resolvedProviderKey
+                  )
+                  .map((file) => file.name.trim())
+                  .filter(Boolean)
+              )
+            )
+          : [];
+      const results = await Promise.allSettled([
+        authFilesApi.getModelDefinitions(resolvedProviderKey),
+        ...providerAuthFileNames.map((name) => authFilesApi.getModelsForAuthFile(name)),
+      ]);
 
-        if (status === 400 || status === 404) {
-          setModelsList([]);
-          setModelsError('unsupported');
-          return;
-        }
+      if (cancelled) return;
 
-        const errorMessage = err instanceof Error ? err.message : '';
-        showNotification(`${t('notification.load_failed')}: ${errorMessage}`, 'error');
-      })
-      .finally(() => {
-        if (cancelled) return;
+      const [definitionsResult, ...authFileResults] = results;
+      const staticModels =
+        definitionsResult.status === 'fulfilled' ? definitionsResult.value : [];
+      const discoveredModels = authFileResults.flatMap((result) =>
+        result.status === 'fulfilled' ? result.value : []
+      );
+      const catalogLoaded =
+        definitionsResult.status === 'fulfilled' ||
+        authFileResults.some((result) => result.status === 'fulfilled');
+
+      if (catalogLoaded) {
+        setModelsList(mergeAuthFileModels(discoveredModels, staticModels));
         setModelsLoading(false);
-      });
+        return;
+      }
+
+      const status =
+        typeof definitionsResult.reason === 'object' && definitionsResult.reason !== null &&
+        'status' in definitionsResult.reason
+          ? (definitionsResult.reason as { status?: unknown }).status
+          : undefined;
+
+      setModelsList([]);
+      if (status === 400 || status === 404) {
+        setModelsError('unsupported');
+      } else {
+        const errorMessage =
+          definitionsResult.reason instanceof Error ? definitionsResult.reason.message : '';
+        showNotification(`${t('notification.load_failed')}: ${errorMessage}`, 'error');
+      }
+      setModelsLoading(false);
+    };
+
+    void loadModels();
 
     return () => {
       cancelled = true;
     };
-  }, [excludedUnsupported, resolvedProviderKey, showNotification, t]);
+  }, [excludedUnsupported, files, resolvedProviderKey, showNotification, t]);
 
   const applyProviderChange = useCallback(
     (value: string) => {
