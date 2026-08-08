@@ -122,6 +122,45 @@ describe('FreeBuff unified quota adapter', () => {
     });
   });
 
+  test('preserves and renders entitlement details and a shared provider pool', () => {
+    const state = FREEBUFF_CONFIG.buildSnapshotState?.({
+      name: 'freebuff-details.json',
+      type: 'freebuff',
+      usage_quota: {
+        known: true,
+        resources: [
+          {
+            resource_type: 'freebuff_premium_sessions',
+            total_limit: 10,
+            current_usage: 2,
+            remaining: 8,
+            entitlement_breakdown: { base: 6, referral: 3, streak: 1 },
+          },
+          {
+            resource_type: 'claude-fable-5',
+            total_limit: 1,
+            current_usage: 0,
+            remaining: 1,
+            shared_pool: { total_limit: 55, remaining: 47 },
+          },
+        ],
+      },
+    });
+
+    expect(state?.snapshot?.resources[0]).toMatchObject({
+      entitlementBreakdown: { base: 6, referral: 3, streak: 1 },
+    });
+    expect(state?.snapshot?.resources[1]).toMatchObject({
+      sharedPool: { totalLimit: 55, remaining: 47, exhausted: false },
+    });
+
+    const markup = renderToStaticMarkup(
+      createElement(FreebuffQuotaBody, { classes: quotaClasses, quota: state! })
+    );
+    expect(markup).toContain('基础 6 次 · 推荐奖励 +3 · 连续使用奖励 +1');
+    expect(markup).toContain('全局池剩余 47 / 55');
+  });
+
   test('refreshes only the requested auth index and selects its provider snapshot', async () => {
     let request: unknown;
     authFilesApi.refreshAuthQuotas = (async (payload) => {
@@ -253,7 +292,7 @@ describe('FreeBuff unified quota adapter', () => {
 
     expect(markup).toContain('限量模型会话');
     expect(markup).toContain('共享模型：deepseek-v4-flash, mimo-v2.5');
-    expect(markup).toContain('额度上限 8');
+    expect(markup).toContain('至少 8 次会话');
     expect(markup).toContain('当前用量未上报');
     expect(markup).toContain('>--<');
     expect(markup).not.toContain('暂无配额数据');
@@ -308,7 +347,8 @@ describe('FreeBuff unified quota adapter', () => {
     expect(markup).toContain('>∞<');
     expect(markup).toContain('高级模型会话');
     expect(markup).toContain('共享模型：deepseek-v4-pro, gpt-5.6-luna, minimax-m3');
-    expect(markup).toContain('额度上限 6');
+    expect(markup).toContain('至少 6 次会话');
+    expect(markup.match(/当前用量未上报/g)).toHaveLength(1);
     expect(markup).toContain('适用模型：deepseek-v4-flash, mimo-v2.5');
     expect(markup).toContain('glm-5.2');
     expect(markup).not.toContain('暂无配额数据');

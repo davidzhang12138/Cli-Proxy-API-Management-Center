@@ -60,6 +60,14 @@ export interface AuthFileItem {
   recentRequests?: RecentRequestBucket[];
   usage_quota?: UsageQuotaSnapshotPayload | null;
   usageQuota?: UsageQuotaSnapshotPayload | null;
+  quota_supported?: boolean | string | number | null;
+  quotaSupported?: boolean | string | number | null;
+  quota_status?: string | null;
+  quotaStatus?: string | null;
+  quota_remaining_ratio?: number | string | null;
+  quotaRemainingRatio?: number | string | null;
+  quota_next_reset?: string | number | null;
+  quotaNextReset?: string | number | null;
   [key: string]: unknown;
 }
 
@@ -120,6 +128,14 @@ export interface AuthQuotaEntry {
   failed?: unknown;
   usage_quota?: UsageQuotaSnapshotPayload | null;
   usageQuota?: UsageQuotaSnapshotPayload | null;
+  quota_supported?: boolean | string | number | null;
+  quotaSupported?: boolean | string | number | null;
+  quota_status?: string | null;
+  quotaStatus?: string | null;
+  quota_remaining_ratio?: number | string | null;
+  quotaRemainingRatio?: number | string | null;
+  quota_next_reset?: string | number | null;
+  quotaNextReset?: string | number | null;
 }
 
 export interface AuthQuotasResponse {

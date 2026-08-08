@@ -2,8 +2,12 @@ import type {
   AntigravityQuotaGroup,
   AntigravityModelsPayload,
   KiroQuotaState,
+  UsageQuotaEntitlementBreakdown,
+  UsageQuotaEntitlementBreakdownPayload,
   UsageQuotaResource,
   UsageQuotaResourcePayload,
+  UsageQuotaSharedPool,
+  UsageQuotaSharedPoolPayload,
   UsageQuotaSnapshot,
   UsageQuotaSnapshotPayload,
 } from '@/types';
@@ -89,6 +93,29 @@ const usageQuotaResourceLabel = (resourceType?: string): string => {
     .join(' ');
 };
 
+const parseUsageQuotaEntitlementBreakdown = (
+  value: unknown
+): UsageQuotaEntitlementBreakdown | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const payload = value as UsageQuotaEntitlementBreakdownPayload;
+  const base = normalizeNumberValue(payload.base);
+  const referral = normalizeNumberValue(payload.referral);
+  const streak = normalizeNumberValue(payload.streak);
+  if (base === null && referral === null && streak === null) return undefined;
+  return { base, referral, streak };
+};
+
+const parseUsageQuotaSharedPool = (value: unknown): UsageQuotaSharedPool | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const payload = value as UsageQuotaSharedPoolPayload;
+  const totalLimit = normalizeNumberValue(payload.total_limit ?? payload.totalLimit);
+  const remaining = normalizeNumberValue(payload.remaining);
+  const exhausted =
+    normalizeBooleanValue(payload.exhausted) ?? (remaining !== null && remaining <= 0) ?? false;
+  if (totalLimit === null && remaining === null && !exhausted) return undefined;
+  return { totalLimit, remaining, exhausted };
+};
+
 const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const payload = value as UsageQuotaResourcePayload;
@@ -98,8 +125,12 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
   const shared = normalizeBooleanValue(payload.shared) ?? false;
   const totalLimit = normalizeNumberValue(payload.total_limit ?? payload.totalLimit);
   const limitHint = normalizeNumberValue(payload.limit_hint ?? payload.limitHint);
+  const entitlementBreakdown = parseUsageQuotaEntitlementBreakdown(
+    payload.entitlement_breakdown ?? payload.entitlementBreakdown
+  );
   const currentUsage = normalizeNumberValue(payload.current_usage ?? payload.currentUsage);
   const remaining = normalizeNumberValue(payload.remaining);
+  const sharedPool = parseUsageQuotaSharedPool(payload.shared_pool ?? payload.sharedPool);
   const minimumCreditAmountForUsage = normalizeNumberValue(
     payload.minimum_credit_amount_for_usage ?? payload.minimumCreditAmountForUsage
   );
@@ -122,8 +153,10 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
     shared,
     totalLimit,
     limitHint,
+    entitlementBreakdown,
     currentUsage,
     remaining,
+    sharedPool,
     minimumCreditAmountForUsage,
     windowSeconds,
     resetAt,

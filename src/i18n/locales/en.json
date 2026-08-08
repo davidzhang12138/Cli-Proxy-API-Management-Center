@@ -629,7 +629,11 @@
     "resource_provider_spend": "Provider spending limit",
     "models": "Models: {{models}}",
     "shared_models": "Shared pool: {{models}}",
-    "limit_hint": "Limit {{limit}}",
+    "limit_hint": "At least {{limit}} sessions",
+    "base_sessions": "Base {{count}}",
+    "referral_bonus": "Referral +{{count}}",
+    "streak_bonus": "Streak +{{count}}",
+    "shared_pool_remaining": "Global pool {{remaining}} / {{total}} remaining",
     "usage_unknown": "Usage not reported",
     "unlimited": "Unlimited",
     "exhausted": "Exhausted"

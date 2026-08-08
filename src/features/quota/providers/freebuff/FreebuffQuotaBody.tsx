@@ -43,7 +43,7 @@ export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuo
     return <div className={classes.quotaMessage}>{t('freebuff_quota.empty_data')}</div>;
   }
 
-  const baseResources =
+  const baseResources: UsageQuotaResource[] =
     snapshot.resources.length > 0
       ? snapshot.resources
       : [
@@ -90,7 +90,9 @@ export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuo
         resource.remaining !== null ||
         resource.exhausted ||
         resource.usageUnknown ||
-        resource.unlimited
+        resource.unlimited ||
+        Boolean(resource.entitlementBreakdown) ||
+        Boolean(resource.sharedPool)
     )
     .sort((left, right) => {
       const leftSpend = left.resourceType?.toLowerCase() === 'provider_spend' ? 1 : 0;
@@ -133,7 +135,38 @@ export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuo
               models: modelList,
             })
           : null;
-        const showUsageUnknown = resource.usageUnknown && !resource.exhausted && remaining === null;
+        const showUsageUnknown =
+          resource.usageUnknown && !resource.unlimited && !resource.exhausted && remaining === null;
+        const entitlementBreakdown = resource.entitlementBreakdown;
+        const entitlementParts = entitlementBreakdown
+          ? [
+              entitlementBreakdown.base !== null
+                ? t('freebuff_quota.base_sessions', {
+                    count: formatNumber(entitlementBreakdown.base),
+                  })
+                : null,
+              entitlementBreakdown.referral !== null
+                ? t('freebuff_quota.referral_bonus', {
+                    count: formatNumber(entitlementBreakdown.referral),
+                  })
+                : null,
+              entitlementBreakdown.streak !== null
+                ? t('freebuff_quota.streak_bonus', {
+                    count: formatNumber(entitlementBreakdown.streak),
+                  })
+                : null,
+            ].filter((part): part is string => Boolean(part))
+          : [];
+        const entitlementLabel = entitlementParts.length > 0 ? entitlementParts.join(' · ') : null;
+        const sharedPool = resource.sharedPool;
+        const sharedPoolRemaining = sharedPool?.remaining ?? (sharedPool?.exhausted ? 0 : null);
+        const sharedPoolLabel =
+          sharedPool && sharedPoolRemaining !== null && sharedPool.totalLimit !== null
+            ? t('freebuff_quota.shared_pool_remaining', {
+                remaining: formatNumber(sharedPoolRemaining),
+                total: formatNumber(sharedPool.totalLimit),
+              })
+            : null;
 
         return (
           <div key={`${rawResourceType}-${index}`} className={classes.quotaRow}>
@@ -188,6 +221,8 @@ export function FreebuffQuotaBody({ quota, classes }: QuotaBodyProps<FreebuffQuo
                 {modelScopeLabel}
               </div>
             ) : null}
+            {entitlementLabel ? <div className={classes.quotaScope}>{entitlementLabel}</div> : null}
+            {sharedPoolLabel ? <div className={classes.quotaScope}>{sharedPoolLabel}</div> : null}
             {percent !== null ? (
               <QuotaMeter percent={percent} classes={classes} index={index} />
             ) : null}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { normalizeAuthFilesResponse } from '../src/services/api/authFiles';
+import { mergeAuthQuotaSnapshots, normalizeAuthFilesResponse } from '../src/services/api/authFiles';
 import type { AuthFilesResponse } from '../src/types/authFile';
 
 const responseWithRawFiles = (files: Array<Record<string, unknown>>): AuthFilesResponse =>
@@ -104,5 +104,60 @@ describe('auth-files response normalization', () => {
 
     expect(result.files[0]?.account).toBe('sk-live-abcd');
     expect(result.files[0]?.accountType).toBeUndefined();
+  });
+
+  test('preserves quota summary fields for matched and synthetic auth entries', () => {
+    const result = mergeAuthQuotaSnapshots(
+      responseWithRawFiles([{ id: 'matched', name: 'matched.json', type: 'freebuff' }]),
+      {
+        auths: [
+          {
+            id: 'matched',
+            provider: 'freebuff',
+            usage_quota: null,
+            quota_supported: true,
+            quota_status: 'available',
+            quota_remaining_ratio: 0.8,
+            quota_next_reset: '2026-08-09T07:00:00Z',
+          },
+          {
+            id: 'synthetic',
+            auth_index: 'freebuff:synthetic',
+            provider: 'freebuff',
+            label: 'Synthetic FreeBuff',
+            usage_quota: { known: true },
+            quotaSupported: true,
+            quotaStatus: 'partial',
+            quotaRemainingRatio: 0.5,
+            quotaNextReset: '2026-08-10T07:00:00Z',
+          },
+        ],
+      }
+    );
+
+    const matched = result.files.find((file) => file.id === 'matched');
+    expect(matched).toMatchObject({
+      quota_supported: true,
+      quotaSupported: true,
+      quota_status: 'available',
+      quotaStatus: 'available',
+      quota_remaining_ratio: 0.8,
+      quotaRemainingRatio: 0.8,
+      quota_next_reset: '2026-08-09T07:00:00Z',
+      quotaNextReset: '2026-08-09T07:00:00Z',
+    });
+
+    const synthetic = result.files.find((file) => file.id === 'synthetic');
+    expect(synthetic).toMatchObject({
+      runtimeOnly: true,
+      quota_supported: true,
+      quotaSupported: true,
+      quota_status: 'partial',
+      quotaStatus: 'partial',
+      quota_remaining_ratio: 0.5,
+      quotaRemainingRatio: 0.5,
+      quota_next_reset: '2026-08-10T07:00:00Z',
+      quotaNextReset: '2026-08-10T07:00:00Z',
+    });
   });
 });

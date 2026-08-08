@@ -617,7 +617,11 @@
     "resource_provider_spend": "Общий лимит расходов",
     "models": "Модели: {{models}}",
     "shared_models": "Общий пул: {{models}}",
-    "limit_hint": "Лимит {{limit}}",
+    "limit_hint": "Не менее {{limit}} сеансов",
+    "base_sessions": "Базовые: {{count}}",
+    "referral_bonus": "За приглашения: +{{count}}",
+    "streak_bonus": "За серию: +{{count}}",
+    "shared_pool_remaining": "В общем пуле осталось {{remaining}} / {{total}}",
     "usage_unknown": "Текущий расход не сообщается",
     "unlimited": "Без лимита",
     "exhausted": "Исчерпано"

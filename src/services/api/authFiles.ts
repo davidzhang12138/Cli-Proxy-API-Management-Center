@@ -187,6 +187,39 @@ const readQuotaTextField = (entry: AuthQuotaEntry, key: keyof AuthQuotaEntry): s
   return typeof value === 'string' ? value.trim() : '';
 };
 
+type AuthQuotaSummarySource = Pick<
+  AuthQuotaEntry,
+  | 'quota_supported'
+  | 'quotaSupported'
+  | 'quota_status'
+  | 'quotaStatus'
+  | 'quota_remaining_ratio'
+  | 'quotaRemainingRatio'
+  | 'quota_next_reset'
+  | 'quotaNextReset'
+>;
+
+const buildAuthQuotaSummaryFields = (entry: AuthQuotaSummarySource): Partial<AuthFileEntry> => {
+  const quotaSupported =
+    entry.quota_supported !== undefined ? entry.quota_supported : entry.quotaSupported;
+  const quotaStatus = entry.quota_status !== undefined ? entry.quota_status : entry.quotaStatus;
+  const quotaRemainingRatio =
+    entry.quota_remaining_ratio !== undefined
+      ? entry.quota_remaining_ratio
+      : entry.quotaRemainingRatio;
+  const quotaNextReset =
+    entry.quota_next_reset !== undefined ? entry.quota_next_reset : entry.quotaNextReset;
+
+  return {
+    ...(quotaSupported !== undefined ? { quota_supported: quotaSupported, quotaSupported } : {}),
+    ...(quotaStatus !== undefined ? { quota_status: quotaStatus, quotaStatus } : {}),
+    ...(quotaRemainingRatio !== undefined
+      ? { quota_remaining_ratio: quotaRemainingRatio, quotaRemainingRatio }
+      : {}),
+    ...(quotaNextReset !== undefined ? { quota_next_reset: quotaNextReset, quotaNextReset } : {}),
+  };
+};
+
 const readDateField = (entry: AuthFileEntry): number => {
   const candidates = [entry['modtime'], entry['updated_at'], entry['last_refresh']];
 
@@ -302,6 +335,7 @@ const normalizeAuthFileEntry = (entry: AuthFileEntry): AuthFileEntry => {
 
   return {
     ...entry,
+    ...buildAuthQuotaSummaryFields(entry),
     runtimeOnly: readRuntimeOnlyField(entry),
     authIndex: normalizeRecentRequestAuthIndex(entry['auth_index'] ?? entry.authIndex),
     recentRequests: normalizeRecentRequestBuckets(entry.recent_requests ?? entry.recentRequests),
@@ -400,10 +434,11 @@ const buildAuthFileFromQuotaEntry = (entry: AuthQuotaEntry): AuthFileEntry | nul
     success: entry.success,
     failed: entry.failed,
     usage_quota: usageQuota,
+    ...buildAuthQuotaSummaryFields(entry),
   };
 };
 
-const mergeAuthQuotaSnapshots = (
+export const mergeAuthQuotaSnapshots = (
   filesPayload: AuthFilesResponse,
   quotasPayload: AuthQuotasResponse | null,
   options: { includeSynthetic?: boolean } = {}
@@ -421,13 +456,13 @@ const mergeAuthQuotaSnapshots = (
 
   quotaEntries.forEach((entry) => {
     const usageQuota = entry.usage_quota ?? entry.usageQuota;
-    if (!usageQuota) return;
-
     const matched = authQuotaMatchKeys(entry)
       .map((key) => byKey.get(key))
       .find((file): file is AuthFileEntry => Boolean(file));
 
     if (matched) {
+      Object.assign(matched, buildAuthQuotaSummaryFields(entry));
+      if (!usageQuota) return;
       matched.usage_quota = usageQuota;
       if (!hasMeaningfulValue(matched.success)) matched.success = entry.success;
       if (!hasMeaningfulValue(matched.failed)) matched.failed = entry.failed;
@@ -437,6 +472,7 @@ const mergeAuthQuotaSnapshots = (
       return;
     }
 
+    if (!usageQuota) return;
     if (!includeSynthetic) return;
     const synthetic = buildAuthFileFromQuotaEntry(entry);
     if (!synthetic) return;

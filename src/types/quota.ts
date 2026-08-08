@@ -84,6 +84,19 @@ export interface UsageQuotaSnapshotPayload {
   resources?: UsageQuotaResourcePayload[];
 }
 
+export interface UsageQuotaEntitlementBreakdownPayload {
+  base?: number | string | null;
+  referral?: number | string | null;
+  streak?: number | string | null;
+}
+
+export interface UsageQuotaSharedPoolPayload {
+  total_limit?: number | string | null;
+  totalLimit?: number | string | null;
+  remaining?: number | string | null;
+  exhausted?: boolean | string | number | null;
+}
+
 export interface UsageQuotaResourcePayload {
   resource_type?: string | null;
   resourceType?: string | null;
@@ -93,9 +106,13 @@ export interface UsageQuotaResourcePayload {
   totalLimit?: number | string | null;
   limit_hint?: number | string | null;
   limitHint?: number | string | null;
+  entitlement_breakdown?: UsageQuotaEntitlementBreakdownPayload | null;
+  entitlementBreakdown?: UsageQuotaEntitlementBreakdownPayload | null;
   current_usage?: number | string | null;
   currentUsage?: number | string | null;
   remaining?: number | string | null;
+  shared_pool?: UsageQuotaSharedPoolPayload | null;
+  sharedPool?: UsageQuotaSharedPoolPayload | null;
   minimum_credit_amount_for_usage?: number | string | null;
   minimumCreditAmountForUsage?: number | string | null;
   window_seconds?: number | string | null;
@@ -127,14 +144,28 @@ export interface UsageQuotaSnapshot {
   resources: UsageQuotaResource[];
 }
 
+export interface UsageQuotaEntitlementBreakdown {
+  base: number | null;
+  referral: number | null;
+  streak: number | null;
+}
+
+export interface UsageQuotaSharedPool {
+  totalLimit: number | null;
+  remaining: number | null;
+  exhausted: boolean;
+}
+
 export interface UsageQuotaResource {
   resourceType?: string;
   models?: string[];
   shared?: boolean;
   totalLimit: number | null;
   limitHint?: number | null;
+  entitlementBreakdown?: UsageQuotaEntitlementBreakdown;
   currentUsage: number | null;
   remaining: number | null;
+  sharedPool?: UsageQuotaSharedPool;
   minimumCreditAmountForUsage: number | null;
   windowSeconds: number | null;
   resetAt?: string;
