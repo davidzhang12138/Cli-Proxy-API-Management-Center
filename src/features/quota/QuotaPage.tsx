@@ -38,6 +38,7 @@ import {
   classifyQuotaFiles,
   filterEntriesByTab,
   paginate,
+  resolveQuotaDisplayName,
   sortQuotaEntries,
   type QuotaFileEntry,
 } from './logic';
@@ -50,12 +51,6 @@ import { readQuotaUiState, writeQuotaUiState } from './uiState';
 import styles from './QuotaPage.module.scss';
 
 const SKELETON_CARD_COUNT = 6;
-
-/**
- * 时间线泳道名 = 卡片标题，两者必须一致。卡片显示的就是文件名，所以这里是恒等。
- * 提到模块级是为了引用稳定 —— 它进了泳道 memo 的依赖数组。
- */
-const displayNameFor = (name: string) => name;
 
 export function QuotaPage() {
   const { t } = useTranslation();
@@ -409,7 +404,7 @@ export function QuotaPage() {
         <QuotaTimeline
           entries={pageItems}
           quotaFor={getQuota}
-          displayNameFor={displayNameFor}
+          displayNameFor={resolveQuotaDisplayName}
           resolvedTheme={resolvedTheme}
         />
       </section>

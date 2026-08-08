@@ -7,6 +7,7 @@ import {
   filterEntriesByTab,
   isQuotaRefreshDisabled,
   paginate,
+  resolveQuotaDisplayName,
   resolveQuotaProviderType,
   sortQuotaEntries,
   type QuotaFileEntry,
@@ -38,6 +39,26 @@ describe('resolveQuotaProviderType', () => {
     expect(resolveQuotaProviderType(file('a', 'keelcode'))).toBe('keelcode');
     expect(resolveQuotaProviderType(file('a', 'gemini'))).toBeNull();
     expect(resolveQuotaProviderType(file('a', 'claude', { disabled: true }))).toBeNull();
+  });
+});
+
+describe('resolveQuotaDisplayName', () => {
+  test.each([
+    ['codex-010fc1ef-parrotlokman176@gmail.com-plus.json', 'codex', 'parrotlokman176@gmail.com'],
+    ['freebuff-a68142285-gmail-com.json', 'freebuff', 'a68142285@gmail.com'],
+    ['hyper-helendelacruz2024-gmail-com-0c124e1.json', 'hyper', 'helendelacruz2024@gmail.com'],
+    ['keelcode-a68142285-gmail-com-1fe7b70106eb.json', 'keelcode', 'a68142285@gmail.com'],
+  ])(
+    'shows the structured account email instead of the %s storage name',
+    (name, provider, email) => {
+      expect(resolveQuotaDisplayName(file(name, provider, { email }))).toBe(email);
+    }
+  );
+
+  test('falls back to the extension-less file name when no account identity is available', () => {
+    expect(resolveQuotaDisplayName(file('kimi-1712345678901.json', 'kimi'))).toBe(
+      'kimi-1712345678901'
+    );
   });
 });
 

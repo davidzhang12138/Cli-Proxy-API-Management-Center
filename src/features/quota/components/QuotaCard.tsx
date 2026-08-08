@@ -1,5 +1,5 @@
 /**
- * 额度卡片：头部（提供商图标 + mono 文件名）+ 四态 body + 动作 footer。
+ * 额度卡片：头部（提供商图标 + mono 凭证身份）+ 四态 body + 动作 footer。
  *
  * - idle：整个 body 是一个点击加载按钮（上游直连有速率考虑，不自动拉取）；
  * - loading：双幽灵行骨架（aria-busy，文字等价视觉隐藏）；
@@ -15,12 +15,13 @@ import { resolveQuotaErrorMessage } from '@/utils/quota';
 import {
   getAuthFileIcon,
   getThemeSurfaceIconBackground,
+  getTypeColor,
   getTypeLabel,
   isThemeSurfaceIconProvider,
 } from '@/features/authFiles/constants';
 import { bindQuotaClasses } from '../types';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
-import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
+import { isQuotaRefreshDisabled, resolveQuotaDisplayName, type QuotaFileEntry } from '../logic';
 import bodyStyles from './QuotaBody.module.scss';
 import styles from './QuotaCard.module.scss';
 
@@ -65,6 +66,8 @@ export function QuotaCard(props: QuotaCardProps) {
   const loading = status === 'loading';
   const iconSrc = getAuthFileIcon(entry.type, resolvedTheme);
   const typeLabel = getTypeLabel(t, entry.type);
+  const typeColor = getTypeColor(entry.type, resolvedTheme);
+  const displayName = resolveQuotaDisplayName(file);
   const errorMessage = resolveQuotaErrorMessage(
     t,
     quota?.errorStatus,
@@ -87,8 +90,15 @@ export function QuotaCard(props: QuotaCardProps) {
           title={typeLabel}
           style={
             isThemeSurfaceIconProvider(entry.type)
-              ? { background: getThemeSurfaceIconBackground(resolvedTheme) }
-              : undefined
+              ? {
+                  backgroundColor: getThemeSurfaceIconBackground(resolvedTheme),
+                  color: typeColor.text,
+                }
+              : {
+                  backgroundColor: typeColor.bg,
+                  color: typeColor.text,
+                  ...(typeColor.border ? { border: typeColor.border } : {}),
+                }
           }
         >
           {iconSrc ? (
@@ -97,9 +107,21 @@ export function QuotaCard(props: QuotaCardProps) {
             <span className={styles.iconFallback}>{typeLabel.slice(0, 1).toUpperCase()}</span>
           )}
         </span>
-        <span className={styles.fileName} title={file.name}>
-          {file.name}
-        </span>
+        <div className={styles.identity}>
+          <span
+            className={styles.typeBadge}
+            style={{
+              backgroundColor: typeColor.bg,
+              color: typeColor.text,
+              ...(typeColor.border ? { border: typeColor.border } : {}),
+            }}
+          >
+            {typeLabel}
+          </span>
+          <span className={styles.identityName} title={displayName}>
+            {displayName}
+          </span>
+        </div>
       </header>
 
       <div className={styles.body}>

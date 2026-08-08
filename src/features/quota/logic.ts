@@ -4,6 +4,7 @@
  */
 
 import type { AuthFileItem } from '@/types';
+import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
 import { ANTIGRAVITY_CONFIG } from './providers/antigravity/data';
 import { CLAUDE_CONFIG } from './providers/claude/data';
 import { CODEX_CONFIG } from './providers/codex/data';
@@ -32,6 +33,13 @@ export interface QuotaFileEntry {
   file: AuthFileItem;
   type: QuotaProviderType;
 }
+
+/**
+ * 配额卡片与时间线沿用认证文件页的身份规则：优先显示邮箱 / 项目 ID，
+ * 没有结构化身份时才回落到去掉 .json 后缀的文件名。
+ */
+export const resolveQuotaDisplayName = (file: AuthFileItem): string =>
+  deriveAuthFileIdentity(file).primary;
 
 export const resolveQuotaProviderType = (file: AuthFileItem): QuotaProviderType | null =>
   QUOTA_TAB_ORDER.find((type) => QUOTA_FILTER_MAP[type](file)) ?? null;

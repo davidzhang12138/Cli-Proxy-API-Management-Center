@@ -17,7 +17,7 @@ import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatRelativeInstant, TYPE_COLORS } from '@/utils/quota';
 import { useNow } from '@/hooks/useNow';
-import type { ResolvedTheme, ThemeColors } from '@/types';
+import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import {
   buildTimelineLane,
   laneHasWindow,
@@ -51,7 +51,8 @@ export interface QuotaTimelineProps {
    * off the entry, and lanes see exactly what the cards see.
    */
   quotaFor: (entry: QuotaFileEntry) => QuotaCardState | undefined;
-  displayNameFor: (name: string) => string;
+  /** Must use the same credential identity rule as the card title above. */
+  displayNameFor: (file: AuthFileItem) => string;
   resolvedTheme: ResolvedTheme;
   /** Injectable for tests/screenshots; defaults to the real clock. */
   now?: number;
@@ -92,7 +93,7 @@ export function QuotaTimeline({
     () =>
       entries.map((entry) => ({
         name: entry.file.name,
-        displayName: displayNameFor(entry.file.name),
+        displayName: displayNameFor(entry.file),
         provider: entry.type,
         quota: quotaFor(entry),
       })),
