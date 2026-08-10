@@ -654,7 +654,7 @@
   "keelcode_quota": {
     "title": "KeelCode 配额",
     "empty_title": "暂无 KeelCode 认证",
-    "empty_desc": "使用 KeelCode OAuth 登录后即可查看各配额池的剩余量。",
+    "empty_desc": "使用 KeelCode OAuth 登录后即可查看每日模型额度或 Credits 配额池余额。",
     "idle": "点击此处刷新配额",
     "loading": "正在加载配额...",
     "load_failed": "配额获取失败：{{message}}",
@@ -662,9 +662,13 @@
     "empty_data": "暂无配额数据",
     "remaining_amount": "剩余 {{remaining}} / {{total}}",
     "remaining_only": "剩余 {{remaining}}",
+    "model_quota_notice": "Free 套餐按模型分别计算每日请求额度。",
+    "model_remaining_amount": "今日剩余 {{remaining}} / {{total}} 次请求",
+    "model_remaining_only": "今日剩余 {{remaining}} 次请求",
     "reset_at": "重置 {{time}}",
     "resource_premium": "Premium 配额池",
     "resource_oss": "OSS 配额池",
+    "resource_combined": "共享 Credits 配额池",
     "exhausted": "已耗尽"
   },
   "vertex_import": {

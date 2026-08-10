@@ -654,7 +654,7 @@
   "keelcode_quota": {
     "title": "KeelCode quota",
     "empty_title": "No KeelCode credentials",
-    "empty_desc": "Sign in with KeelCode OAuth to view each quota pool's remaining balance.",
+    "empty_desc": "Sign in with KeelCode OAuth to view daily model limits or credit pool balances.",
     "idle": "Click to refresh quota",
     "loading": "Loading quota...",
     "load_failed": "Failed to load quota: {{message}}",
@@ -662,9 +662,13 @@
     "empty_data": "No quota data",
     "remaining_amount": "{{remaining}} / {{total}} remaining",
     "remaining_only": "{{remaining}} remaining",
+    "model_quota_notice": "Free plan request limits are tracked separately for each model and reset daily.",
+    "model_remaining_amount": "{{remaining}} / {{total}} requests remaining today",
+    "model_remaining_only": "{{remaining}} requests remaining today",
     "reset_at": "Resets {{time}}",
     "resource_premium": "Premium pool",
     "resource_oss": "OSS pool",
+    "resource_combined": "Shared credits pool",
     "exhausted": "Exhausted"
   },
   "vertex_import": {

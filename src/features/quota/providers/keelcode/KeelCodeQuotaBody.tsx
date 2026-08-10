@@ -22,9 +22,13 @@ const resourceRemaining = (resource: UsageQuotaResource, limit: number | null): 
       : null);
 
 const getResourceLabel = (
-  resourceType: string | undefined,
+  resource: UsageQuotaResource,
   translate: (key: string) => string
 ): string => {
+  const modelId = resource.models?.find((model) => model.trim())?.trim();
+  if (resource.modelScoped && modelId) return modelId;
+
+  const resourceType = resource.resourceType;
   const rawType = resourceType?.trim() || 'quota';
   const normalizedType = rawType.toLowerCase();
   const key = `keelcode_quota.resource_${normalizedType}`;
@@ -67,10 +71,15 @@ export function KeelCodeQuotaBody({ quota, classes }: QuotaBodyProps<KeelCodeQuo
   if (visibleResources.length === 0) {
     return <div className={classes.quotaMessage}>{t('keelcode_quota.empty_data')}</div>;
   }
+  const hasModelQuotas = visibleResources.some((resource) => resource.modelScoped);
 
   return (
     <>
+      {hasModelQuotas && (
+        <div className={classes.quotaScope}>{t('keelcode_quota.model_quota_notice')}</div>
+      )}
       {visibleResources.map((resource, index) => {
+        const isModelQuota = resource.modelScoped === true;
         const limit = resourceLimit(resource);
         const remaining = resourceRemaining(resource, limit);
         const percent =
@@ -84,25 +93,30 @@ export function KeelCodeQuotaBody({ quota, classes }: QuotaBodyProps<KeelCodeQuo
         );
         const amount =
           remaining !== null && limit !== null
-            ? t('keelcode_quota.remaining_amount', {
-                remaining: formatNumber(remaining),
-                total: formatNumber(limit),
-              })
+            ? t(
+                isModelQuota
+                  ? 'keelcode_quota.model_remaining_amount'
+                  : 'keelcode_quota.remaining_amount',
+                {
+                  remaining: formatNumber(remaining),
+                  total: formatNumber(limit),
+                }
+              )
             : resource.exhausted
               ? t('keelcode_quota.exhausted')
               : remaining !== null
-                ? t('keelcode_quota.remaining_only', { remaining: formatNumber(remaining) })
+                ? t(
+                    isModelQuota
+                      ? 'keelcode_quota.model_remaining_only'
+                      : 'keelcode_quota.remaining_only',
+                    { remaining: formatNumber(remaining) }
+                  )
                 : null;
 
         return (
-          <div
-            key={`${resource.resourceType || 'quota'}-${index}`}
-            className={classes.quotaRow}
-          >
+          <div key={`${resource.resourceType || 'quota'}-${index}`} className={classes.quotaRow}>
             <div className={classes.quotaRowHeader}>
-              <span className={classes.quotaModel}>
-                {getResourceLabel(resource.resourceType, t)}
-              </span>
+              <span className={classes.quotaModel}>{getResourceLabel(resource, t)}</span>
               <div className={classes.quotaMeta}>
                 <span className={classes.quotaPercent}>
                   {percent === null ? '--' : `${percent}%`}

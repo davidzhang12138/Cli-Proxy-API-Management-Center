@@ -642,7 +642,7 @@
   "keelcode_quota": {
     "title": "Квота KeelCode",
     "empty_title": "Нет учётных данных KeelCode",
-    "empty_desc": "Войдите через KeelCode OAuth, чтобы увидеть остаток каждого пула квоты.",
+    "empty_desc": "Войдите через KeelCode OAuth, чтобы увидеть дневные лимиты моделей или баланс пулов кредитов.",
     "idle": "Нажмите, чтобы обновить квоту",
     "loading": "Загрузка квоты...",
     "load_failed": "Не удалось загрузить квоту: {{message}}",
@@ -650,9 +650,13 @@
     "empty_data": "Нет данных о квоте",
     "remaining_amount": "Осталось {{remaining}} / {{total}}",
     "remaining_only": "Осталось {{remaining}}",
+    "model_quota_notice": "Лимиты Free-плана учитываются отдельно для каждой модели и сбрасываются ежедневно.",
+    "model_remaining_amount": "Сегодня осталось запросов: {{remaining}} / {{total}}",
+    "model_remaining_only": "Сегодня осталось запросов: {{remaining}}",
     "reset_at": "Сбросится {{time}}",
     "resource_premium": "Пул Premium",
     "resource_oss": "Пул OSS",
+    "resource_combined": "Общий пул кредитов",
     "exhausted": "Исчерпано"
   },
   "vertex_import": {

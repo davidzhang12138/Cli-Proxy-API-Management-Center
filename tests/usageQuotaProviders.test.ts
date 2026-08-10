@@ -533,6 +533,54 @@ describe('KeelCode unified quota adapter', () => {
     ]);
   });
 
+  test('hydrates and renders Free plan daily model request quotas', () => {
+    const state = KEELCODE_CONFIG.buildSnapshotState?.({
+      name: 'keelcode-free.json',
+      type: 'keelcode',
+      usage_quota: {
+        known: true,
+        resource_type: 'keelcode',
+        next_reset: '2026-08-11T00:00:00Z',
+        resources: [
+          {
+            resource_type: 'gpt-5.6-luna',
+            models: ['gpt-5.6-luna'],
+            model_scoped: true,
+            total_limit: 10,
+            current_usage: 1,
+            remaining: 9,
+            reset_at: '2026-08-11T00:00:00Z',
+          },
+          {
+            resource_type: 'deepseek-v4-flash',
+            models: ['deepseek-v4-flash'],
+            model_scoped: true,
+            total_limit: 100,
+            current_usage: 3,
+            remaining: 97,
+            reset_at: '2026-08-11T00:00:00Z',
+          },
+        ],
+      },
+    });
+
+    expect(state?.snapshot?.resources[0]).toMatchObject({
+      resourceType: 'gpt-5.6-luna',
+      models: ['gpt-5.6-luna'],
+      modelScoped: true,
+      totalLimit: 10,
+      remaining: 9,
+    });
+
+    const markup = renderToStaticMarkup(
+      createElement(KeelCodeQuotaBody, { classes: quotaClasses, quota: state! })
+    );
+    expect(markup).toContain('Free 套餐按模型分别计算每日请求额度');
+    expect(markup).toContain('gpt-5.6-luna');
+    expect(markup).toContain('今日剩余 9 / 10 次请求');
+    expect(markup).toContain('今日剩余 97 / 100 次请求');
+  });
+
   test('refreshes the selected KeelCode credential through management API', async () => {
     let request: unknown;
     authFilesApi.refreshAuthQuotas = (async (payload) => {
