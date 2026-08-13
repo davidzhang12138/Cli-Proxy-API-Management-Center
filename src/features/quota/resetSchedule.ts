@@ -129,6 +129,22 @@ export function collectQuotaRowInstants(
     return collectRows((quota as { rows?: WindowLike[] }).rows ?? [], 'row');
   }
 
+  if (provider === 'hyper') {
+    const snapshot = (
+      quota as {
+        snapshot?: {
+          nextReset?: string;
+          resources?: { resourceType?: string; resetAt?: string }[];
+        } | null;
+      }
+    ).snapshot;
+    const credits = snapshot?.resources?.find(
+      (resource) => resource.resourceType?.toLowerCase() === 'hypercredits'
+    );
+    const atMs = parseIsoToMs(credits?.resetAt ?? snapshot?.nextReset);
+    return atMs === null ? [] : [{ rowId: 'hypercredits', atMs, kind: 'window' }];
+  }
+
   return [];
 }
 

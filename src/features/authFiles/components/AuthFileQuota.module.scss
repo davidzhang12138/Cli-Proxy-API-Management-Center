@@ -145,7 +145,8 @@ button.quotaMessageAction {
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     'label state'
-    'value value';
+    'value value'
+    'reset reset';
   gap: 4px 8px;
   padding: 8px 9px;
   border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
@@ -185,6 +186,26 @@ button.quotaMessageAction {
   font-size: 9.5px;
   font-weight: 650;
   color: var(--text-tertiary);
+}
+
+.quotaBalanceReset {
+  grid-area: reset;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  padding-top: 6px;
+  border-top: 1px dashed color-mix(in srgb, var(--border-color) 72%, transparent);
+  font-family: $font-mono;
+  font-size: 9.5px;
+  color: var(--text-tertiary);
+}
+
+.quotaBalance > .quotaScope {
+  grid-area: value;
+  align-self: end;
+  padding-left: 40px;
 }
 
 /* ---------- 进度条（QuotaProgressBar 注入，Meter 风 6px 轨道） ---------- */

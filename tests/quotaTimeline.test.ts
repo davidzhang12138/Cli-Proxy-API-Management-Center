@@ -547,6 +547,35 @@ describe('buildTimelineLane', () => {
     expect(laneHasWindow(lane)).toBe(false);
   });
 
+  test('hyper projects a real refresh cycle without inventing a balance percentage', () => {
+    const resetAt = at(2026, 7, 3, 8);
+    const lane = buildTimelineLane({
+      ...base,
+      provider: 'hyper',
+      quota: {
+        status: 'success',
+        snapshot: {
+          nextReset: new Date(resetAt).toISOString(),
+          resources: [
+            {
+              resourceType: 'hypercredits',
+              remaining: 37,
+              resetAt: new Date(resetAt).toISOString(),
+              windowSeconds: 86_400,
+              exhausted: false,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(lane.anchorMs).toBe(resetAt);
+    expect(lane.periodHours).toBe(24);
+    expect(lane.remaining).toBeNull();
+    expect(lane.limits).toEqual([]);
+    expect(laneHasWindow(lane)).toBe(true);
+  });
+
   test('laneHasWindow drops only lanes that can never draw a bar', () => {
     const drawable = buildTimelineLane({
       ...base,

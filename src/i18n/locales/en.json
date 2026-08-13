@@ -648,6 +648,9 @@
     "missing_auth_index": "The credential is missing auth_index",
     "empty_data": "No balance data",
     "balance_label": "Hypercredits balance",
+    "hidden_state": "Hidden",
+    "hidden_balance": "This team reports billing in USD, so Hypercredits are not displayed.",
+    "reset_label": "Next refresh",
     "available": "Available",
     "exhausted": "Exhausted"
   },

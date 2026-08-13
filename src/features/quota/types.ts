@@ -26,6 +26,7 @@ export interface QuotaClassMap {
   quotaBalanceValue: string;
   quotaBalanceValueExhausted: string;
   quotaBalanceState: string;
+  quotaBalanceReset: string;
   // 套餐 chip 行（codex 命名，claude/antigravity/kimi/xai 复用；
   // premium=金卡、elite=Pro 20x 液态铂金 —— 均为定稿资产，样式不可改）
   codexPlan: string;
@@ -72,6 +73,7 @@ export const QUOTA_CLASS_KEYS: readonly (keyof QuotaClassMap)[] = [
   'quotaBalanceValue',
   'quotaBalanceValueExhausted',
   'quotaBalanceState',
+  'quotaBalanceReset',
   'codexPlan',
   'codexPlanItem',
   'codexPlanLabel',

@@ -107,7 +107,8 @@
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     'label state'
-    'value value';
+    'value value'
+    'reset reset';
   gap: 5px 10px;
   padding: 11px 12px;
   border: 1px solid color-mix(in srgb, var(--border-color) 76%, transparent);
@@ -150,6 +151,26 @@
   font-size: 10.5px;
   font-weight: 650;
   color: var(--text-tertiary);
+}
+
+.quotaBalanceReset {
+  grid-area: reset;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 7px;
+  border-top: 1px dashed color-mix(in srgb, var(--border-color) 74%, transparent);
+  font-family: $font-mono;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+.quotaBalance > .quotaScope {
+  grid-area: value;
+  align-self: end;
+  padding-left: 54px;
 }
 
 /* ---------- 水位条（QuotaMeter）----------

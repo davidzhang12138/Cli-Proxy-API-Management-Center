@@ -13,6 +13,7 @@ import { KEELCODE_CONFIG } from '@/features/quota/providers/keelcode/data';
 import { QUOTA_CLASS_KEYS, type QuotaClassMap } from '@/features/quota/types';
 import { authFilesApi } from '@/services/api';
 import type { AuthFileItem } from '@/types';
+import { formatInstantShort } from '@/utils/quota';
 
 const t = ((key: string) => key) as unknown as TFunction;
 const originalRefreshAuthQuotas = authFilesApi.refreshAuthQuotas;
@@ -432,6 +433,42 @@ describe('FreeBuff unified quota adapter', () => {
 });
 
 describe('Charm Hyper unified quota adapter', () => {
+  test('hydrates the real Hypercredits refresh schedule from a management snapshot', () => {
+    const resetAt = '2026-08-14T08:00:00Z';
+    const state = HYPER_CONFIG.buildSnapshotState?.({
+      name: 'hyper.json',
+      type: 'hyper',
+      usage_quota: {
+        known: true,
+        remaining: 250,
+        resource_type: 'hypercredits',
+        next_reset: resetAt,
+        resources: [
+          {
+            resource_type: 'hypercredits',
+            remaining: 250,
+            window_seconds: 86_400,
+            reset_at: resetAt,
+          },
+        ],
+      },
+    });
+
+    const normalizedResetAt = new Date(resetAt).toISOString();
+    expect(state?.status).toBe('success');
+    expect(state?.snapshot).toMatchObject({
+      nextReset: normalizedResetAt,
+      resources: [
+        expect.objectContaining({
+          resourceType: 'hypercredits',
+          remaining: 250,
+          windowSeconds: 86_400,
+          resetAt: normalizedResetAt,
+        }),
+      ],
+    });
+  });
+
   test('keeps a zero Hypercredits balance as a known exhausted state', () => {
     const file: AuthFileItem = {
       name: 'hyper.json',
@@ -472,6 +509,29 @@ describe('Charm Hyper unified quota adapter', () => {
     );
   });
 
+  test('keeps a genuinely missing Hyper balance in the ordinary empty state', () => {
+    const markup = renderToStaticMarkup(
+      createElement(HyperQuotaBody, {
+        classes: quotaClasses,
+        quota: {
+          status: 'success',
+          snapshot: {
+            known: true,
+            totalLimit: null,
+            currentUsage: null,
+            remaining: null,
+            exhausted: false,
+            resourceType: 'hypercredits',
+            resources: [],
+          },
+        },
+      })
+    );
+
+    expect(markup).toContain('暂无余额数据');
+    expect(markup).not.toContain('该团队使用 USD 计价');
+  });
+
   test('renders an exhausted zero balance without inventing a percentage', () => {
     const markup = renderToStaticMarkup(
       createElement(HyperQuotaBody, {
@@ -494,6 +554,71 @@ describe('Charm Hyper unified quota adapter', () => {
     expect(markup).toContain('quotaBalanceValueExhausted');
     expect(markup).toContain('>0<');
     expect(markup).not.toContain('%');
+  });
+
+  test('renders the next Hypercredits refresh as local time plus a countdown', () => {
+    const resetAtMs = Date.now() + 3 * 24 * 60 * 60 * 1000;
+    const resetAt = new Date(resetAtMs).toISOString();
+    const state = HYPER_CONFIG.buildSnapshotState?.({
+      name: 'hyper.json',
+      type: 'hyper',
+      usage_quota: {
+        known: true,
+        remaining: 100,
+        resource_type: 'hypercredits',
+        next_reset: resetAt,
+        resources: [
+          {
+            resource_type: 'hypercredits',
+            remaining: 100,
+            window_seconds: 2_592_000,
+            reset_at: resetAt,
+          },
+        ],
+      },
+    });
+    const markup = renderToStaticMarkup(
+      createElement(HyperQuotaBody, { classes: quotaClasses, quota: state! })
+    );
+
+    expect(markup).toContain('下次刷新');
+    expect(markup).toContain('quotaBalanceReset');
+    expect(markup).toContain(formatInstantShort(resetAtMs));
+    expect(markup).toContain('quotaResetRelative');
+    expect(markup).not.toContain('%');
+  });
+
+  test('renders a neutral USD-billing state while preserving the real refresh time', () => {
+    const resetAtMs = Date.now() + 5 * 24 * 60 * 60 * 1000;
+    const resetAt = new Date(resetAtMs).toISOString();
+    const state = HYPER_CONFIG.buildSnapshotState?.({
+      name: 'hyper-usd.json',
+      type: 'hyper',
+      usage_quota: {
+        known: true,
+        usage_unknown: true,
+        resource_type: 'hypercredits',
+        next_reset: resetAt,
+        resources: [
+          {
+            resource_type: 'hypercredits',
+            usage_unknown: true,
+            window_seconds: 2_678_400,
+            reset_at: resetAt,
+          },
+        ],
+      },
+    });
+    const markup = renderToStaticMarkup(
+      createElement(HyperQuotaBody, { classes: quotaClasses, quota: state! })
+    );
+
+    expect(state?.snapshot?.usageUnknown).toBe(true);
+    expect(markup).toContain('该团队使用 USD 计价，因此 Hypercredits 余额不展示。');
+    expect(markup).toContain('未展示');
+    expect(markup).toContain('下次刷新');
+    expect(markup).toContain(formatInstantShort(resetAtMs));
+    expect(markup).not.toContain('quotaBalanceValueExhausted');
   });
 });
 

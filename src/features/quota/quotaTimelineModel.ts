@@ -499,7 +499,7 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
     };
   }
 
-  if (provider === 'freebuff') {
+  if (provider === 'freebuff' || provider === 'hyper') {
     const snapshot = (
       quota as {
         snapshot?: {
@@ -511,6 +511,10 @@ export function buildTimelineLane(input: TimelineLaneInput): TimelineLane {
     const resources = snapshot?.resources ?? [];
     const resetSnapshot = { nextReset: snapshot?.nextReset, resources };
     const windows = resources
+      .filter(
+        (resource) =>
+          provider !== 'hyper' || resource.resourceType?.toLowerCase() === 'hypercredits'
+      )
       .map((resource) => {
         const resetAt = resolveUsageQuotaResourceResetAt(resetSnapshot, resource);
         const resetAtMs = resetAt ? Date.parse(resetAt) : Number.NaN;

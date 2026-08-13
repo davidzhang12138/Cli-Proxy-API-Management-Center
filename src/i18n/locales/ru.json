@@ -636,6 +636,9 @@
     "missing_auth_index": "В учётных данных отсутствует auth_index",
     "empty_data": "Нет данных о балансе",
     "balance_label": "Баланс Hypercredits",
+    "hidden_state": "Скрыто",
+    "hidden_balance": "Эта команда использует расчёты в USD, поэтому Hypercredits не отображаются.",
+    "reset_label": "Следующее обновление",
     "available": "Доступно",
     "exhausted": "Исчерпано"
   },

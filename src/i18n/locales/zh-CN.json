@@ -648,6 +648,9 @@
     "missing_auth_index": "认证文件缺少 auth_index",
     "empty_data": "暂无余额数据",
     "balance_label": "Hypercredits 余额",
+    "hidden_state": "未展示",
+    "hidden_balance": "该团队使用 USD 计价，因此 Hypercredits 余额不展示。",
+    "reset_label": "下次刷新",
     "available": "可用",
     "exhausted": "已耗尽"
   },

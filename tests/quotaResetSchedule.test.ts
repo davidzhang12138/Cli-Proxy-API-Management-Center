@@ -99,6 +99,22 @@ describe('collectQuotaRowInstants', () => {
     expect(collectQuotaRowInstants('kimi', quota).map((i) => i.rowId)).toEqual(['r1']);
   });
 
+  test('collects the real Hypercredits refresh instant', () => {
+    const quota = {
+      status: 'success',
+      snapshot: {
+        nextReset: iso(NOW + 2 * DAY_MS),
+        resources: [
+          { resourceType: 'hypercredits', resetAt: iso(NOW + DAY_MS) },
+          { resourceType: 'other', resetAt: iso(NOW + HOUR_MS) },
+        ],
+      },
+    };
+    expect(collectQuotaRowInstants('hyper', quota)).toEqual([
+      { rowId: 'hypercredits', atMs: NOW + DAY_MS, kind: 'window' },
+    ]);
+  });
+
   test('returns nothing unless the credential loaded successfully', () => {
     for (const status of ['idle', 'loading', 'error']) {
       expect(collectQuotaRowInstants('claude', { ...claudeQuota, status })).toEqual([]);
@@ -224,6 +240,17 @@ describe('nextRecoveryMs', () => {
       ],
     };
     expect(nextRecoveryMs('claude', quota, NOW)).toBe(NOW + DAY_MS);
+  });
+
+  test('includes a Hyper refresh in soonest-recovery sorting', () => {
+    const quota = {
+      status: 'success',
+      snapshot: {
+        nextReset: iso(NOW + 2 * HOUR_MS),
+        resources: [{ resourceType: 'hypercredits' }],
+      },
+    };
+    expect(nextRecoveryMs('hyper', quota, NOW)).toBe(NOW + 2 * HOUR_MS);
   });
 
   test('is null for an unloaded credential, so sorting can sink it', () => {

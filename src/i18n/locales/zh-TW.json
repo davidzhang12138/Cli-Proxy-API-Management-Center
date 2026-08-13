@@ -646,6 +646,9 @@
     "missing_auth_index": "認證檔案缺少 auth_index",
     "empty_data": "暫無餘額資料",
     "balance_label": "Hypercredits 餘額",
+    "hidden_state": "未顯示",
+    "hidden_balance": "此團隊使用 USD 計價，因此不顯示 Hypercredits 餘額。",
+    "reset_label": "下次重新整理",
     "available": "可用",
     "exhausted": "已耗盡"
   },
