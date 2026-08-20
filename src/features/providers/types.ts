@@ -187,6 +187,8 @@ export interface SponsorKeyEntryInput {
 export interface ApiKeyEntryInput {
   apiKey: string;
   existingApiKey?: string;
+  baseUrl?: string;
+  models?: ModelEntryInput[];
   disabled: boolean;
   proxyUrl: string;
   weight?: number;

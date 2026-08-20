@@ -257,6 +257,16 @@
   gap: 10px;
 }
 
+.entryModelsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+
 .entryStatusRow {
   display: flex;
   align-items: center;

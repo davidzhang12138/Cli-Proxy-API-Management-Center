@@ -162,6 +162,10 @@ export function openaiToResource(config: OpenAIProviderConfig, index: number): P
   const name = (config.name ?? '').trim();
   const firstEntry = config.apiKeyEntries?.[0];
   const previewApiKey = firstEntry?.apiKey ? maskApiKey(firstEntry.apiKey) : null;
+  const models = [
+    ...(config.models ?? []),
+    ...(config.apiKeyEntries ?? []).flatMap((entry) => entry.models ?? []),
+  ];
   return {
     id: buildId('openaiCompatibility', sourceIndex, truncateForId(name) || `#${sourceIndex}`),
     brand: 'openaiCompatibility',
@@ -171,11 +175,11 @@ export function openaiToResource(config: OpenAIProviderConfig, index: number): P
     apiKeyPreview: previewApiKey,
     apiKey: null,
     authIndex: config.authIndex ?? null,
-    baseUrl: config.baseUrl ?? null,
+    baseUrl: config.baseUrl ?? firstEntry?.baseUrl ?? null,
     proxyUrl: null,
     prefix: config.prefix ?? null,
-    modelCount: config.models?.length ?? 0,
-    models: collectModelNames(config.models),
+    modelCount: collectModelNames(models).length,
+    models: collectModelNames(models),
     priority: normalizePriority(config.priority),
     headerCount: countHeaders(config.headers),
     excludedModelCount: 0,

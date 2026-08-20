@@ -24,6 +24,7 @@ import {
   type OpenAITestScope,
 } from './useConnectivityTest';
 import { ConnectivityStatusIcon } from './ConnectivityStatusIcon';
+import { ModelEntriesEditor } from './ModelEntriesEditor';
 import styles from './sharedForm.module.scss';
 
 const COLLAPSED_LIMIT = 10;
@@ -126,7 +127,13 @@ export function ApiKeyEntriesEditor({
         const apiKey = entry.apiKey.trim() || entry.existingApiKey?.trim() || '';
         return (
           apiKey.toLowerCase().includes(normalizedQuery) ||
-          entry.proxyUrl.trim().toLowerCase().includes(normalizedQuery)
+          entry.proxyUrl.trim().toLowerCase().includes(normalizedQuery) ||
+          (entry.baseUrl ?? '').trim().toLowerCase().includes(normalizedQuery) ||
+          (entry.models ?? []).some(
+            (model) =>
+              model.name.toLowerCase().includes(normalizedQuery) ||
+              (model.alias ?? '').toLowerCase().includes(normalizedQuery)
+          )
         );
       })
     : availabilityFiltered;
@@ -346,6 +353,8 @@ export function ApiKeyEntriesEditor({
         const status = statuses[idx] ?? idleStatus;
         const expanded = expandedIdx === idx;
         const summaryKey = entry.apiKey.trim() || entry.existingApiKey?.trim() || '';
+        const entryModels = entry.models?.length ? entry.models : [{ name: '', alias: '' }];
+        const modelCount = entryModels.filter((model) => model.name.trim()).length;
         return (
           <div
             key={idx}
@@ -360,6 +369,16 @@ export function ApiKeyEntriesEditor({
               >
                 <span>{t('providersPage.form.apiKeyEntry', { index: idx + 1 })}</span>
                 <span className={styles.entrySummary}>
+                  {entry.baseUrl?.trim() ? (
+                    <span className={styles.entryBadge} title={entry.baseUrl}>
+                      {t('providersPage.form.endpointBadge')}
+                    </span>
+                  ) : null}
+                  {modelCount > 0 ? (
+                    <span className={styles.entryBadge}>
+                      {t('providersPage.form.entryModelCountBadge', { count: modelCount })}
+                    </span>
+                  ) : null}
                   {entry.proxyUrl.trim() ? (
                     <span className={styles.entryBadge} title={entry.proxyUrl}>
                       {t('providersPage.form.proxyBadge')}
@@ -442,6 +461,52 @@ export function ApiKeyEntriesEditor({
                     disabled={mutating}
                     ariaLabel={t('providersPage.form.apiKeyEnabled')}
                   />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>{t('providersPage.form.endpointUrl')}</label>
+                  <input
+                    className={styles.input}
+                    type="url"
+                    value={entry.baseUrl ?? ''}
+                    onChange={(e) => onUpdate(idx, { baseUrl: e.target.value })}
+                    disabled={mutating}
+                    placeholder="https://workspace--app-server.us-east.modal.direct/v1"
+                  />
+                  <span className={styles.labelHint}>
+                    {t('providersPage.form.endpointUrlHint')}
+                  </span>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>{t('providersPage.form.entryModels')}</label>
+                  <span className={styles.labelHint}>
+                    {t('providersPage.form.entryModelsHint')}
+                  </span>
+                  <div className={styles.entryModelsPanel}>
+                    <ModelEntriesEditor
+                      models={entryModels}
+                      supportsImage
+                      supportsThinking
+                      mutating={mutating}
+                      removeDisabled={entryModels.length <= 1}
+                      onUpdate={(modelIdx, patch) =>
+                        onUpdate(idx, {
+                          models: entryModels.map((model, currentIdx) =>
+                            currentIdx === modelIdx ? { ...model, ...patch } : model
+                          ),
+                        })
+                      }
+                      onAdd={() =>
+                        onUpdate(idx, {
+                          models: [...entryModels, { name: '', alias: '' }],
+                        })
+                      }
+                      onRemove={(modelIdx) =>
+                        onUpdate(idx, {
+                          models: entryModels.filter((_, currentIdx) => currentIdx !== modelIdx),
+                        })
+                      }
+                    />
+                  </div>
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>{t('providersPage.form.apiKey')}</label>

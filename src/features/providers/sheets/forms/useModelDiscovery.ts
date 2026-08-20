@@ -87,9 +87,10 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
         const entryKey =
           (firstEntry?.apiKey ?? '').trim() || (firstEntry?.existingApiKey ?? '').trim();
         const entryAuthIndex = (firstEntry?.authIndex ?? '').trim() || resolvedAuthIndex;
+        const entryBaseUrl = (firstEntry?.baseUrl ?? '').trim() || baseUrl;
         try {
           next = await modelsApi.fetchModelsViaApiCall(
-            baseUrl,
+            entryBaseUrl,
             entryKey,
             baseHeaders,
             entryAuthIndex
@@ -99,7 +100,7 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
           // reject the configured key for the discovery route. Retry once
           // without any auth/headers before surfacing the original error.
           try {
-            next = await modelsApi.fetchModelsViaApiCall(baseUrl);
+            next = await modelsApi.fetchModelsViaApiCall(entryBaseUrl);
           } catch {
             throw firstErr;
           }
@@ -126,7 +127,10 @@ export function useModelDiscovery(args: UseModelDiscoveryArgs): UseModelDiscover
   const inputSignature = useMemo(() => {
     const headerSig = formHeaders.map((h) => `${h.key}:${h.value}`).join('|');
     const entriesSig = (apiKeyEntries ?? [])
-      .map((e) => `${e.apiKey ?? ''}::${e.existingApiKey ?? ''}::${e.authIndex ?? ''}`)
+      .map(
+        (e) =>
+          `${e.apiKey ?? ''}::${e.existingApiKey ?? ''}::${e.authIndex ?? ''}::${e.baseUrl ?? ''}`
+      )
       .join('|');
     return [
       baseUrl,

@@ -238,8 +238,11 @@ export const buildOpenAIConfig = (
       ?.map((entry, index) => {
         const fallbackApiKey =
           entry.existingApiKey?.trim() || existing?.apiKeyEntries?.[index]?.apiKey?.trim() || '';
+        const entryModels = buildModelAliases(entry.models, true);
         return {
           apiKey: entry.apiKey.trim() || fallbackApiKey,
+          baseUrl: entry.baseUrl?.trim() || undefined,
+          models: entryModels.length ? entryModels : undefined,
           disabled: entry.disabled === true,
           proxyUrl: entry.proxyUrl.trim() || undefined,
           weight: entry.weight,
@@ -251,7 +254,7 @@ export const buildOpenAIConfig = (
   return {
     ...(existing ?? {}),
     name: input.name.trim(),
-    baseUrl: input.baseUrl.trim(),
+    baseUrl: input.baseUrl.trim() || undefined,
     prefix: input.prefix.trim() || undefined,
     apiKeyEntries,
     disabled: input.disabled,

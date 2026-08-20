@@ -197,7 +197,9 @@ export function useConnectivityTest(
           entry.apiKey ?? '',
           entry.existingApiKey ?? '',
           entry.authIndex ?? '',
+          entry.baseUrl ?? '',
           entry.proxyUrl ?? '',
+          (entry.models ?? []).map((model) => `${model.name}:${model.alias ?? ''}`).join(','),
         ].join('||')
       ),
     [apiKeyEntries]
@@ -267,7 +269,8 @@ export function useConnectivityTest(
       if (brand !== 'openaiCompatibility') return false;
       setOpenaiBatchCompleted(false);
 
-      const trimmedBase = baseUrl.trim();
+      const entry = apiKeyEntries?.[idx];
+      const trimmedBase = (entry?.baseUrl ?? '').trim() || baseUrl.trim();
       if (!trimmedBase) {
         updateOpenaiStatus(idx, {
           state: 'error',
@@ -283,7 +286,6 @@ export function useConnectivityTest(
         });
         return false;
       }
-      const entry = apiKeyEntries?.[idx];
       const entryKey = (entry?.apiKey ?? '').trim() || (entry?.existingApiKey ?? '').trim();
       const resolvedAuthIndex =
         (entry?.authIndex ?? '').trim() || (authIndex ?? '').trim() || undefined;
@@ -294,7 +296,10 @@ export function useConnectivityTest(
         });
         return false;
       }
-      const model = pickModel(testModel, models);
+      const entryModels = (entry?.models ?? []).filter((model) => model.name.trim());
+      const model = entryModels.length
+        ? pickModel(undefined, entryModels)
+        : pickModel(testModel, models);
       if (!model) {
         updateOpenaiStatus(idx, {
           state: 'error',

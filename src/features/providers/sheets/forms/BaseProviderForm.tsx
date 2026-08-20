@@ -56,6 +56,8 @@ const emptyHeader = () => ({ key: '', value: '' });
 const emptyModel = (): ModelEntryInput => ({ name: '', alias: '' });
 const emptyApiKeyEntry = (): ApiKeyEntryInput => ({
   apiKey: '',
+  baseUrl: '',
+  models: [emptyModel()],
   disabled: false,
   proxyUrl: '',
   weight: undefined,
@@ -149,6 +151,18 @@ function buildInitialForm(
         ? cfg.apiKeyEntries.map((entry) => ({
             apiKey: '',
             existingApiKey: entry.apiKey,
+            baseUrl: entry.baseUrl ?? '',
+            models: entry.models?.length
+              ? entry.models.map((model) => ({
+                  name: model.name,
+                  alias: model.alias ?? '',
+                  priority: model.priority,
+                  testModel: model.testModel,
+                  image: model.image === true,
+                  thinkingJson: formatJsonObject(model.thinking),
+                  thinkingLevels: readThinkingLevels(model.thinking),
+                }))
+              : [emptyModel()],
             disabled: entry.disabled === true,
             proxyUrl: entry.proxyUrl ?? '',
             weight: entry.weight,
@@ -408,6 +422,17 @@ export function BaseProviderForm({
       return t('providersPage.form.validation.baseUrlRequired');
     }
     if (brand === 'openaiCompatibility') {
+      const configuredEntries = (form.apiKeyEntries ?? []).filter(
+        (entry) => entry.apiKey.trim() || entry.existingApiKey?.trim()
+      );
+      if (!form.baseUrl.trim()) {
+        if (!configuredEntries.length) {
+          return t('providersPage.form.validation.baseUrlOrEntryRequired');
+        }
+        if (configuredEntries.some((entry) => !entry.baseUrl?.trim())) {
+          return t('providersPage.form.validation.entryBaseUrlRequired');
+        }
+      }
       const DURATION_RE = /^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$/;
       const NUM_RE = /^\d+(\.\d+)?$/;
       const isDurationLike = (v: string) => DURATION_RE.test(v) || NUM_RE.test(v);
@@ -606,6 +631,11 @@ export function BaseProviderForm({
                 <span className={styles.labelHint}>
                   {' '}
                   · {t('providersPage.form.baseUrlRequiredHint')}
+                </span>
+              ) : brand === 'openaiCompatibility' ? (
+                <span className={styles.labelHint}>
+                  {' '}
+                  · {t('providersPage.form.baseUrlFallbackHint')}
                 </span>
               ) : null}
             </label>

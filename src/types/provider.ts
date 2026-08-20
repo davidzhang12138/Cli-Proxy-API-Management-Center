@@ -14,6 +14,8 @@ export interface ModelAlias {
 
 export interface ApiKeyEntry {
   apiKey: string;
+  baseUrl?: string;
+  models?: ModelAlias[];
   disabled?: boolean;
   proxyUrl?: string;
   weight?: number;
@@ -61,7 +63,8 @@ export interface ProviderKeyConfig {
 export interface OpenAIProviderConfig {
   name: string;
   prefix?: string;
-  baseUrl: string;
+  /** Provider fallback URL; each API key entry may override it. */
+  baseUrl?: string;
   apiKeyEntries: ApiKeyEntry[];
   disabled?: boolean;
   headers?: Record<string, string>;

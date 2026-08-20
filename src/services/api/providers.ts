@@ -77,7 +77,14 @@ const OPENAI_PROVIDER_FIELDS = [
 const MODEL_ALIAS_FIELDS = ['name', 'alias', 'priority', 'test-model', 'thinking'] as const;
 const OPENAI_MODEL_ALIAS_FIELDS = [...MODEL_ALIAS_FIELDS, 'image'] as const;
 
-const API_KEY_ENTRY_FIELDS = ['api-key', 'disabled', 'proxy-url', 'weight'] as const;
+const API_KEY_ENTRY_FIELDS = [
+  'api-key',
+  'base-url',
+  'models',
+  'disabled',
+  'proxy-url',
+  'weight',
+] as const;
 
 const CLOAK_FIELDS = ['mode', 'strict-mode', 'sensitive-words', 'cache-user-id'] as const;
 
@@ -271,12 +278,17 @@ const mergeOpenAIProviderPayload = (raw: unknown, payload: Record<string, unknow
   const rawApiKeyEntries = isRecord(raw) ? raw['api-key-entries'] : undefined;
   const apiKeyEntries = payload['api-key-entries'];
   if (Array.isArray(apiKeyEntries)) {
-    next['api-key-entries'] = mergeKnownRecordList(
-      rawApiKeyEntries,
-      apiKeyEntries.filter(isRecord),
-      API_KEY_ENTRY_FIELDS,
-      apiKeyEntryIdentity
-    );
+    const rawRecords = Array.isArray(rawApiKeyEntries)
+      ? rawApiKeyEntries.map((item) => (isRecord(item) ? item : undefined))
+      : [];
+    const usedIndexes = new Set<number>();
+    next['api-key-entries'] = apiKeyEntries.filter(isRecord).map((entry, index) => {
+      const rawEntry = findRawRecord(rawRecords, usedIndexes, entry, index, apiKeyEntryIdentity);
+      const merged = mergeKnownFields(rawEntry, entry, API_KEY_ENTRY_FIELDS);
+      const entryModels = mergeModelPayloads(rawEntry, entry.models, OPENAI_MODEL_ALIAS_FIELDS);
+      if (entryModels) merged.models = entryModels;
+      return merged;
+    });
   }
   const models = mergeModelPayloads(raw, payload.models, OPENAI_MODEL_ALIAS_FIELDS);
   if (models) next.models = models;
@@ -324,6 +336,9 @@ const serializeModelAliases = (models?: ModelAlias[], includeOpenAIFields = fals
 
 const serializeApiKeyEntry = (entry: ApiKeyEntry) => {
   const payload: Record<string, unknown> = { 'api-key': entry.apiKey };
+  if (entry.baseUrl?.trim()) payload['base-url'] = entry.baseUrl.trim();
+  const models = serializeModelAliases(entry.models, true);
+  if (models && models.length) payload.models = models;
   if (entry.disabled) payload.disabled = true;
   if (entry.proxyUrl) payload['proxy-url'] = entry.proxyUrl;
   if (entry.weight !== undefined) payload.weight = entry.weight;
@@ -422,7 +437,7 @@ const serializeGeminiKey = (config: GeminiKeyConfig) => {
 const serializeOpenAIProvider = (provider: OpenAIProviderConfig) => {
   const payload: Record<string, unknown> = {
     name: provider.name,
-    'base-url': provider.baseUrl,
+    'base-url': provider.baseUrl?.trim() || undefined,
     'api-key-entries': Array.isArray(provider.apiKeyEntries)
       ? provider.apiKeyEntries.map((entry) => serializeApiKeyEntry(entry))
       : [],

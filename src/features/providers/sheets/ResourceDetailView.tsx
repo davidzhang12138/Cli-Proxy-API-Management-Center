@@ -79,7 +79,7 @@ export function ResourceDetailView({ resource, usageByProvider }: ResourceDetail
                     usageByProvider,
                     openaiConfig.name,
                     entry.apiKey,
-                    openaiConfig.baseUrl
+                    entry.baseUrl ?? openaiConfig.baseUrl
                   )
                 : { success: 0, failure: 0 };
               return (

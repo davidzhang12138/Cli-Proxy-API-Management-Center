@@ -111,14 +111,18 @@ const normalizeApiKeyEntry = (entry: unknown): ApiKeyEntry | null => {
   if (!trimmed) return null;
 
   const proxyUrl = record?.['proxy-url'];
+  const baseUrl = record?.['base-url'];
   const disabled = normalizeBoolean(record?.disabled);
   const weight = readCredentialWeight(record?.weight);
   const authIndex = normalizeAuthIndex(record?.['auth-index']);
+  const models = normalizeModelAliases(record?.models);
 
   const result: ApiKeyEntry = {
     apiKey: trimmed,
     proxyUrl: proxyUrl ? String(proxyUrl) : undefined,
   };
+  if (baseUrl && String(baseUrl).trim()) result.baseUrl = String(baseUrl).trim();
+  if (models.length) result.models = models;
   if (disabled !== undefined) result.disabled = disabled;
   if (weight !== undefined) result.weight = weight;
   if (authIndex) result.authIndex = authIndex;
@@ -237,14 +241,15 @@ const normalizeOpenAIProvider = (
 ): OpenAIProviderConfig | null => {
   if (!isRecord(provider)) return null;
   const name = provider.name;
-  const baseUrl = provider['base-url'];
-  if (!name || !baseUrl) return null;
+  if (!name) return null;
 
   const apiKeyEntries = Array.isArray(provider['api-key-entries'])
     ? (provider['api-key-entries']
         .map((entry) => normalizeApiKeyEntry(entry))
         .filter(Boolean) as ApiKeyEntry[])
     : [];
+  const baseUrl = String(provider['base-url'] ?? '').trim();
+  if (!baseUrl && !apiKeyEntries.some((entry) => entry.baseUrl?.trim())) return null;
 
   const headers = normalizeHeaders(provider.headers);
   const models = normalizeModelAliases(provider.models);
@@ -253,9 +258,9 @@ const normalizeOpenAIProvider = (
 
   const result: OpenAIProviderConfig = {
     name: String(name),
-    baseUrl: String(baseUrl),
     apiKeyEntries,
   };
+  if (baseUrl) result.baseUrl = baseUrl;
 
   const disabled = normalizeBoolean(provider.disabled);
   if (disabled !== undefined) result.disabled = disabled;
