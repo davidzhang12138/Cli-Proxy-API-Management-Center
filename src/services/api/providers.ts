@@ -62,6 +62,7 @@ const OPENAI_PROVIDER_FIELDS = [
   'disabled',
   'prefix',
   'base-url',
+  'forward-user-agent',
   'api-key-entries',
   'headers',
   'models',
@@ -428,6 +429,7 @@ const serializeOpenAIProvider = (provider: OpenAIProviderConfig) => {
   };
   if (provider.prefix?.trim()) payload.prefix = provider.prefix.trim();
   if (provider.disabled !== undefined) payload.disabled = provider.disabled;
+  if (provider.forwardUserAgent === true) payload['forward-user-agent'] = true;
   const headers = serializeHeaders(provider.headers);
   if (headers) payload.headers = headers;
   const models = serializeModelAliases(provider.models, true);

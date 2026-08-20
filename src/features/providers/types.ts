@@ -210,6 +210,8 @@ export interface ProviderEntryFormInput {
   prefix: string;
   disabled: boolean;
   disableCooling?: boolean;
+  /** OpenAI-compatible only: forward the downstream User-Agent. */
+  forwardUserAgent?: boolean;
   quotaBackoffMin?: string;
   quotaBackoffMax?: string;
   priority?: number;

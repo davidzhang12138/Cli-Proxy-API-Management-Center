@@ -259,6 +259,8 @@ const normalizeOpenAIProvider = (
 
   const disabled = normalizeBoolean(provider.disabled);
   if (disabled !== undefined) result.disabled = disabled;
+  const forwardUserAgent = normalizeBoolean(provider['forward-user-agent']);
+  if (forwardUserAgent !== undefined) result.forwardUserAgent = forwardUserAgent;
   const disableCooling = normalizeBoolean(provider['disable-cooling']);
   if (disableCooling !== undefined) result.disableCooling = disableCooling;
   const quotaBackoffMinRaw = provider['quota-backoff-min'];

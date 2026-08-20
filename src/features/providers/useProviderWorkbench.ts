@@ -251,6 +251,7 @@ export const buildOpenAIConfig = (
     apiKeyEntries,
     disabled: input.disabled,
     disableCooling: input.disableCooling === true,
+    forwardUserAgent: input.forwardUserAgent === true,
     quotaBackoffMin: input.quotaBackoffMin?.trim() || undefined,
     quotaBackoffMax: input.quotaBackoffMax?.trim() || undefined,
     headers: Object.keys(headers).length ? headers : undefined,

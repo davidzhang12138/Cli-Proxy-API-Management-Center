@@ -2002,6 +2002,8 @@
       "hideApiKey": "隐藏密钥",
       "disableCooling": "禁用冷却调度",
       "disableCoolingHint": "仅对当前凭据或提供商禁用失败后的冷却窗口",
+      "forwardUserAgent": "转发客户端 User-Agent",
+      "forwardUserAgentHint": "OpenAI 兼容上游请求使用下游客户端传入的 User-Agent",
       "modelImage": "允许图片端点",
       "modelImageHint": "允许该模型用于 /v1/images/generations 和 /v1/images/edits",
       "showAllEntries": "显示全部（{{count}}）",

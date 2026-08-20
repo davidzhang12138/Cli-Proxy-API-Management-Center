@@ -1980,6 +1980,8 @@
       "hideApiKey": "隱藏金鑰",
       "disableCooling": "停用冷卻調度",
       "disableCoolingHint": "僅對目前憑證或提供商停用失敗後的冷卻視窗",
+      "forwardUserAgent": "轉發客戶端 User-Agent",
+      "forwardUserAgentHint": "OpenAI 相容上游請求使用下游客戶端傳入的 User-Agent",
       "modelImage": "允許圖片端點",
       "modelImageHint": "允許該模型用於 /v1/images/generations 和 /v1/images/edits",
       "showAllEntries": "顯示全部（{{count}}）",

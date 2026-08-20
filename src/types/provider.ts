@@ -65,6 +65,8 @@ export interface OpenAIProviderConfig {
   apiKeyEntries: ApiKeyEntry[];
   disabled?: boolean;
   headers?: Record<string, string>;
+  /** Forward the downstream User-Agent to the OpenAI-compatible upstream. */
+  forwardUserAgent?: boolean;
   models?: ModelAlias[];
   priority?: number;
   testModel?: string;

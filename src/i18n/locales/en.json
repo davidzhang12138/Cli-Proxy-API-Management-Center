@@ -2002,6 +2002,8 @@
       "hideApiKey": "Hide API key",
       "disableCooling": "Disable cooling",
       "disableCoolingHint": "Disable failure cooldown windows only for this credential or provider",
+      "forwardUserAgent": "Forward client User-Agent",
+      "forwardUserAgentHint": "Use the downstream client's User-Agent for upstream OpenAI-compatible requests",
       "modelImage": "Allow image endpoints",
       "modelImageHint": "Allow this model on /v1/images/generations and /v1/images/edits",
       "showAllEntries": "Show all ({{count}})",

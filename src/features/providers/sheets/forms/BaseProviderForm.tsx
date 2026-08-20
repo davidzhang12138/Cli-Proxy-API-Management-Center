@@ -88,6 +88,7 @@ function buildInitialForm(
       prefix: '',
       disabled: false,
       disableCooling: false,
+      forwardUserAgent: brand === 'openaiCompatibility' ? false : undefined,
       quotaBackoffMin: '',
       quotaBackoffMax: '',
       priority: undefined,
@@ -124,6 +125,7 @@ function buildInitialForm(
       prefix: cfg.prefix ?? '',
       disabled: cfg.disabled === true,
       disableCooling: cfg.disableCooling === true,
+      forwardUserAgent: cfg.forwardUserAgent === true,
       quotaBackoffMin: cfg.quotaBackoffMin ?? '',
       quotaBackoffMax: cfg.quotaBackoffMax ?? '',
       priority: cfg.priority,
@@ -788,6 +790,22 @@ export function BaseProviderForm({
             <span className={styles.checkboxText}>
               <span>{t('providersPage.form.disableCooling')}</span>
               <small>{t('providersPage.form.disableCoolingHint')}</small>
+            </span>
+          </label>
+        ) : null}
+
+        {brand === 'openaiCompatibility' ? (
+          <label className={styles.checkboxRow}>
+            <input
+              type="checkbox"
+              className={styles.checkboxBox}
+              checked={form.forwardUserAgent ?? false}
+              disabled={mutating}
+              onChange={(e) => updateField('forwardUserAgent', e.target.checked)}
+            />
+            <span className={styles.checkboxText}>
+              <span>{t('providersPage.form.forwardUserAgent')}</span>
+              <small>{t('providersPage.form.forwardUserAgentHint')}</small>
             </span>
           </label>
         ) : null}
