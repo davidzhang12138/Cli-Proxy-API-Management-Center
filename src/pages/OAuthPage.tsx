@@ -7,15 +7,11 @@ import { Input } from '@/components/ui/Input';
 import { IconPlug } from '@/components/ui/icons';
 import { useAuthStore, useNotificationStore, useThemeStore } from '@/stores';
 import { oauthApi, freebuffAuthApi, type OAuthProvider } from '@/services/api/oauth';
-import { authFilesApi, pluginsApi, type BuiltInOAuthProvider } from '@/services/api';
+import { pluginsApi, type BuiltInOAuthProvider } from '@/services/api';
 import { vertexApi, type VertexImportResponse } from '@/services/api/vertex';
 import { copyToClipboard } from '@/utils/clipboard';
 import { normalizeApiBase } from '@/utils/connection';
 import { getErrorMessage, isRecord } from '@/utils/helpers';
-import {
-  getContextCodeCredentialFileName,
-  normalizeContextCodeCredential,
-} from '@/utils/contextCodeCredential';
 import { notifyAuthFilesChanged } from '@/features/authFiles/authFilesEvents';
 import { getPluginTitle, resolvePluginAssetURL } from '@/features/plugins/pluginResources';
 import type { PluginListEntry } from '@/types';
@@ -72,20 +68,6 @@ interface VertexImportState {
   result?: VertexImportResult;
 }
 
-interface ContextCodeImportResult {
-  workspace?: string;
-  orgId: string;
-  authFile: string;
-}
-
-interface ContextCodeImportState {
-  file?: File;
-  fileName: string;
-  loading: boolean;
-  error?: string;
-  result?: ContextCodeImportResult;
-}
-
 interface KiroState {
   startUrl: string;
   region: string;
@@ -138,16 +120,7 @@ interface VertexLoginMethod {
   id: 'vertex';
 }
 
-interface ContextCodeImportLoginMethod {
-  kind: 'context-code-import';
-  id: 'context-code-import';
-}
-
-type LoginMethod =
-  | OAuthLoginMethod
-  | KiroLoginMethod
-  | VertexLoginMethod
-  | ContextCodeImportLoginMethod;
+type LoginMethod = OAuthLoginMethod | KiroLoginMethod | VertexLoginMethod;
 type LoginMethodStatus = 'waiting' | 'success' | 'error' | undefined;
 
 function getErrorStatus(error: unknown): number | undefined {
@@ -276,13 +249,7 @@ const buildPluginOAuthProviderCards = (
   plugins: PluginListEntry[],
   apiBase: string
 ): PluginOAuthProviderCard[] => {
-  const seenProviders = new Set([
-    ...BUILTIN_PROVIDER_IDS,
-    'freebuff',
-    'context-code',
-    'kiro',
-    'vertex',
-  ]);
+  const seenProviders = new Set([...BUILTIN_PROVIDER_IDS, 'freebuff', 'kiro', 'vertex']);
   return plugins.flatMap((plugin) => {
     const provider = plugin.oauthProvider;
     if (
@@ -322,10 +289,6 @@ export function OAuthPage() {
     location: '',
     loading: false,
   });
-  const [contextCodeState, setContextCodeState] = useState<ContextCodeImportState>({
-    fileName: '',
-    loading: false,
-  });
   const [kiroState, setKiroState] = useState<KiroState>({
     startUrl: '',
     region: '',
@@ -336,7 +299,6 @@ export function OAuthPage() {
   const pollingTimers = useRef<Partial<Record<string, number>>>({});
   const successResetTimers = useRef<Partial<Record<string, number>>>({});
   const vertexFileInputRef = useRef<HTMLInputElement | null>(null);
-  const contextCodeFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const resolvedKiroBase = normalizeApiBase(apiBase || window.location.origin);
 
@@ -392,7 +354,6 @@ export function OAuthPage() {
         id: getOAuthLoginMethodID(provider.id),
         provider,
       })),
-      { kind: 'context-code-import' as const, id: 'context-code-import' as const },
       { kind: 'kiro' as const, id: 'kiro' as const },
       { kind: 'vertex' as const, id: 'vertex' as const },
     ],
@@ -416,13 +377,11 @@ export function OAuthPage() {
 
   const getLoginMethodTitle = (method: LoginMethod) => {
     if (method.kind === 'oauth') return getProviderTitleText(method.provider);
-    if (method.kind === 'context-code-import') return t('auth_login.context_code_title');
     if (method.kind === 'kiro') return t('auth_login.kiro_oauth_title');
     return t('vertex_import.title');
   };
 
   const getLoginMethodTabTitle = (method: LoginMethod) => {
-    if (method.kind === 'context-code-import') return t('auth_login.context_code_import_tab');
     if (method.kind === 'kiro') return 'Kiro';
     if (method.kind === 'vertex') return 'Vertex';
     if (method.provider.kind === 'plugin') return method.provider.title;
@@ -439,12 +398,6 @@ export function OAuthPage() {
       if (kiroState.loading) return 'waiting';
       if (kiroState.success) return 'success';
       if (kiroState.error) return 'error';
-      return undefined;
-    }
-    if (method.kind === 'context-code-import') {
-      if (contextCodeState.loading) return 'waiting';
-      if (contextCodeState.result) return 'success';
-      if (contextCodeState.error) return 'error';
       return undefined;
     }
     if (vertexState.loading) return 'waiting';
@@ -809,66 +762,6 @@ export function OAuthPage() {
     }
   };
 
-  const handleContextCodeFilePick = () => {
-    contextCodeFileInputRef.current?.click();
-  };
-
-  const handleContextCodeFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.name.endsWith('.json')) {
-      showNotification(t('auth_login.context_code_file_required'), 'warning');
-      event.target.value = '';
-      return;
-    }
-    setContextCodeState({ file, fileName: file.name, loading: false });
-    event.target.value = '';
-  };
-
-  const handleContextCodeImport = async () => {
-    if (!contextCodeState.file) {
-      const message = t('auth_login.context_code_file_required');
-      setContextCodeState((prev) => ({ ...prev, error: message }));
-      showNotification(message, 'warning');
-      return;
-    }
-
-    setContextCodeState((prev) => ({
-      ...prev,
-      loading: true,
-      error: undefined,
-      result: undefined,
-    }));
-    try {
-      const credential = normalizeContextCodeCredential(
-        JSON.parse(await contextCodeState.file.text()) as unknown
-      );
-      const authFileName = await getContextCodeCredentialFileName(credential.device_id);
-      const authFile = new File([`${JSON.stringify(credential, null, 2)}\n`], authFileName, {
-        type: 'application/json',
-      });
-      await authFilesApi.upload(authFile);
-      setContextCodeState((prev) => ({
-        ...prev,
-        loading: false,
-        result: {
-          workspace: credential.selected_workspace_name || credential.selected_workspace_id,
-          orgId: credential.org_id,
-          authFile: authFileName,
-        },
-      }));
-      notifyAuthFilesChanged();
-      showNotification(t('auth_login.context_code_import_success'), 'success');
-    } catch (err: unknown) {
-      const detail = getErrorMessage(err);
-      const message = detail
-        ? `${t('auth_login.context_code_import_error')} ${detail}`
-        : t('auth_login.context_code_import_error');
-      setContextCodeState((prev) => ({ ...prev, loading: false, error: message }));
-      showNotification(message, 'error');
-    }
-  };
-
   const openKiroOAuth = (method: 'builder-id' | 'idc') => {
     const params = new URLSearchParams({ method });
     if (method === 'idc') {
@@ -1211,97 +1104,6 @@ export function OAuthPage() {
     </Card>
   );
 
-  const renderContextCodeMethod = () => (
-    <Card
-      className={styles.detailCard}
-      title={
-        <span className={styles.cardTitle}>
-          <img src={iconContextCode} alt="" className={styles.cardTitleIcon} />
-          {t('auth_login.context_code_title')}
-        </span>
-      }
-      subtitle={t('auth_login.context_code_hint')}
-      extra={
-        <Button onClick={handleContextCodeImport} loading={contextCodeState.loading}>
-          {t('auth_login.context_code_import_button')}
-        </Button>
-      }
-    >
-      <div className={styles.cardContent}>
-        <div className={styles.authUrlBox}>
-          <div className={styles.authUrlLabel}>{t('auth_login.context_code_pair_label')}</div>
-          <div className={styles.authUrlValue}>context-code login</div>
-        </div>
-
-        <div className={`${styles.formItem} ${styles.vertexFilePanel}`}>
-          <label className={styles.formItemLabel}>{t('auth_login.context_code_file_label')}</label>
-          <div className={styles.filePicker}>
-            <Button variant="secondary" size="sm" onClick={handleContextCodeFilePick}>
-              {t('auth_login.context_code_choose_file')}
-            </Button>
-            <div
-              className={`${styles.fileName} ${
-                contextCodeState.fileName ? '' : styles.fileNamePlaceholder
-              }`.trim()}
-            >
-              {contextCodeState.fileName || t('auth_login.context_code_file_placeholder')}
-            </div>
-          </div>
-          <div className={styles.cardHintSecondary}>{t('auth_login.context_code_file_hint')}</div>
-          <input
-            ref={contextCodeFileInputRef}
-            type="file"
-            accept=".json,application/json"
-            style={{ display: 'none' }}
-            onChange={handleContextCodeFileChange}
-          />
-        </div>
-
-        {contextCodeState.error && (
-          <div className="status-badge error">{contextCodeState.error}</div>
-        )}
-        {contextCodeState.result && (
-          <>
-            <div className={styles.connectionBox}>
-              <div className={styles.connectionLabel}>
-                {t('auth_login.context_code_result_title')}
-              </div>
-              <div className={styles.keyValueList}>
-                {contextCodeState.result.workspace && (
-                  <div className={styles.keyValueItem}>
-                    <span className={styles.keyValueKey}>
-                      {t('auth_login.context_code_result_workspace')}
-                    </span>
-                    <span className={styles.keyValueValue}>
-                      {contextCodeState.result.workspace}
-                    </span>
-                  </div>
-                )}
-                <div className={styles.keyValueItem}>
-                  <span className={styles.keyValueKey}>
-                    {t('auth_login.context_code_result_org')}
-                  </span>
-                  <span className={styles.keyValueValue}>{contextCodeState.result.orgId}</span>
-                </div>
-                <div className={styles.keyValueItem}>
-                  <span className={styles.keyValueKey}>
-                    {t('auth_login.context_code_result_file')}
-                  </span>
-                  <span className={styles.keyValueValue}>{contextCodeState.result.authFile}</span>
-                </div>
-              </div>
-            </div>
-            <div className={styles.successActions}>
-              <Button variant="secondary" size="sm" onClick={() => navigate('/auth-files')}>
-                {t('auth_login.view_auth_files')}
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
-    </Card>
-  );
-
   const renderVertexMethod = () => (
     <Card
       className={styles.detailCard}
@@ -1395,7 +1197,6 @@ export function OAuthPage() {
     if (activeLoginMethod.kind === 'oauth') {
       return renderOAuthProvider(activeLoginMethod.provider);
     }
-    if (activeLoginMethod.kind === 'context-code-import') return renderContextCodeMethod();
     if (activeLoginMethod.kind === 'kiro') return renderKiroMethod();
     return renderVertexMethod();
   };
@@ -1452,13 +1253,7 @@ export function OAuthPage() {
                       <OAuthProviderIcon provider={method.provider} theme={resolvedTheme} />
                     ) : (
                       <img
-                        src={
-                          method.kind === 'kiro'
-                            ? iconKiro
-                            : method.kind === 'vertex'
-                              ? iconVertex
-                              : iconContextCode
-                        }
+                        src={method.kind === 'kiro' ? iconKiro : iconVertex}
                         alt=""
                         className={styles.methodIcon}
                       />
