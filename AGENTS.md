@@ -28,6 +28,11 @@ Tests use Bun's built-in test runner and are colocated under `tests/` as `*.test
 
 Git history follows Conventional Commit style, for example `feat: add support for xAI provider`, `fix(auth-files): keep disabled card actions visible`, and `ci: use node 24 for releases`. Keep commits focused and scoped when useful. Pull requests should include a change summary, linked issue when applicable, UI screenshots, backend version or reproduction details for integration work, and verification notes.
 
+## Release Tag Guidelines
+
+- For project-specific releases, keep the current base version and increment only the numeric `-x` suffix, for example `v1.22.6-2` → `v1.22.6-3`.
+- When releasing immediately after merging upstream, use the latest upstream tag unchanged if there are no additional project changes, for example upstream `v1.22.7` → release `v1.22.7`. Append `-1` only when releasing new project changes on top of that upstream tag; increment the suffix for later project releases.
+
 ## Architecture & Configuration Notes
 
 This UI is not the proxy; it talks to the backend Management API under `/v0/management`. Treat backend contracts as the source of truth. For OAuth/provider changes, inspect `../CLIProxyAPI` before changing route names, provider keys, callback parameters, or auth-file semantics. Store no secrets in the repo; management keys are entered at runtime and persisted only in browser storage.
