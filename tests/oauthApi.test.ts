@@ -94,6 +94,37 @@ describe('OAuth management API', () => {
     });
   });
 
+  test('starts Context Code workspace pairing through the management OAuth endpoint', async () => {
+    let request: { url: string; config?: unknown } | undefined;
+    apiClient.get = (async (url: string, config?: unknown) => {
+      request = { url, config };
+      return {
+        status: 'ok',
+        url: 'https://workspace.context.ai/cli/pair?code=ABCD-EFGH',
+        verification_uri_complete: 'https://workspace.context.ai/cli/pair?code=ABCD-EFGH',
+        user_code: 'ABCD-EFGH',
+        state: 'context-123',
+        flow: 'device',
+        expires_in: 300,
+      };
+    }) as typeof apiClient.get;
+
+    const response = await oauthApi.startAuth('context-code', {
+      proxyUrl: '  socks5://127.0.0.1:1080  ',
+    });
+
+    expect(request).toEqual({
+      url: '/context-code-auth-url',
+      config: { params: { 'proxy-url': 'socks5://127.0.0.1:1080' } },
+    });
+    expect(response).toMatchObject({
+      state: 'context-123',
+      flow: 'device',
+      user_code: 'ABCD-EFGH',
+      expires_in: 300,
+    });
+  });
+
   test('starts Cline device OAuth with proxy support', async () => {
     let request: { url: string; config?: unknown } | undefined;
     apiClient.get = (async (url: string, config?: unknown) => {

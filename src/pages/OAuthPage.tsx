@@ -138,12 +138,16 @@ interface VertexLoginMethod {
   id: 'vertex';
 }
 
-interface ContextCodeLoginMethod {
-  kind: 'context-code';
-  id: 'context-code';
+interface ContextCodeImportLoginMethod {
+  kind: 'context-code-import';
+  id: 'context-code-import';
 }
 
-type LoginMethod = OAuthLoginMethod | KiroLoginMethod | VertexLoginMethod | ContextCodeLoginMethod;
+type LoginMethod =
+  | OAuthLoginMethod
+  | KiroLoginMethod
+  | VertexLoginMethod
+  | ContextCodeImportLoginMethod;
 type LoginMethodStatus = 'waiting' | 'success' | 'error' | undefined;
 
 function getErrorStatus(error: unknown): number | undefined {
@@ -196,6 +200,12 @@ const PROVIDERS: BuiltInOAuthProviderCard[] = [
   },
   {
     kind: 'builtin',
+    id: 'context-code',
+    titleKey: 'auth_login.context_code_oauth_title',
+    icon: iconContextCode,
+  },
+  {
+    kind: 'builtin',
     id: 'cline',
     titleKey: 'auth_login.cline_oauth_title',
     icon: iconCline,
@@ -212,6 +222,7 @@ const BUILTIN_PROVIDER_TAB_TITLES: Record<BuiltInOAuthProvider, string> = {
   xai: 'xAI',
   hyper: 'Charm Hyper',
   keelcode: 'KeelCode',
+  'context-code': 'Context Code',
   cline: 'Cline',
 };
 
@@ -381,7 +392,7 @@ export function OAuthPage() {
         id: getOAuthLoginMethodID(provider.id),
         provider,
       })),
-      { kind: 'context-code' as const, id: 'context-code' as const },
+      { kind: 'context-code-import' as const, id: 'context-code-import' as const },
       { kind: 'kiro' as const, id: 'kiro' as const },
       { kind: 'vertex' as const, id: 'vertex' as const },
     ],
@@ -405,13 +416,13 @@ export function OAuthPage() {
 
   const getLoginMethodTitle = (method: LoginMethod) => {
     if (method.kind === 'oauth') return getProviderTitleText(method.provider);
-    if (method.kind === 'context-code') return t('auth_login.context_code_title');
+    if (method.kind === 'context-code-import') return t('auth_login.context_code_title');
     if (method.kind === 'kiro') return t('auth_login.kiro_oauth_title');
     return t('vertex_import.title');
   };
 
   const getLoginMethodTabTitle = (method: LoginMethod) => {
-    if (method.kind === 'context-code') return 'Context Code';
+    if (method.kind === 'context-code-import') return t('auth_login.context_code_import_tab');
     if (method.kind === 'kiro') return 'Kiro';
     if (method.kind === 'vertex') return 'Vertex';
     if (method.provider.kind === 'plugin') return method.provider.title;
@@ -430,7 +441,7 @@ export function OAuthPage() {
       if (kiroState.error) return 'error';
       return undefined;
     }
-    if (method.kind === 'context-code') {
+    if (method.kind === 'context-code-import') {
       if (contextCodeState.loading) return 'waiting';
       if (contextCodeState.result) return 'success';
       if (contextCodeState.error) return 'error';
@@ -1384,7 +1395,7 @@ export function OAuthPage() {
     if (activeLoginMethod.kind === 'oauth') {
       return renderOAuthProvider(activeLoginMethod.provider);
     }
-    if (activeLoginMethod.kind === 'context-code') return renderContextCodeMethod();
+    if (activeLoginMethod.kind === 'context-code-import') return renderContextCodeMethod();
     if (activeLoginMethod.kind === 'kiro') return renderKiroMethod();
     return renderVertexMethod();
   };

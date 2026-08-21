@@ -9,7 +9,15 @@ import {
 } from '@/utils/providerKeys';
 
 export type BuiltInOAuthProvider =
-  'codex' | 'anthropic' | 'antigravity' | 'kimi' | 'xai' | 'hyper' | 'keelcode' | 'cline';
+  | 'codex'
+  | 'anthropic'
+  | 'antigravity'
+  | 'kimi'
+  | 'xai'
+  | 'hyper'
+  | 'keelcode'
+  | 'context-code'
+  | 'cline';
 
 export type OAuthProvider = BuiltInOAuthProvider | 'freebuff';
 

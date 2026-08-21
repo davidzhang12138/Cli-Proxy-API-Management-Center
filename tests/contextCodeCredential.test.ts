@@ -19,6 +19,7 @@ describe('Context Code credential import', () => {
 
     expect(credential).toEqual({
       type: 'context-code',
+      auth_kind: 'oauth',
       server: 'https://workspace.context.ai',
       client_token: 'ctxc-token',
       device_id: 'device-1',

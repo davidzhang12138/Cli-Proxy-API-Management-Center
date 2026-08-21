@@ -5,6 +5,7 @@ type JsonRecord = Record<string, unknown>;
 
 export interface ContextCodeCredential {
   type: 'context-code';
+  auth_kind: 'oauth';
   server: string;
   client_token: string;
   device_id: string;
@@ -90,6 +91,7 @@ export const normalizeContextCodeCredential = (value: unknown): ContextCodeCrede
 
   return {
     type: 'context-code',
+    auth_kind: 'oauth',
     server,
     client_token: clientToken,
     device_id: deviceId,
