@@ -1,15 +1,24 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { authFilesApi } from '@/services/api';
 import type { AuthFileModelItem } from '@/features/authFiles/constants';
 import { isModelExcluded } from '@/features/authFiles/constants';
+import { getErrorMessage } from '@/utils/helpers';
 import styles from './AuthFileModelsModal.module.scss';
+
+type ModelCheckState =
+  | { state: 'checking' }
+  | { state: 'success'; latencyMs: number }
+  | { state: 'error'; message: string; statusCode?: number };
 
 export type AuthFileModelsModalProps = {
   open: boolean;
   fileName: string;
   fileType: string;
+  authIndex: string;
   loading: boolean;
   error: 'unsupported' | null;
   models: AuthFileModelItem[];
@@ -20,7 +29,48 @@ export type AuthFileModelsModalProps = {
 
 export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
   const { t } = useTranslation();
-  const { open, fileName, fileType, loading, error, models, excluded, onClose, onCopyText } = props;
+  const {
+    open,
+    fileName,
+    fileType,
+    authIndex,
+    loading,
+    error,
+    models,
+    excluded,
+    onClose,
+    onCopyText,
+  } = props;
+  const [checks, setChecks] = useState<Record<string, ModelCheckState>>({});
+
+  useEffect(() => {
+    setChecks({});
+  }, [fileName, open]);
+
+  const checkModel = async (model: string) => {
+    setChecks((current) => ({ ...current, [model]: { state: 'checking' } }));
+    try {
+      const result = await authFilesApi.checkModel(fileName, model, authIndex);
+      setChecks((current) => ({
+        ...current,
+        [model]: result.available
+          ? { state: 'success', latencyMs: result.latency_ms }
+          : {
+              state: 'error',
+              message: result.message || `HTTP ${result.status_code}`,
+              statusCode: result.status_code,
+            },
+      }));
+    } catch (requestError) {
+      setChecks((current) => ({
+        ...current,
+        [model]: {
+          state: 'error',
+          message: getErrorMessage(requestError, t('auth_files.models_check_failed')),
+        },
+      }));
+    }
+  };
 
   return (
     <Modal
@@ -55,6 +105,7 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
         <div className={styles.list}>
           {models.map((model) => {
             const excludedModel = isModelExcluded(model.id, fileType, excluded);
+            const check = checks[model.id];
             return (
               <div
                 key={model.id}
@@ -79,6 +130,33 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
                   <span className={styles.excludedBadge}>
                     {t('auth_files.models_excluded_badge', { defaultValue: '已禁用' })}
                   </span>
+                )}
+                {check?.state === 'success' && (
+                  <span className={styles.availableBadge}>
+                    {t('auth_files.models_available', { latency: check.latencyMs })}
+                  </span>
+                )}
+                {check?.state === 'error' && (
+                  <span className={styles.unavailableBadge} title={check.message}>
+                    {t('auth_files.models_unavailable')}
+                    {check.statusCode ? ` · ${check.statusCode}` : ''}
+                  </span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={styles.checkButton}
+                  loading={check?.state === 'checking'}
+                  disabled={excludedModel}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void checkModel(model.id);
+                  }}
+                >
+                  {t('auth_files.models_check')}
+                </Button>
+                {check?.state === 'error' && (
+                  <span className={styles.checkMessage}>{check.message}</span>
                 )}
               </div>
             );

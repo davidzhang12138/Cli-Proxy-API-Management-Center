@@ -22,6 +22,12 @@ import { parseTimestampMs } from '@/utils/timestamp';
 
 type StatusError = { status?: number };
 type AuthFileStatusResponse = { status: string; disabled: boolean };
+export type AuthFileModelCheckResult = {
+  available: boolean;
+  status_code: number;
+  message?: string;
+  latency_ms: number;
+};
 type AuthFileEntry = AuthFilesResponse['files'][number];
 export type AuthFileFieldsPatch = {
   prefix?: string;
@@ -841,6 +847,13 @@ export const authFilesApi = {
       ? (models as { id: string; display_name?: string; type?: string; owned_by?: string }[])
       : [];
   },
+
+  checkModel: (name: string, model: string, authIndex?: string) =>
+    apiClient.post<AuthFileModelCheckResult>('/auth-files/model-check', {
+      name,
+      model,
+      ...(authIndex ? { auth_index: authIndex } : {}),
+    }),
 
   // 获取指定 channel 的模型定义
   async getModelDefinitions(

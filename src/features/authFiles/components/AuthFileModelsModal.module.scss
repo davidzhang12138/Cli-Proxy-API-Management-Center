@@ -68,7 +68,6 @@
 }
 
 .excludedBadge {
-  margin-left: auto;
   font-size: 10.5px;
   font-weight: 600;
   color: var(--failure-badge-text);
@@ -77,6 +76,38 @@
   border-radius: $radius-full;
   padding: 1px 7px;
   white-space: nowrap;
+}
+
+.availableBadge,
+.unavailableBadge {
+  font-size: 10.5px;
+  font-weight: 600;
+  border-radius: $radius-full;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+
+.availableBadge {
+  color: var(--success-badge-text);
+  background: var(--success-badge-bg);
+  border: 1px solid var(--success-badge-border);
+}
+
+.unavailableBadge {
+  color: var(--failure-badge-text);
+  background: var(--failure-badge-bg);
+  border: 1px solid var(--failure-badge-border);
+}
+
+.checkButton {
+  margin-left: auto;
+}
+
+.checkMessage {
+  flex-basis: 100%;
+  color: var(--failure-badge-text);
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 
 @media (prefers-reduced-motion: reduce) {

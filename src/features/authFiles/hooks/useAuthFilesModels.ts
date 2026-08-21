@@ -29,6 +29,7 @@ export type UseAuthFilesModelsResult = {
   modelsList: AuthFileModelItem[];
   modelsFileName: string;
   modelsFileType: string;
+  modelsAuthIndex: string;
   modelsError: ModelsError;
   showModels: (item: AuthFileItem) => Promise<void>;
   closeModelsModal: () => void;
@@ -45,6 +46,7 @@ export function useAuthFilesModels(): UseAuthFilesModelsResult {
   const [modelsList, setModelsList] = useState<AuthFileModelItem[]>([]);
   const [modelsFileName, setModelsFileName] = useState('');
   const [modelsFileType, setModelsFileType] = useState('');
+  const [modelsAuthIndex, setModelsAuthIndex] = useState('');
   const [modelsError, setModelsError] = useState<ModelsError>(null);
   const modelsCacheRef = useRef<Map<string, AuthFileModelItem[]>>(new Map());
   const modelsCacheVersionRef = useRef(0);
@@ -55,6 +57,7 @@ export function useAuthFilesModels(): UseAuthFilesModelsResult {
     activeModelsRequestIdRef.current += 1;
     setModelsModalOpen(false);
     setModelsLoading(false);
+    setModelsAuthIndex('');
   }, []);
 
   const invalidateModels = useCallback((names?: string[]) => {
@@ -77,6 +80,7 @@ export function useAuthFilesModels(): UseAuthFilesModelsResult {
 
       setModelsFileName(item.name);
       setModelsFileType(item.type || '');
+      setModelsAuthIndex(String(item.authIndex ?? item.auth_index ?? '').trim());
       const quotaModels = getFreebuffQuotaModels(item);
       setModelsList(quotaModels);
       setModelsError(null);
@@ -127,6 +131,7 @@ export function useAuthFilesModels(): UseAuthFilesModelsResult {
     modelsList,
     modelsFileName,
     modelsFileType,
+    modelsAuthIndex,
     modelsError,
     showModels,
     closeModelsModal,

@@ -102,6 +102,7 @@ export function AuthFilesPage() {
     modelsList,
     modelsFileName,
     modelsFileType,
+    modelsAuthIndex,
     modelsError,
     showModels,
     closeModelsModal,
@@ -769,6 +770,7 @@ export function AuthFilesPage() {
         open={modelsModalOpen}
         fileName={modelsFileName}
         fileType={modelsFileType}
+        authIndex={modelsAuthIndex}
         loading={modelsLoading}
         error={modelsError}
         models={modelsList}
