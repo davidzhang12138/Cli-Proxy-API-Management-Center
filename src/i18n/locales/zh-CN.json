@@ -1877,6 +1877,7 @@
       },
       "websocketsTag": "WebSockets",
       "cloakTag": "Cloak",
+      "cliProfileTag": "CLI 指纹",
       "empty": "尚未添加配置,点击右上角新建。",
       "filterPlaceholder": "搜索密钥、地址、前缀…",
       "description": "在 {{route}} 下管理资源",
@@ -2072,7 +2073,11 @@
         "xhigh": "超高",
         "max": "最大",
         "auto": "自动"
-      }
+      },
+      "fingerprintProfile": "请求指纹",
+      "fingerprintProfileDefault": "默认（由调用方控制）",
+      "fingerprintProfileClaudeCodeCli": "Claude Code CLI",
+      "fingerprintProfileHint": "默认保留调用方传入的提示词和请求头；也可选择使用 Claude Code CLI 请求指纹。"
     },
     "delete": {
       "title": "删除资源",

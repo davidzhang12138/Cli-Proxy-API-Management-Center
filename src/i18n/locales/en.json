@@ -1877,6 +1877,7 @@
       },
       "websocketsTag": "WebSockets",
       "cloakTag": "Cloak",
+      "cliProfileTag": "CLI Profile",
       "empty": "No resources yet, click \"New\" to add.",
       "filterPlaceholder": "Search keys, URLs, prefixes…",
       "description": "Manage resources under {{route}}",
@@ -2072,7 +2073,11 @@
         "xhigh": "Extra high",
         "max": "Maximum",
         "auto": "Automatic"
-      }
+      },
+      "fingerprintProfile": "Request fingerprint",
+      "fingerprintProfileDefault": "Default (caller-owned)",
+      "fingerprintProfileClaudeCodeCli": "Claude Code CLI",
+      "fingerprintProfileHint": "Keep the caller's prompt and headers by default, or opt in to the Claude Code CLI request fingerprint."
     },
     "delete": {
       "title": "Delete resource",

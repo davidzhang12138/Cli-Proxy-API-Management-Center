@@ -56,7 +56,7 @@ export interface ProviderKeyConfig {
   excludedModels?: string[];
   disableCooling?: boolean;
   cloak?: CloakConfig;
-  experimentalCchSigning?: boolean;
+  fingerprintProfile?: string;
   authIndex?: string;
 }
 

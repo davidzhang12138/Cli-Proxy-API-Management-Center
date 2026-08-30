@@ -1855,6 +1855,7 @@
       },
       "websocketsTag": "WebSockets",
       "cloakTag": "Cloak",
+      "cliProfileTag": "CLI-профиль",
       "empty": "Нет ресурсов, нажмите \"Создать\".",
       "filterPlaceholder": "Поиск по ключам, URL, префиксам…",
       "description": "Управление ресурсами {{route}}",
@@ -2044,7 +2045,11 @@
         "xhigh": "Очень высокий",
         "max": "Максимальный",
         "auto": "Автоматический"
-      }
+      },
+      "fingerprintProfile": "Отпечаток запроса",
+      "fingerprintProfileDefault": "По умолчанию (управляет клиент)",
+      "fingerprintProfileClaudeCodeCli": "Claude Code CLI",
+      "fingerprintProfileHint": "По умолчанию сохраняются prompt и заголовки клиента; можно включить отпечаток запросов Claude Code CLI."
     },
     "delete": {
       "title": "Удалить ресурс",
