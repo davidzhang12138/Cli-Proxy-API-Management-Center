@@ -29,6 +29,20 @@ describe('mergeAuthFileModels', () => {
     ).toEqual([{ id: 'Model-A' }, { id: 'model-b' }]);
   });
 
+  test('drops blank and non-string model IDs', () => {
+    expect(
+      mergeAuthFileModels(
+        [
+          { id: '' },
+          { id: '   ' },
+          { id: 42 as unknown as string },
+          { id: 'valid-model' },
+        ],
+        []
+      )
+    ).toEqual([{ id: 'valid-model' }]);
+  });
+
   test('extracts quota models from shared and model-scoped resources', () => {
     expect(
       modelsFromUsageQuotaSnapshot({

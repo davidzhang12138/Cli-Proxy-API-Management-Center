@@ -19,7 +19,6 @@ export type AuthFileType =
   | 'vertex'
   | 'freebuff'
   | 'hyper'
-  | 'keelcode'
   | 'context-code'
   | 'cline'
   | 'cline-pass'

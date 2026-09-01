@@ -245,40 +245,19 @@ export function AuthFilesOAuthExcludedEditPage() {
     setModelsError(null);
 
     const loadModels = async () => {
-      const providerAuthFileNames =
-        resolvedProviderKey === 'keelcode'
-          ? Array.from(
-              new Set(
-                files
-                  .filter(
-                    (file) =>
-                      normalizeProviderKey(String(file.type ?? file.provider ?? '')) ===
-                      resolvedProviderKey
-                  )
-                  .map((file) => file.name.trim())
-                  .filter(Boolean)
-              )
-            )
-          : [];
       const results = await Promise.allSettled([
         authFilesApi.getModelDefinitions(resolvedProviderKey),
-        ...providerAuthFileNames.map((name) => authFilesApi.getModelsForAuthFile(name)),
       ]);
 
       if (cancelled) return;
 
-      const [definitionsResult, ...authFileResults] = results;
+      const [definitionsResult] = results;
       const staticModels =
         definitionsResult.status === 'fulfilled' ? definitionsResult.value : [];
-      const discoveredModels = authFileResults.flatMap((result) =>
-        result.status === 'fulfilled' ? result.value : []
-      );
-      const catalogLoaded =
-        definitionsResult.status === 'fulfilled' ||
-        authFileResults.some((result) => result.status === 'fulfilled');
+      const catalogLoaded = definitionsResult.status === 'fulfilled';
 
       if (catalogLoaded) {
-        setModelsList(mergeAuthFileModels(discoveredModels, staticModels));
+        setModelsList(staticModels);
         setModelsLoading(false);
         return;
       }

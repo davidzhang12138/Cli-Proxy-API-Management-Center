@@ -15,7 +15,6 @@ export type BuiltInOAuthProvider =
   | 'kimi'
   | 'xai'
   | 'hyper'
-  | 'keelcode'
   | 'context-code'
   | 'cline';
 

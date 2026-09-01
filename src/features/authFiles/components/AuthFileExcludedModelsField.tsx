@@ -7,7 +7,7 @@ import {
   type ExcludedModelsCatalogState,
 } from '@/components/excludedModels';
 import { authFilesApi } from '@/services/api';
-import { normalizeProviderKey, type AuthFileModelItem } from '@/features/authFiles/constants';
+import type { AuthFileModelItem } from '@/features/authFiles/constants';
 import { mergeAuthFileModels } from '@/features/authFiles/modelCatalog';
 
 interface AuthFileExcludedModelsFieldProps {
@@ -40,36 +40,16 @@ export function AuthFileExcludedModelsField({
 
   useEffect(() => {
     let cancelled = false;
-    const isKeelCode = normalizeProviderKey(providerKey) === 'keelcode';
     setModels([]);
     setLoading(true);
     setLoadFailed(false);
 
     const loadCatalog = async () => {
-      const [authFileResult, definitionsResult] = await Promise.allSettled([
-        authFilesApi.getModelsForAuthFile(fileName),
-        isKeelCode ? authFilesApi.getModelDefinitions(providerKey) : Promise.resolve(null),
-      ]);
-
+      const authFileResult = await authFilesApi.getModelsForAuthFile(fileName);
       if (cancelled) return;
 
-      const authFileModels = authFileResult.status === 'fulfilled' ? authFileResult.value : [];
-      const definitionModels =
-        isKeelCode && definitionsResult.status === 'fulfilled'
-          ? (definitionsResult.value ?? [])
-          : [];
-      const catalogLoaded =
-        authFileResult.status === 'fulfilled' ||
-        (isKeelCode && definitionsResult.status === 'fulfilled');
-
-      if (!catalogLoaded) {
-        setLoadFailed(true);
-        setLoading(false);
-        return;
-      }
-
       const byId = new Map<string, AuthFileModelItem>();
-      mergeAuthFileModels(authFileModels, definitionModels).forEach((item) => {
+      mergeAuthFileModels(authFileResult, []).forEach((item) => {
         byId.set(item.id.toLowerCase(), item);
       });
       // 已配置但目录里没有的精确规则也塞进候选，否则它们会在列表里凭空消失。
@@ -86,7 +66,11 @@ export function AuthFileExcludedModelsField({
       setLoading(false);
     };
 
-    void loadCatalog();
+    loadCatalog().catch(() => {
+      if (cancelled) return;
+      setLoadFailed(true);
+      setLoading(false);
+    });
 
     return () => {
       cancelled = true;

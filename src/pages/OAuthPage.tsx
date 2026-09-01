@@ -27,7 +27,6 @@ import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
 import iconCrush from '@/assets/icons/crush.png';
-import iconKeelCode from '@/assets/icons/keelcode.svg';
 import iconContextCode from '@/assets/icons/context-code.svg';
 import iconCline from '@/assets/icons/cline.svg';
 
@@ -167,12 +166,6 @@ const PROVIDERS: BuiltInOAuthProviderCard[] = [
   },
   {
     kind: 'builtin',
-    id: 'keelcode',
-    titleKey: 'auth_login.keelcode_oauth_title',
-    icon: iconKeelCode,
-  },
-  {
-    kind: 'builtin',
     id: 'context-code',
     titleKey: 'auth_login.context_code_oauth_title',
     icon: iconContextCode,
@@ -194,7 +187,6 @@ const BUILTIN_PROVIDER_TAB_TITLES: Record<BuiltInOAuthProvider, string> = {
   kimi: 'Kimi',
   xai: 'xAI',
   hyper: 'Charm Hyper',
-  keelcode: 'KeelCode',
   'context-code': 'Context Code',
   cline: 'Cline',
 };

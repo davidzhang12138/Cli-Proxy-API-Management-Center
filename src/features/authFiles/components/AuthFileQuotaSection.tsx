@@ -51,8 +51,6 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     if (quotaType === 'freebuff')
       return state.freebuffQuota[file.name] as QuotaCardState | undefined;
     if (quotaType === 'hyper') return state.hyperQuota[file.name] as QuotaCardState | undefined;
-    if (quotaType === 'keelcode')
-      return state.keelcodeQuota[file.name] as QuotaCardState | undefined;
     return assertNever(quotaType);
   });
 

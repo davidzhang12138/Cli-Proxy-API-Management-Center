@@ -9,7 +9,6 @@ import iconIflow from '@/assets/icons/iflow.svg';
 import iconKiro from '@/assets/icons/kiro.svg';
 import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
-import iconKeelCode from '@/assets/icons/keelcode.svg';
 import iconContextCode from '@/assets/icons/context-code.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
 import iconCrush from '@/assets/icons/crush.png';
@@ -38,8 +37,7 @@ export type QuotaProviderType =
   | 'kimi'
   | 'xai'
   | 'freebuff'
-  | 'hyper'
-  | 'keelcode';
+  | 'hyper';
 
 export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'antigravity',
@@ -50,7 +48,6 @@ export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'xai',
   'freebuff',
   'hyper',
-  'keelcode',
 ]);
 
 export const OAUTH_PROVIDER_PRESETS = [
@@ -62,7 +59,6 @@ export const OAUTH_PROVIDER_PRESETS = [
   'claude',
   'codex',
   'kimi',
-  'keelcode',
   'context-code',
   'cline',
   'cline-pass',
@@ -99,7 +95,6 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   iflow: iconIflow,
   kiro: iconKiro,
   kimi: { light: iconKimiLight, dark: iconKimiDark },
-  keelcode: iconKeelCode,
   'context-code': iconContextCode,
   cline: iconCline,
   'cline-pass': iconCline,

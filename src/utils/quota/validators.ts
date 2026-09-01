@@ -39,10 +39,6 @@ export function isHyperFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'hyper';
 }
 
-export function isKeelCodeFile(file: AuthFileItem): boolean {
-  return resolveAuthProvider(file) === 'keelcode';
-}
-
 export function isXaiFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'xai';
 }

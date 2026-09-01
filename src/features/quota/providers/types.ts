@@ -13,7 +13,6 @@ import type {
   CodexQuotaState,
   FreebuffQuotaState,
   HyperQuotaState,
-  KeelCodeQuotaState,
   KimiQuotaState,
   KiroQuotaState,
   XaiQuotaState,
@@ -29,8 +28,7 @@ export type QuotaProviderType =
   | 'kimi'
   | 'xai'
   | 'freebuff'
-  | 'hyper'
-  | 'keelcode';
+  | 'hyper';
 
 /** useQuotaStore 的结构契约（storeSelector/storeSetter 依赖）。 */
 export interface QuotaStore {
@@ -42,7 +40,6 @@ export interface QuotaStore {
   xaiQuota: Record<string, XaiQuotaState>;
   freebuffQuota: Record<string, FreebuffQuotaState>;
   hyperQuota: Record<string, HyperQuotaState>;
-  keelcodeQuota: Record<string, KeelCodeQuotaState>;
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
@@ -51,7 +48,6 @@ export interface QuotaStore {
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
   setFreebuffQuota: (updater: QuotaUpdater<Record<string, FreebuffQuotaState>>) => void;
   setHyperQuota: (updater: QuotaUpdater<Record<string, HyperQuotaState>>) => void;
-  setKeelCodeQuota: (updater: QuotaUpdater<Record<string, KeelCodeQuotaState>>) => void;
   clearQuotaCache: () => void;
 }
 
