@@ -1004,7 +1004,9 @@ export function MainLayout() {
     ? t('sidebar.toggle_collapse', { defaultValue: 'Close navigation' })
     : t('sidebar.toggle_expand', { defaultValue: 'Open navigation' });
 
-  const sidebarToggleLabel = sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse');
+  const sidebarToggleLabel = sidebarCollapsed
+    ? t('sidebar.expand', { defaultValue: '展开侧栏' })
+    : t('sidebar.collapse', { defaultValue: '收起侧栏' });
 
   return (
     <div
@@ -1019,11 +1021,8 @@ export function MainLayout() {
           <button
             className="sidebar-toggle-header"
             onClick={() => setSidebarCollapsed((prev) => !prev)}
-            title={
-              sidebarCollapsed
-                ? t('sidebar.expand', { defaultValue: '展开' })
-                : t('sidebar.collapse', { defaultValue: '收起' })
-            }
+            title={`${sidebarToggleLabel} (${shortcutText})`}
+            aria-label={`${sidebarToggleLabel} (${shortcutText})`}
           >
             {sidebarCollapsed ? headerIcons.chevronRight : headerIcons.chevronLeft}
           </button>
