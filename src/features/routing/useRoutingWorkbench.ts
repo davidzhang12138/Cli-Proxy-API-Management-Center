@@ -25,6 +25,7 @@ export type RoutingCandidateSource = 'oauth' | 'api-key' | 'openai-compat';
 export interface RoutingCandidateUpdate {
   priority?: number;
   weight?: number | null;
+  modelPriorities?: Record<string, number>;
 }
 
 export interface RoutingCandidate {
@@ -36,6 +37,10 @@ export interface RoutingCandidate {
   detail: string;
   models: string[];
   priority: number;
+  /** Model overrides owned by this credential (auth file, key entry, or provider). */
+  modelPriorities: Record<string, number>;
+  /** Provider-level overrides inherited by an OpenAI-compatible API key entry. */
+  inheritedModelPriorities?: Record<string, number>;
   weight: number;
   enabled: boolean;
   status: 'ready' | 'disabled' | 'warning';
@@ -54,6 +59,12 @@ export interface RoutingGroup {
   editable: boolean;
   updatePriority: (priority: number) => Promise<void>;
   updateCandidatePriority: (candidateId: string, priority: number) => Promise<void>;
+  updateCandidateModelPriority: (
+    candidateId: string,
+    model: string,
+    priority: number | null
+  ) => Promise<void>;
+  updateModelPriority: (model: string, priority: number | null) => Promise<void>;
 }
 
 export interface RoutingSnapshot {
@@ -101,6 +112,51 @@ const effectivePriority = (value: number | undefined): number =>
 
 const effectiveWeight = (value: number | undefined): number =>
   typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : 1;
+
+const hasModelPriority = (priorities: Record<string, number> | undefined, model: string): boolean =>
+  Boolean(priorities && Object.prototype.hasOwnProperty.call(priorities, model));
+
+export type RoutingModelPrioritySource = 'override' | 'inherited';
+
+export const getRoutingCandidatePriority = (
+  candidate: RoutingCandidate,
+  model: string | null
+): number => {
+  if (!model) return candidate.priority;
+  const override = candidate.modelPriorities[model];
+  if (hasModelPriority(candidate.modelPriorities, model)) return Math.trunc(override);
+  const inherited = candidate.inheritedModelPriorities?.[model];
+  if (typeof inherited === 'number' && hasModelPriority(candidate.inheritedModelPriorities, model)) {
+    return Math.trunc(inherited);
+  }
+  return candidate.priority;
+};
+
+export const getRoutingModelPrioritySource = (
+  candidate: RoutingCandidate,
+  model: string | null
+): RoutingModelPrioritySource | null => {
+  if (!model) return null;
+  if (hasModelPriority(candidate.modelPriorities, model)) return 'override';
+  return 'inherited';
+};
+
+const nextModelPriorities = (
+  current: Record<string, number> | undefined,
+  model: string,
+  priority: number | null
+): Record<string, number> => {
+  const next = { ...(current ?? {}) };
+  if (priority === null) delete next[model];
+  else next[model] = priority;
+  return next;
+};
+
+const candidateServesModel = (
+  candidate: RoutingCandidate,
+  model: string,
+  coverage: string[]
+): boolean => (candidate.models.length === 0 ? coverage.includes(model) : candidate.models.includes(model));
 
 const isRuntimeOnly = (file: AuthFileItem): boolean =>
   file.runtimeOnly === true || file.runtimeOnly === 'true';
@@ -153,6 +209,7 @@ const buildStandardCandidate = (
     detail: config.baseUrl ?? 'default endpoint',
     models: modelNames(config.models),
     priority: effectivePriority(config.priority),
+    modelPriorities: config.modelPriorities ?? {},
     weight: effectiveWeight(config.weight),
     enabled,
     status: enabled ? 'ready' : 'disabled',
@@ -160,7 +217,10 @@ const buildStandardCandidate = (
     update: async (next) => {
       const updated = {
         ...config,
-        priority: next.priority === undefined || next.priority === 0 ? undefined : next.priority,
+        ...(next.priority === undefined
+          ? {}
+          : { priority: next.priority === 0 ? undefined : next.priority }),
+        ...(next.modelPriorities === undefined ? {} : { modelPriorities: next.modelPriorities }),
         ...(next.weight === undefined
           ? {}
           : { weight: next.weight === null ? undefined : next.weight }),
@@ -192,6 +252,7 @@ const buildOAuthCandidate = (file: AuthFileItem): RoutingCandidate => {
     detail: file.name,
     models,
     priority: effectivePriority(file.priority),
+    modelPriorities: file.modelPriorities ?? {},
     weight: effectiveWeight(file.weight),
     enabled,
     status: file.disabled ? 'disabled' : warning ? 'warning' : 'ready',
@@ -199,8 +260,11 @@ const buildOAuthCandidate = (file: AuthFileItem): RoutingCandidate => {
     update: async (next) => {
       if (runtimeOnly) throw new Error('Runtime-only credentials cannot be edited');
       await authFilesApi.patchFields(file.name, {
-        priority: next.priority,
-        weight: next.weight,
+        ...(next.priority === undefined ? {} : { priority: next.priority }),
+        ...(next.weight === undefined ? {} : { weight: next.weight }),
+        ...(next.modelPriorities === undefined
+          ? {}
+          : { model_priorities: next.modelPriorities }),
       });
     },
   };
@@ -216,6 +280,8 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
     const identity = apiKey ? maskApiKey(apiKey) : provider.name;
     const enabled = provider.disabled !== true && entry?.disabled !== true;
     const models = entry?.models?.length ? modelNames(entry.models) : providerModels;
+    const modelPriorities = entry ? entry.modelPriorities ?? {} : provider.modelPriorities ?? {};
+    const inheritedModelPriorities = entry ? provider.modelPriorities : undefined;
 
     return {
       id: `compat:${sourceIndex}:${entryIndex}:${provider.name}:${apiKey}`,
@@ -226,6 +292,10 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
       detail: entry?.baseUrl ?? provider.baseUrl ?? 'default endpoint',
       models,
       priority: effectivePriority(provider.priority),
+      modelPriorities,
+      ...(inheritedModelPriorities
+        ? { inheritedModelPriorities }
+        : {}),
       weight: effectiveWeight(entry?.weight),
       enabled,
       status: enabled ? 'ready' : 'disabled',
@@ -235,6 +305,9 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
           currentIndex === entryIndex
             ? {
                 ...current,
+                ...(next.modelPriorities === undefined
+                  ? {}
+                  : { modelPriorities: next.modelPriorities }),
                 ...(next.weight === undefined
                   ? {}
                   : { weight: next.weight === null ? undefined : next.weight }),
@@ -243,7 +316,12 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
         );
         await providersApi.updateOpenAIProvider(provider.name, sourceIndex, {
           ...provider,
-          priority: next.priority === undefined || next.priority === 0 ? undefined : next.priority,
+          ...(next.priority === undefined
+            ? {}
+            : { priority: next.priority === 0 ? undefined : next.priority }),
+          ...(entry || next.modelPriorities === undefined
+            ? {}
+            : { modelPriorities: next.modelPriorities }),
           apiKeyEntries: nextEntries,
         });
       },
@@ -291,6 +369,36 @@ const groupRecords = (candidates: RoutingCandidate[], catalog?: string[]): Group
           );
           if (!candidate) throw new Error('Credential is not editable');
           await candidate.update({ priority });
+          candidate.priority = priority;
+        },
+        updateCandidateModelPriority: async (
+          candidateId: string,
+          model: string,
+          priority: number | null
+        ) => {
+          const candidate = groupCandidates.find(
+            (item) => item.id === candidateId && item.editable
+          );
+          if (!candidate) throw new Error('Credential is not editable');
+          if (!candidateServesModel(candidate, model, coverage)) {
+            throw new Error('Credential does not serve this model');
+          }
+          const modelPriorities = nextModelPriorities(candidate.modelPriorities, model, priority);
+          await candidate.update({
+            modelPriorities,
+          });
+          candidate.modelPriorities = modelPriorities;
+        },
+        updateModelPriority: async (model: string, priority: number | null) => {
+          for (const candidate of groupCandidates) {
+            if (!candidate.editable) continue;
+            if (!candidateServesModel(candidate, model, coverage)) continue;
+            const modelPriorities = nextModelPriorities(candidate.modelPriorities, model, priority);
+            await candidate.update({
+              modelPriorities,
+            });
+            candidate.modelPriorities = modelPriorities;
+          }
         },
       },
     })

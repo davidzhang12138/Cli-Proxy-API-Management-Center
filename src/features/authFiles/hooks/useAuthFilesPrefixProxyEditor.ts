@@ -29,12 +29,20 @@ type AuthFileHeadersErrorKey =
 type AuthFileContentErrorKey =
   'auth_files.prefix_proxy_invalid_json' | 'auth_files.prefix_proxy_html_challenge';
 type AuthFileWeightErrorKey = 'auth_files.weight_invalid_integer' | 'auth_files.weight_invalid_max';
-type AuthFileEditorErrorKey = AuthFileHeadersErrorKey | AuthFileWeightErrorKey;
+type AuthFileModelPrioritiesErrorKey =
+  | 'auth_files.model_priorities_invalid_json'
+  | 'auth_files.model_priorities_invalid_object'
+  | 'auth_files.model_priorities_invalid_value';
+type AuthFileEditorErrorKey =
+  | AuthFileHeadersErrorKey
+  | AuthFileWeightErrorKey
+  | AuthFileModelPrioritiesErrorKey;
 
 export type PrefixProxyEditorField =
   | 'prefix'
   | 'proxyUrl'
   | 'priority'
+  | 'modelPrioritiesText'
   | 'weight'
   | 'disableCooling'
   | 'websockets'
@@ -59,6 +67,8 @@ export type PrefixProxyEditorState = {
   prefix: string;
   proxyUrl: string;
   priority: string;
+  modelPrioritiesText: string;
+  modelPrioritiesError: string | null;
   weight: string;
   weightError: string | null;
   disableCooling: boolean;
@@ -127,6 +137,58 @@ const parseHeadersText = (
   }
 
   return { value: parsed as AuthFileHeaders, errorKey: null };
+};
+
+type ModelPriorities = Record<string, number>;
+
+const normalizeModelPriorities = (value: unknown): ModelPriorities => {
+  if (!isRecordObject(value)) return {};
+  const result: ModelPriorities = {};
+  Object.entries(value).forEach(([key, raw]) => {
+    const model = key.trim();
+    if (!model || typeof raw !== 'number' || !Number.isSafeInteger(raw)) return;
+    result[model] = raw;
+  });
+  return result;
+};
+
+const parseModelPrioritiesText = (
+  text: string
+): { value: ModelPriorities | null; errorKey: AuthFileModelPrioritiesErrorKey | null } => {
+  const trimmed = text.trim();
+  if (!trimmed) return { value: {}, errorKey: null };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed) as unknown;
+  } catch {
+    return { value: null, errorKey: 'auth_files.model_priorities_invalid_json' };
+  }
+  if (!isRecordObject(parsed)) {
+    return { value: null, errorKey: 'auth_files.model_priorities_invalid_object' };
+  }
+
+  const result: ModelPriorities = {};
+  for (const [key, raw] of Object.entries(parsed)) {
+    const model = key.trim();
+    if (!model || typeof raw !== 'number' || !Number.isSafeInteger(raw)) {
+      return { value: null, errorKey: 'auth_files.model_priorities_invalid_value' };
+    }
+    result[model] = raw;
+  }
+  return { value: result, errorKey: null };
+};
+
+const readModelPriorities = (value: Record<string, unknown>): ModelPriorities =>
+  normalizeModelPriorities(value.model_priorities ?? value['model-priorities']);
+
+const modelPrioritiesEqual = (left: ModelPriorities, right: ModelPriorities): boolean => {
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key, index) => key === rightKeys[index] && left[key] === right[key])
+  );
 };
 
 const credentialWeightErrorKey = (error: CredentialWeightError): AuthFileWeightErrorKey =>
@@ -305,6 +367,15 @@ export const buildAuthFileFieldsPatch = (
     }
   }
 
+  const { value: nextModelPriorities, errorKey: modelPrioritiesErrorKey } =
+    parseModelPrioritiesText(editor.modelPrioritiesText ?? '');
+  if (modelPrioritiesErrorKey) {
+    throw new Error(resolveError(modelPrioritiesErrorKey));
+  }
+  if (nextModelPriorities && !modelPrioritiesEqual(readModelPriorities(original), nextModelPriorities)) {
+    patch.model_priorities = nextModelPriorities;
+  }
+
   const weightError = validateCredentialWeightText(editor.weight);
   if (weightError) {
     throw new Error(resolveError(credentialWeightErrorKey(weightError)));
@@ -408,6 +479,15 @@ const buildPrefixProxyUpdatedText = (
     }
   }
 
+  if (patch.model_priorities !== undefined) {
+    delete next['model-priorities'];
+    if (Object.keys(patch.model_priorities).length > 0) {
+      next.model_priorities = patch.model_priorities;
+    } else {
+      delete next.model_priorities;
+    }
+  }
+
   if (patch.weight !== undefined) {
     if (patch.weight === null) {
       delete next.weight;
@@ -462,7 +542,8 @@ export function useAuthFilesPrefixProxyEditor(
 
   const hasBlockingValidationError = Boolean(
     (prefixProxyEditor?.headersTouched && prefixProxyEditor.headersError) ||
-    prefixProxyEditor?.weightError
+    prefixProxyEditor?.weightError ||
+    prefixProxyEditor?.modelPrioritiesError
   );
   const prefixProxyUpdatedText =
     prefixProxyEditor && !hasBlockingValidationError
@@ -504,6 +585,8 @@ export function useAuthFilesPrefixProxyEditor(
       prefix: '',
       proxyUrl: '',
       priority: '',
+      modelPrioritiesText: '{}',
+      modelPrioritiesError: null,
       weight: '',
       weightError: null,
       disableCooling: false,
@@ -558,6 +641,7 @@ export function useAuthFilesPrefixProxyEditor(
       const prefix = typeof json.prefix === 'string' ? json.prefix : '';
       const proxyUrl = typeof json.proxy_url === 'string' ? json.proxy_url : '';
       const priority = parsePriorityValue(json.priority);
+      const modelPriorities = readModelPriorities(json);
       const weight = readCredentialWeight(json.weight);
       const disableCooling = readAuthFileDisableCooling(json);
       const websockets = supportsAuthFileWebsockets(providerKey)
@@ -588,6 +672,8 @@ export function useAuthFilesPrefixProxyEditor(
           prefix,
           proxyUrl,
           priority: priority !== undefined ? String(priority) : '',
+          modelPrioritiesText: JSON.stringify(modelPriorities, null, 2),
+          modelPrioritiesError: null,
           weight: weight !== undefined ? String(weight) : '',
           weightError: null,
           disableCooling,
@@ -625,6 +711,15 @@ export function useAuthFilesPrefixProxyEditor(
       if (field === 'prefix') return { ...prev, prefix: String(value) };
       if (field === 'proxyUrl') return { ...prev, proxyUrl: String(value) };
       if (field === 'priority') return { ...prev, priority: String(value) };
+      if (field === 'modelPrioritiesText') {
+        const modelPrioritiesText = String(value);
+        const { errorKey } = parseModelPrioritiesText(modelPrioritiesText);
+        return {
+          ...prev,
+          modelPrioritiesText,
+          modelPrioritiesError: errorKey ? t(errorKey) : null,
+        };
+      }
       if (field === 'weight') {
         const weight = String(value);
         const error = validateCredentialWeightText(weight);

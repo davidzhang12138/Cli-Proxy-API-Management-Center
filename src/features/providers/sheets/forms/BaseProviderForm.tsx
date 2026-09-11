@@ -41,6 +41,8 @@ import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
 import { PayloadFilterRulesEditor } from '@/features/config/components/blocks/PayloadFilterRulesEditor';
 import { PayloadRulesEditor } from '@/features/config/components/blocks/PayloadRulesEditor';
 import { parseProviderPayload } from '../../providerPayload';
+import { formatModelPrioritiesText, parseModelPrioritiesText } from '@/utils/modelPriorities';
+import { ModelPrioritiesField } from './ModelPrioritiesField';
 
 /** 模块级常量，免得每次渲染都给 picker 一个新数组引用。 */
 const DISABLE_ALL_RULES = [DISABLE_ALL_RULE];
@@ -64,6 +66,7 @@ const emptyApiKeyEntry = (): ApiKeyEntryInput => ({
   disabled: false,
   proxyUrl: '',
   weight: undefined,
+  modelPrioritiesText: '{}',
 });
 const XAI_API_BASE_URL = 'https://api.x.ai/v1';
 
@@ -103,6 +106,7 @@ function buildInitialForm(
       providerPayloadFilterRules: [],
       priority: undefined,
       weight: undefined,
+      modelPrioritiesText: '{}',
       models: [emptyModel()],
       headers: [emptyHeader()],
       excludedModelsText: '',
@@ -145,6 +149,7 @@ function buildInitialForm(
       providerPayloadOverrideRawRules: providerPayload.overrideRawRules,
       providerPayloadFilterRules: providerPayload.filterRules,
       priority: cfg.priority,
+      modelPrioritiesText: formatModelPrioritiesText(cfg.modelPriorities),
       models: cfg.models?.length
         ? cfg.models.map((m) => ({
             name: m.name,
@@ -180,6 +185,8 @@ function buildInitialForm(
             disabled: entry.disabled === true,
             proxyUrl: entry.proxyUrl ?? '',
             weight: entry.weight,
+            modelPriorities: entry.modelPriorities,
+            modelPrioritiesText: formatModelPrioritiesText(entry.modelPriorities),
             authIndex: entry.authIndex,
           }))
         : [emptyApiKeyEntry()],
@@ -436,6 +443,13 @@ export function BaseProviderForm({
       return t('providersPage.form.validation.baseUrlRequired');
     }
     if (brand === 'openaiCompatibility') {
+      const modelPriorityTexts = [
+        form.modelPrioritiesText,
+        ...(form.apiKeyEntries ?? []).map((entry) => entry.modelPrioritiesText),
+      ].filter((value): value is string => value !== undefined);
+      if (modelPriorityTexts.some((value) => !parseModelPrioritiesText(value).valid)) {
+        return t('providersPage.form.validation.modelPrioritiesInvalid');
+      }
       const configuredEntries = (form.apiKeyEntries ?? []).filter(
         (entry) => entry.apiKey.trim() || entry.existingApiKey?.trim()
       );
@@ -845,6 +859,15 @@ export function BaseProviderForm({
         ) : null}
 
         {brand === 'openaiCompatibility' ? (
+          <ModelPrioritiesField
+            id={fid + '-modelPriorities'}
+            value={form.modelPrioritiesText ?? '{}'}
+            disabled={mutating}
+            onChange={(value) => updateField('modelPrioritiesText', value)}
+          />
+        ) : null}
+
+        {brand === 'openaiCompatibility' ? (
           <label className={styles.checkboxRow}>
             <input
               type="checkbox"
@@ -907,13 +930,13 @@ export function BaseProviderForm({
           <Collapsible
             label={t('providersPage.form.providerPayloadSection')}
             hint={String(providerPayloadCount)}
-            defaultOpen={providerPayloadCount > 0}
+            defaultOpen={false}
           >
             <div className={styles.section}>
               <Collapsible
                 label={t('config_management.visual.sections.payload.override_rules')}
                 hint={t('config_management.visual.sections.payload.override_rules_desc')}
-                defaultOpen={Boolean(form.providerPayloadOverrideRules?.length)}
+                defaultOpen={false}
               >
                 <PayloadRulesEditor
                   value={form.providerPayloadOverrideRules ?? []}
@@ -925,7 +948,7 @@ export function BaseProviderForm({
               <Collapsible
                 label={t('config_management.visual.sections.payload.override_raw_rules')}
                 hint={t('config_management.visual.sections.payload.override_raw_rules_desc')}
-                defaultOpen={Boolean(form.providerPayloadOverrideRawRules?.length)}
+                defaultOpen={false}
               >
                 <PayloadRulesEditor
                   value={form.providerPayloadOverrideRawRules ?? []}
@@ -938,7 +961,7 @@ export function BaseProviderForm({
               <Collapsible
                 label={t('config_management.visual.sections.payload.default_rules')}
                 hint={t('config_management.visual.sections.payload.default_rules_desc')}
-                defaultOpen={Boolean(form.providerPayloadDefaultRules?.length)}
+                defaultOpen={false}
               >
                 <PayloadRulesEditor
                   value={form.providerPayloadDefaultRules ?? []}
@@ -949,7 +972,7 @@ export function BaseProviderForm({
               <Collapsible
                 label={t('config_management.visual.sections.payload.default_raw_rules')}
                 hint={t('config_management.visual.sections.payload.default_raw_rules_desc')}
-                defaultOpen={Boolean(form.providerPayloadDefaultRawRules?.length)}
+                defaultOpen={false}
               >
                 <PayloadRulesEditor
                   value={form.providerPayloadDefaultRawRules ?? []}
@@ -961,7 +984,7 @@ export function BaseProviderForm({
               <Collapsible
                 label={t('config_management.visual.sections.payload.filter_rules')}
                 hint={t('config_management.visual.sections.payload.filter_rules_desc')}
-                defaultOpen={Boolean(form.providerPayloadFilterRules?.length)}
+                defaultOpen={false}
               >
                 <PayloadFilterRulesEditor
                   value={form.providerPayloadFilterRules ?? []}
@@ -981,7 +1004,7 @@ export function BaseProviderForm({
           hint={`${
             apiKeyEntries.filter((e) => e.apiKey.trim() || e.existingApiKey?.trim()).length
           }`}
-          defaultOpen
+          defaultOpen={false}
         >
           <ApiKeyEntriesEditor
             entries={apiKeyEntries}

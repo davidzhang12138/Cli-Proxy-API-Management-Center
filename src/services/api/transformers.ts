@@ -103,6 +103,16 @@ const normalizeAuthIndex = (value: unknown): string | undefined => {
   return trimmed ? trimmed : undefined;
 };
 
+const normalizeIntegerMap = (value: unknown): Record<string, number> | undefined => {
+  if (!isRecord(value)) return undefined;
+  const result: Record<string, number> = {};
+  Object.entries(value).forEach(([key, raw]) => {
+    const parsed = Number(raw);
+    if (key.trim() && Number.isSafeInteger(parsed)) result[key.trim()] = parsed;
+  });
+  return Object.keys(result).length ? result : undefined;
+};
+
 const normalizeApiKeyEntry = (entry: unknown): ApiKeyEntry | null => {
   if (entry === undefined || entry === null) return null;
   const record = isRecord(entry) ? entry : null;
@@ -116,6 +126,7 @@ const normalizeApiKeyEntry = (entry: unknown): ApiKeyEntry | null => {
   const weight = readCredentialWeight(record?.weight);
   const authIndex = normalizeAuthIndex(record?.['auth-index']);
   const models = normalizeModelAliases(record?.models);
+  const modelPriorities = normalizeIntegerMap(record?.['model-priorities']);
 
   const result: ApiKeyEntry = {
     apiKey: trimmed,
@@ -123,6 +134,7 @@ const normalizeApiKeyEntry = (entry: unknown): ApiKeyEntry | null => {
   };
   if (baseUrl && String(baseUrl).trim()) result.baseUrl = String(baseUrl).trim();
   if (models.length) result.models = models;
+  if (modelPriorities) result.modelPriorities = modelPriorities;
   if (disabled !== undefined) result.disabled = disabled;
   if (weight !== undefined) result.weight = weight;
   if (authIndex) result.authIndex = authIndex;
@@ -146,6 +158,8 @@ const normalizeProviderKeyConfig = (item: unknown): ProviderKeyConfig | null => 
       config.priority = parsed;
     }
   }
+  const modelPriorities = normalizeIntegerMap(record?.['model-priorities']);
+  if (modelPriorities) config.modelPriorities = modelPriorities;
   const prefix = normalizePrefix(record?.prefix);
   if (prefix) config.prefix = prefix;
   const baseUrl = record?.['base-url'];
@@ -216,6 +230,8 @@ const normalizeGeminiKeyConfig = (item: unknown): GeminiKeyConfig | null => {
       config.priority = parsed;
     }
   }
+  const modelPriorities = normalizeIntegerMap(record?.['model-priorities']);
+  if (modelPriorities) config.modelPriorities = modelPriorities;
   const prefix = normalizePrefix(record?.prefix);
   if (prefix) config.prefix = prefix;
   const baseUrl = record?.['base-url'];
@@ -255,6 +271,7 @@ const normalizeOpenAIProvider = (
   const payload = normalizeRecord(provider.payload);
   const models = normalizeModelAliases(provider.models);
   const priority = provider.priority;
+  const modelPriorities = normalizeIntegerMap(provider['model-priorities']);
   const testModel = provider['test-model'];
 
   const result: OpenAIProviderConfig = {
@@ -295,6 +312,7 @@ const normalizeOpenAIProvider = (
   if (payload) result.payload = payload;
   if (models.length) result.models = models;
   if (priority !== undefined) result.priority = Number(priority);
+  if (modelPriorities) result.modelPriorities = modelPriorities;
   if (testModel) result.testModel = String(testModel);
   const authIndex = normalizeAuthIndex(provider['auth-index']);
   if (authIndex) result.authIndex = authIndex;

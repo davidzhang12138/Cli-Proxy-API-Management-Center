@@ -25,6 +25,7 @@ const RESPONSE_ONLY_FIELDS = ['auth-index'] as const;
 const PROVIDER_COMMON_KEY_FIELDS = [
   'api-key',
   'priority',
+  'model-priorities',
   'weight',
   'prefix',
   'base-url',
@@ -50,6 +51,7 @@ const CLAUDE_KEY_FIELDS = [
 const VERTEX_KEY_FIELDS = [
   'api-key',
   'priority',
+  'model-priorities',
   'weight',
   'prefix',
   'base-url',
@@ -62,6 +64,7 @@ const VERTEX_KEY_FIELDS = [
 const OPENAI_PROVIDER_FIELDS = [
   'name',
   'priority',
+  'model-priorities',
   'disabled',
   'prefix',
   'base-url',
@@ -87,6 +90,7 @@ const API_KEY_ENTRY_FIELDS = [
   'disabled',
   'proxy-url',
   'weight',
+  'model-priorities',
 ] as const;
 
 const CLOAK_FIELDS = ['mode', 'strict-mode', 'sensitive-words', 'cache-user-id'] as const;
@@ -345,12 +349,18 @@ const serializeApiKeyEntry = (entry: ApiKeyEntry) => {
   if (entry.disabled) payload.disabled = true;
   if (entry.proxyUrl) payload['proxy-url'] = entry.proxyUrl;
   if (entry.weight !== undefined) payload.weight = entry.weight;
+  if (entry.modelPriorities && Object.keys(entry.modelPriorities).length) {
+    payload['model-priorities'] = entry.modelPriorities;
+  }
   return payload;
 };
 
 const serializeProviderKey = (config: ProviderKeyConfig) => {
   const payload: Record<string, unknown> = { 'api-key': config.apiKey };
   if (config.priority !== undefined) payload.priority = config.priority;
+  if (config.modelPriorities && Object.keys(config.modelPriorities).length) {
+    payload['model-priorities'] = config.modelPriorities;
+  }
   if (config.weight !== undefined) payload.weight = config.weight;
   if (config.prefix?.trim()) payload.prefix = config.prefix.trim();
   if (config.baseUrl) payload['base-url'] = config.baseUrl;
@@ -405,6 +415,9 @@ const serializeVertexModelAliases = (models?: ModelAlias[]) =>
 const serializeVertexKey = (config: ProviderKeyConfig) => {
   const payload: Record<string, unknown> = { 'api-key': config.apiKey };
   if (config.priority !== undefined) payload.priority = config.priority;
+  if (config.modelPriorities && Object.keys(config.modelPriorities).length) {
+    payload['model-priorities'] = config.modelPriorities;
+  }
   if (config.weight !== undefined) payload.weight = config.weight;
   if (config.prefix?.trim()) payload.prefix = config.prefix.trim();
   if (config.baseUrl) payload['base-url'] = config.baseUrl;
@@ -422,6 +435,9 @@ const serializeVertexKey = (config: ProviderKeyConfig) => {
 const serializeGeminiKey = (config: GeminiKeyConfig) => {
   const payload: Record<string, unknown> = { 'api-key': config.apiKey };
   if (config.priority !== undefined) payload.priority = config.priority;
+  if (config.modelPriorities && Object.keys(config.modelPriorities).length) {
+    payload['model-priorities'] = config.modelPriorities;
+  }
   if (config.weight !== undefined) payload.weight = config.weight;
   if (config.prefix?.trim()) payload.prefix = config.prefix.trim();
   if (config.baseUrl) payload['base-url'] = config.baseUrl;
@@ -454,6 +470,9 @@ const serializeOpenAIProvider = (provider: OpenAIProviderConfig) => {
   if (models && models.length) payload.models = models;
   if (provider.payload) payload.payload = provider.payload;
   if (provider.priority !== undefined) payload.priority = provider.priority;
+  if (provider.modelPriorities && Object.keys(provider.modelPriorities).length) {
+    payload['model-priorities'] = provider.modelPriorities;
+  }
   if (provider.testModel) payload['test-model'] = provider.testModel;
   if (provider.disableCooling) payload['disable-cooling'] = true;
   const quotaBackoffMin = provider.quotaBackoffMin?.trim();

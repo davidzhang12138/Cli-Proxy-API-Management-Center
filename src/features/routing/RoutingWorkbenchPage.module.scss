@@ -310,6 +310,57 @@
   color: var(--info-color);
 }
 
+.modelScopeNotice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  border: 1px solid var(--primary-30);
+  border-radius: $radius-md;
+  color: var(--primary-color);
+  background: var(--primary-8);
+}
+
+.modelScopeNotice > svg {
+  flex: 0 0 auto;
+}
+
+.modelScopeNotice div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.modelScopeNotice strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelScopeNotice span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.modelScopeNotice button {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid var(--primary-30);
+  border-radius: 7px;
+  color: var(--primary-color);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.modelScopeNotice button:hover {
+  background: var(--primary-8);
+}
+
 .workspace {
   display: grid;
   grid-template-columns: 255px minmax(0, 1fr);
@@ -759,6 +810,30 @@
   font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.modelPriorityBadge {
+  overflow: hidden;
+  max-width: 90px;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-family: $font-mono;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelPriorityOverride {
+  border-color: var(--primary-30);
+  color: var(--primary-color);
+  background: var(--primary-8);
+}
+
+.modelPriorityInherited {
+  border-color: var(--border-color);
+  color: var(--text-tertiary);
+  background: var(--bg-secondary);
 }
 
 .identity,

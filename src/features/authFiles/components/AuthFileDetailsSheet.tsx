@@ -139,7 +139,8 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
               !dirty ||
               !editor?.json ||
               Boolean(editor?.headersTouched && editor.headersError) ||
-              Boolean(editor?.weightError)
+              Boolean(editor?.weightError) ||
+              Boolean(editor?.modelPrioritiesError)
             }
           >
             {t('common.save')}
@@ -196,6 +197,27 @@ export function AuthFileDetailsSheet(props: AuthFileDetailsSheetProps) {
                     disabled={disableControls || editor.saving || !editor.json}
                     onChange={(e) => onChange('priority', e.target.value)}
                   />
+                  <div className="form-group">
+                    <label className={styles.label} htmlFor={`${editor.fileName}-model-priorities`}>
+                      {t('auth_files.model_priorities_label')}
+                    </label>
+                    <textarea
+                      id={`${editor.fileName}-model-priorities`}
+                      className={`${styles.textarea} ${
+                        editor.modelPrioritiesError ? styles.textareaInvalid : ''
+                      }`}
+                      value={editor.modelPrioritiesText}
+                      placeholder={t('auth_files.model_priorities_placeholder')}
+                      rows={5}
+                      aria-invalid={Boolean(editor.modelPrioritiesError)}
+                      disabled={disableControls || editor.saving || !editor.json}
+                      onChange={(e) => onChange('modelPrioritiesText', e.target.value)}
+                    />
+                    {editor.modelPrioritiesError ? (
+                      <div className="error-box">{editor.modelPrioritiesError}</div>
+                    ) : null}
+                    <div className="hint">{t('auth_files.model_priorities_hint')}</div>
+                  </div>
                   <Input
                     label={t('auth_files.weight_label')}
                     type="number"

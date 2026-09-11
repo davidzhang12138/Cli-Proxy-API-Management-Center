@@ -87,6 +87,7 @@ import {
   type SponsorProtocolUrls,
 } from './sponsorDefinitions';
 import { runSponsorMutationWithRecovery } from './sponsorMutationRecovery';
+import { parseModelPrioritiesText } from '@/utils/modelPriorities';
 
 export interface UseProviderWorkbenchResult {
   connected: boolean;
@@ -135,6 +136,18 @@ const parseThinkingJson = (value: string | undefined): Record<string, unknown> |
     throw new Error('Thinking config must be a JSON object');
   }
   return parsed as Record<string, unknown>;
+};
+
+const readModelPrioritiesText = (
+  value: string | undefined,
+  fallback?: Record<string, number>
+): Record<string, number> | undefined => {
+  if (value === undefined) return fallback;
+  const parsed = parseModelPrioritiesText(value);
+  if (!parsed.valid || !parsed.value) {
+    throw new Error('Model priorities must be a JSON object with integer values.');
+  }
+  return parsed.value;
 };
 
 /**
@@ -198,6 +211,7 @@ const buildProviderKeyConfig = (
     baseUrl: input.baseUrl.trim() || undefined,
     proxyUrl: input.proxyUrl.trim() || undefined,
     models: models.length ? models : undefined,
+    modelPriorities: existing?.modelPriorities,
     headers: Object.keys(headers).length ? headers : undefined,
     excludedModels: excluded,
     disableCooling: input.disableCooling === true,
@@ -239,6 +253,10 @@ export const buildOpenAIConfig = (
 ): OpenAIProviderConfig => {
   const headers = headersFromEntries(input.headers);
   const models = buildModelAliases(input.models, true);
+  const modelPriorities = readModelPrioritiesText(
+    input.modelPrioritiesText,
+    existing?.modelPriorities
+  );
   const providerPayload = serializeProviderPayload({
     defaultRules: input.providerPayloadDefaultRules ?? [],
     defaultRawRules: input.providerPayloadDefaultRawRules ?? [],
@@ -252,6 +270,10 @@ export const buildOpenAIConfig = (
         const fallbackApiKey =
           entry.existingApiKey?.trim() || existing?.apiKeyEntries?.[index]?.apiKey?.trim() || '';
         const entryModels = buildModelAliases(entry.models, true);
+        const entryModelPriorities = readModelPrioritiesText(
+          entry.modelPrioritiesText,
+          entry.modelPriorities ?? existing?.apiKeyEntries?.[index]?.modelPriorities
+        );
         return {
           apiKey: entry.apiKey.trim() || fallbackApiKey,
           baseUrl: entry.baseUrl?.trim() || undefined,
@@ -259,6 +281,7 @@ export const buildOpenAIConfig = (
           disabled: entry.disabled === true,
           proxyUrl: entry.proxyUrl.trim() || undefined,
           weight: entry.weight,
+          modelPriorities: entryModelPriorities,
           authIndex: entry.authIndex?.trim() || undefined,
         };
       })
@@ -278,6 +301,7 @@ export const buildOpenAIConfig = (
     payload: providerPayload,
     headers: Object.keys(headers).length ? headers : undefined,
     models: models.length ? models : undefined,
+    modelPriorities,
     priority: input.priority,
     testModel: input.testModel?.trim() || undefined,
   };

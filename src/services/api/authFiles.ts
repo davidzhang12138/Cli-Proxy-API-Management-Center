@@ -34,6 +34,7 @@ export type AuthFileFieldsPatch = {
   proxy_url?: string;
   headers?: Record<string, string>;
   priority?: number;
+  model_priorities?: Record<string, number>;
   weight?: number | null;
   disable_cooling?: boolean;
   'disable-cooling'?: boolean;
@@ -314,6 +315,16 @@ const readIntegerField = (value: unknown): number | undefined => {
   return Number.isSafeInteger(parsed) ? parsed : undefined;
 };
 
+const readIntegerMap = (value: unknown): Record<string, number> | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const result: Record<string, number> = {};
+  Object.entries(value as Record<string, unknown>).forEach(([key, raw]) => {
+    const parsed = readIntegerField(raw);
+    if (key.trim() && parsed !== undefined) result[key.trim()] = parsed;
+  });
+  return Object.keys(result).length > 0 ? result : undefined;
+};
+
 const readRuntimeOnlyField = (entry: AuthFileEntry): boolean => {
   const raw = entry['runtime_only'] ?? entry.runtimeOnly;
   if (typeof raw === 'boolean') return raw;
@@ -337,6 +348,7 @@ const normalizeAuthFileEntry = (entry: AuthFileEntry): AuthFileEntry => {
   const projectId = readTextField(entry, 'project_id');
   const modified = readDateField(entry);
   const priority = readIntegerField(entry['priority']);
+  const modelPriorities = readIntegerMap(entry['model_priorities'] ?? entry['model-priorities']);
   const weight = readIntegerField(entry['weight']);
 
   return {
@@ -350,6 +362,7 @@ const normalizeAuthFileEntry = (entry: AuthFileEntry): AuthFileEntry => {
     ...(statusMessage ? { statusMessage } : {}),
     ...(modified > 0 ? { modified } : {}),
     priority,
+    ...(modelPriorities ? { modelPriorities } : {}),
     weight,
     ...(note ? { note } : {}),
     ...(email ? { email } : {}),

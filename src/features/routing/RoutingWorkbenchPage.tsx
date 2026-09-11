@@ -25,6 +25,8 @@ import {
   type RoutingCandidate,
   type RoutingGroup,
   type RoutingStrategy,
+  getRoutingCandidatePriority,
+  getRoutingModelPrioritySource,
   useRoutingWorkbench,
 } from './useRoutingWorkbench';
 import styles from './RoutingWorkbenchPage.module.scss';
@@ -95,6 +97,28 @@ const parseInteger = (value: string, fallback: number | null): number | null => 
   return Number.isSafeInteger(parsed) ? parsed : null;
 };
 
+const candidateServesModel = (candidate: RoutingCandidate, model: string | null): boolean =>
+  !model || candidate.models.length === 0 || candidate.models.includes(model);
+
+const scopedCandidates = (group: RoutingGroup, model: string | null): RoutingCandidate[] =>
+  group.candidates.filter((candidate) => candidateServesModel(candidate, model));
+
+const groupPriorityForModel = (group: RoutingGroup, model: string | null): number => {
+  if (!model) return group.priority;
+  const candidates = scopedCandidates(group, model);
+  return Math.max(...candidates.map((candidate) => getRoutingCandidatePriority(candidate, model)), 0);
+};
+
+const groupUniformForModel = (group: RoutingGroup, model: string | null): boolean => {
+  if (!model) return group.uniformPriority;
+  const priorities = scopedCandidates(group, model).map((candidate) =>
+    getRoutingCandidatePriority(candidate, model)
+  );
+  return new Set(priorities).size <= 1;
+};
+
+const draftKey = (id: string, model: string | null): string => `${id}:${model ?? '__all'}`;
+
 const formatTime = (value: number, locale: string): string => {
   if (!value) return '—';
   return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(value);
@@ -103,6 +127,9 @@ const formatTime = (value: number, locale: string): string => {
 function GroupRow({
   group,
   coverage,
+  selectedModel,
+  priority,
+  uniformPriority,
   expanded,
   saving,
   draftPriority,
@@ -117,6 +144,9 @@ function GroupRow({
 }: {
   group: RoutingGroup;
   coverage: string[];
+  selectedModel: string | null;
+  priority: number;
+  uniformPriority: boolean;
   expanded: boolean;
   saving: boolean;
   draftPriority: string;
@@ -130,9 +160,11 @@ function GroupRow({
   onCandidatePrioritySave: (candidateId: string) => void;
 }) {
   const { t } = useTranslation();
-  const dirty = draftPriority !== String(group.priority);
+  const dirty = draftPriority !== String(priority);
   const enabled = group.candidates.some((candidate) => candidate.enabled);
-  const priorityLocked = !group.uniformPriority;
+  const priorityLocked = !uniformPriority;
+  const visibleCandidates = scopedCandidates(group, selectedModel);
+  const displayedCoverage = selectedModel ? [selectedModel] : coverage;
   return (
     <article className={styles.groupBlock}>
       <div className={styles.groupRow}>
@@ -154,15 +186,17 @@ function GroupRow({
             </span>
           </div>
         </div>
-        <div className={styles.groupModels} title={coverage.join('\n')}>
-          {coverage.length
-            ? coverage.slice(0, 4).join(' · ')
+        <div className={styles.groupModels} title={displayedCoverage.join('\n')}>
+          {displayedCoverage.length
+            ? displayedCoverage.slice(0, 4).join(' · ')
             : t('routing_page.unscoped_model')}
-          {coverage.length > 4 ? ` +${coverage.length - 4}` : ''}
+          {displayedCoverage.length > 4 ? ` +${displayedCoverage.length - 4}` : ''}
         </div>
         <div className={styles.groupPriorityCell}>
           <label className={styles.srOnly} htmlFor={`group-priority-${group.id}`}>
-            {t('routing_page.priority')}
+            {selectedModel
+              ? t('routing_page.model_priority_for_model', { model: selectedModel })
+              : t('routing_page.priority')}
           </label>
           <input
             id={`group-priority-${group.id}`}
@@ -172,6 +206,11 @@ function GroupRow({
             value={draftPriority}
             disabled={!group.editable || saving || priorityLocked}
             aria-describedby={priorityLocked ? `group-priority-note-${group.id}` : undefined}
+            aria-label={
+              selectedModel
+                ? t('routing_page.model_priority_for_model', { model: selectedModel })
+                : t('routing_page.priority')
+            }
             onChange={(event) => onPriorityChange(event.target.value)}
           />
         </div>
@@ -179,7 +218,7 @@ function GroupRow({
           <span className={enabled ? styles.groupReady : styles.groupDisabled}>
             {enabled ? t('routing_page.status_ready') : t('routing_page.status_disabled')}
           </span>
-          {group.uniformPriority ? null : (
+          {!uniformPriority ? (
             <span
               id={`group-priority-note-${group.id}`}
               className={styles.mixedBadge}
@@ -187,14 +226,14 @@ function GroupRow({
             >
               {t('routing_page.mixed_priority')}
             </span>
-          )}
+          ) : null}
         </div>
         <div className={styles.actionCell}>
           {group.editable ? (
             <Button
               size="sm"
               variant={dirty ? 'primary' : 'secondary'}
-              disabled={!dirty || saving}
+              disabled={!dirty || saving || priorityLocked}
               loading={saving}
               onClick={onSave}
             >
@@ -207,7 +246,7 @@ function GroupRow({
       </div>
       {expanded ? (
         <div className={styles.groupChildren}>
-          {group.editable && !group.uniformPriority ? (
+          {group.editable && !uniformPriority ? (
             <div className={styles.groupHint}>
               <IconAlertTriangle size={14} />
               <span>{t('routing_page.group_priority_hint')}</span>
@@ -218,12 +257,18 @@ function GroupRow({
               {saveError}
             </div>
           ) : null}
-          {group.candidates.map((candidate, index) => (
+          {visibleCandidates.map((candidate, index) => (
             <CandidateRow
               key={candidate.id}
               candidate={candidate}
+              selectedModel={selectedModel}
+              priority={getRoutingCandidatePriority(candidate, selectedModel)}
+              prioritySource={getRoutingModelPrioritySource(candidate, selectedModel)}
               rank={candidate.enabled ? index + 1 : null}
-              draftPriority={draftPriorities[candidate.id] ?? String(candidate.priority)}
+              draftPriority={
+                draftPriorities[draftKey(candidate.id, selectedModel)] ??
+                String(getRoutingCandidatePriority(candidate, selectedModel))
+              }
               saving={candidateSavingId === candidate.id}
               onPriorityChange={onCandidatePriorityChange}
               onSave={onCandidatePrioritySave}
@@ -263,6 +308,9 @@ function CandidateStatus({ candidate }: { candidate: RoutingCandidate }) {
 
 function CandidateRow({
   candidate,
+  selectedModel,
+  priority,
+  prioritySource,
   rank,
   draftPriority,
   saving,
@@ -270,6 +318,9 @@ function CandidateRow({
   onSave,
 }: {
   candidate: RoutingCandidate;
+  selectedModel: string | null;
+  priority: number;
+  prioritySource: 'override' | 'inherited' | null;
   rank: number | null;
   draftPriority: string;
   saving: boolean;
@@ -277,10 +328,12 @@ function CandidateRow({
   onSave: (candidateId: string) => void;
 }) {
   const { t } = useTranslation();
-  const modelSummary = candidate.models.length
-    ? candidate.models.slice(0, 3).join(' · ')
-    : t('routing_page.unscoped_model');
-  const dirty = draftPriority !== String(candidate.priority);
+  const modelSummary = selectedModel
+    ? selectedModel
+    : candidate.models.length
+      ? candidate.models.slice(0, 3).join(' · ')
+      : t('routing_page.unscoped_model');
+  const dirty = draftPriority !== String(priority);
 
   return (
     <article className={`${styles.candidateRow} ${!candidate.enabled ? styles.rowDisabled : ''}`}>
@@ -297,6 +350,26 @@ function CandidateRow({
           <ProviderMark provider={candidate.provider} size={21} />
           <span className={styles.providerName}>{providerLabel(candidate)}</span>
           <span className={styles.sourceTag}>{sourceLabels[candidate.source]}</span>
+          {selectedModel && prioritySource ? (
+            <span
+              className={`${styles.modelPriorityBadge} ${
+                prioritySource === 'override'
+                  ? styles.modelPriorityOverride
+                  : styles.modelPriorityInherited
+              }`}
+              title={t(
+                prioritySource === 'override'
+                  ? 'routing_page.model_priority_override'
+                  : 'routing_page.model_priority_inherited'
+              )}
+            >
+              {t(
+                prioritySource === 'override'
+                  ? 'routing_page.model_priority_override'
+                  : 'routing_page.model_priority_inherited'
+              )}
+            </span>
+          ) : null}
         </div>
         <strong className={styles.identity} title={candidate.identity}>
           {candidate.identity}
@@ -319,7 +392,9 @@ function CandidateRow({
 
       <div className={styles.numberCell}>
         <label className={styles.srOnly} htmlFor={`priority-${candidate.id}`}>
-          {t('routing_page.priority')}
+          {selectedModel
+            ? t('routing_page.model_priority_for_model', { model: selectedModel })
+            : t('routing_page.priority')}
         </label>
         {candidate.editable ? (
           <input
@@ -330,10 +405,14 @@ function CandidateRow({
             value={draftPriority}
             disabled={saving}
             onChange={(event) => onPriorityChange(candidate.id, event.target.value)}
-            aria-label={t('routing_page.priority')}
+            aria-label={
+              selectedModel
+                ? t('routing_page.model_priority_for_model', { model: selectedModel })
+                : t('routing_page.priority')
+            }
           />
         ) : (
-          <span className={styles.detailValue}>{candidate.priority}</span>
+          <span className={styles.detailValue}>{priority}</span>
         )}
       </div>
 
@@ -378,6 +457,7 @@ export function RoutingWorkbenchPage() {
   const [savingGroupId, setSavingGroupId] = useState<string | null>(null);
   const [savingCandidateId, setSavingCandidateId] = useState<string | null>(null);
   const [failedGroups, setFailedGroups] = useState<Record<string, string>>({});
+  const selectedModelValue = selectedModel === ALL_MODELS ? null : selectedModel;
 
   const candidates = useMemo(
     () => workbench.snapshot?.candidates ?? [],
@@ -417,10 +497,12 @@ export function RoutingWorkbenchPage() {
 
     // Every group here is enabled, so only priority decides the order.
     return [...searched].sort((left, right) => {
-      if (left.priority !== right.priority) return right.priority - left.priority;
+      const leftPriority = groupPriorityForModel(left, selectedModelValue);
+      const rightPriority = groupPriorityForModel(right, selectedModelValue);
+      if (leftPriority !== rightPriority) return rightPriority - leftPriority;
       return left.id.localeCompare(right.id);
     });
-  }, [coveredGroups, modelCoverage, query, selectedModel]);
+  }, [coveredGroups, modelCoverage, query, selectedModel, selectedModelValue]);
 
   /**
    * Model index, scoped to the pool: a model is listed only if a still-visible
@@ -449,37 +531,55 @@ export function RoutingWorkbenchPage() {
     }
   }, [modelCounts, selectedModel]);
 
+  useEffect(() => {
+    setExpandedGroups({});
+  }, [selectedModel]);
+
   const activeCount = candidates.filter((candidate) => candidate.enabled).length;
   const providerCount = coveredGroups.length;
   const highestPriority = candidates.reduce(
-    (current, candidate) => (candidate.enabled ? Math.max(current, candidate.priority) : current),
+    (current, candidate) =>
+      candidate.enabled
+        ? Math.max(current, getRoutingCandidatePriority(candidate, selectedModelValue))
+        : current,
     0
   );
 
   const getGroupDraft = useCallback(
-    (group: RoutingGroup): string => groupDrafts[group.id] ?? String(group.priority),
+    (group: RoutingGroup, model: string | null): string => {
+      const priority = groupPriorityForModel(group, model);
+      return groupDrafts[draftKey(group.id, model)] ?? String(priority);
+    },
     [groupDrafts]
   );
 
   /** Group priority is a uniform level: refuse to flatten a group whose members differ. */
   const saveGroup = useCallback(
     async (group: RoutingGroup) => {
-      if (!group.uniformPriority) {
+      const model = selectedModelValue;
+      const uniformPriority = groupUniformForModel(group, model);
+      if (!uniformPriority) {
         showNotification(t('routing_page.group_priority_blocked'), 'error');
         return;
       }
-      const priority = parseInteger(getGroupDraft(group), 0);
-      if (priority === null) {
+      const value = getGroupDraft(group, model);
+      const priority = model ? parseInteger(value, null) : parseInteger(value, 0);
+      if (!model && priority === null) {
+        showNotification(t('routing_page.invalid_priority'), 'error');
+        return;
+      }
+      if (model && value.trim() && priority === null) {
         showNotification(t('routing_page.invalid_priority'), 'error');
         return;
       }
 
       try {
         setSavingGroupId(group.id);
-        await group.updatePriority(priority);
+        if (model) await group.updateModelPriority(model, priority);
+        else await group.updatePriority(priority as number);
         setGroupDrafts((current) => {
           const nextDrafts = { ...current };
-          delete nextDrafts[group.id];
+          delete nextDrafts[draftKey(group.id, model)];
           return nextDrafts;
         });
         await workbench.refresh();
@@ -493,27 +593,41 @@ export function RoutingWorkbenchPage() {
         setSavingGroupId(null);
       }
     },
-    [getGroupDraft, showNotification, t, workbench]
+    [getGroupDraft, selectedModelValue, showNotification, t, workbench]
   );
 
-  const handleCandidatePriorityChange = useCallback((candidateId: string, value: string) => {
-    setCandidateDrafts((current) => ({ ...current, [candidateId]: value }));
-  }, []);
+  const handleCandidatePriorityChange = useCallback(
+    (candidateId: string, value: string) => {
+      setCandidateDrafts((current) => ({
+        ...current,
+        [draftKey(candidateId, selectedModelValue)]: value,
+      }));
+    },
+    [selectedModelValue]
+  );
 
   const saveCandidatePriority = useCallback(
     async (group: RoutingGroup, candidateId: string) => {
-      const priority = parseInteger(candidateDrafts[candidateId] ?? '', null);
-      if (priority === null) {
+      const model = selectedModelValue;
+      const key = draftKey(candidateId, model);
+      const value = candidateDrafts[key] ?? '';
+      const priority = parseInteger(value, null);
+      if (!model && priority === null) {
+        showNotification(t('routing_page.invalid_priority'), 'error');
+        return;
+      }
+      if (model && value.trim() && priority === null) {
         showNotification(t('routing_page.invalid_priority'), 'error');
         return;
       }
 
       try {
         setSavingCandidateId(candidateId);
-        await group.updateCandidatePriority(candidateId, priority);
+        if (model) await group.updateCandidateModelPriority(candidateId, model, priority);
+        else await group.updateCandidatePriority(candidateId, priority as number);
         setCandidateDrafts((current) => {
           const nextDrafts = { ...current };
-          delete nextDrafts[candidateId];
+          delete nextDrafts[key];
           return nextDrafts;
         });
         // A group-wide refresh would race sibling saves; patch the row locally instead.
@@ -532,7 +646,7 @@ export function RoutingWorkbenchPage() {
         setSavingCandidateId(null);
       }
     },
-    [candidateDrafts, showNotification, t]
+    [candidateDrafts, selectedModelValue, showNotification, t]
   );
 
   const handleStrategyChange = useCallback(
@@ -660,6 +774,21 @@ export function RoutingWorkbenchPage() {
         <span>{t('routing_page.session_hint')}</span>
       </div>
 
+      {selectedModelValue ? (
+        <div className={styles.modelScopeNotice} role="status">
+          <IconModelCluster size={17} />
+          <div>
+            <strong>
+              {t('routing_page.model_priority_for_model', { model: selectedModelValue })}
+            </strong>
+            <span>{t('routing_page.model_scope_hint')}</span>
+          </div>
+          <button type="button" onClick={() => setSelectedModel(ALL_MODELS)}>
+            {t('routing_page.all_models')}
+          </button>
+        </div>
+      ) : null}
+
       <section className={styles.workspace}>
         <aside className={styles.modelRail}>
           <div className={styles.railHeading}>
@@ -723,7 +852,11 @@ export function RoutingWorkbenchPage() {
             <span aria-hidden="true" />
             <span>{t('routing_page.group')}</span>
             <span>{t('routing_page.models')}</span>
-            <span>{t('routing_page.priority')}</span>
+            <span>
+              {selectedModelValue
+                ? t('routing_page.model_priority_for_model', { model: selectedModelValue })
+                : t('routing_page.priority')}
+            </span>
             <span>{t('common.status')}</span>
             <span>{t('common.action')}</span>
           </div>
@@ -747,9 +880,12 @@ export function RoutingWorkbenchPage() {
                   key={group.id}
                   group={group}
                   coverage={modelCoverage.get(group.id) ?? []}
+                  selectedModel={selectedModelValue}
+                  priority={groupPriorityForModel(group, selectedModelValue)}
+                  uniformPriority={groupUniformForModel(group, selectedModelValue)}
                   expanded={expandedGroups[group.id] === true}
                   saving={savingGroupId === group.id}
-                  draftPriority={getGroupDraft(group)}
+                  draftPriority={getGroupDraft(group, selectedModelValue)}
                   draftPriorities={candidateDrafts}
                   candidateSavingId={savingCandidateId}
                   saveError={failedGroups[group.id] ?? null}
@@ -760,7 +896,10 @@ export function RoutingWorkbenchPage() {
                     }))
                   }
                   onPriorityChange={(value) =>
-                    setGroupDrafts((current) => ({ ...current, [group.id]: value }))
+                    setGroupDrafts((current) => ({
+                      ...current,
+                      [draftKey(group.id, selectedModelValue)]: value,
+                    }))
                   }
                   onSave={() => void saveGroup(group)}
                   onCandidatePriorityChange={handleCandidatePriorityChange}

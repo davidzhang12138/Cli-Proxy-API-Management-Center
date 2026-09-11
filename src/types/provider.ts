@@ -19,6 +19,7 @@ export interface ApiKeyEntry {
   disabled?: boolean;
   proxyUrl?: string;
   weight?: number;
+  modelPriorities?: Record<string, number>;
   authIndex?: string;
 }
 
@@ -40,6 +41,7 @@ export interface ProviderPayloadConfig {
 export interface GeminiKeyConfig {
   apiKey: string;
   priority?: number;
+  modelPriorities?: Record<string, number>;
   weight?: number;
   prefix?: string;
   baseUrl?: string;
@@ -54,6 +56,7 @@ export interface GeminiKeyConfig {
 export interface ProviderKeyConfig {
   apiKey: string;
   priority?: number;
+  modelPriorities?: Record<string, number>;
   weight?: number;
   prefix?: string;
   baseUrl?: string;
@@ -81,6 +84,7 @@ export interface OpenAIProviderConfig {
   forwardUserAgent?: boolean;
   models?: ModelAlias[];
   priority?: number;
+  modelPriorities?: Record<string, number>;
   testModel?: string;
   disableCooling?: boolean;
   /** 429 配额退避冷却下限,Go duration 字符串如 "30s"/"5m"/"1h"。yaml: quota-backoff-min */

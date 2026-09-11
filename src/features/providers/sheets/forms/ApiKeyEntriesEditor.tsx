@@ -26,6 +26,7 @@ import {
 import { ConnectivityStatusIcon } from './ConnectivityStatusIcon';
 import { ModelEntriesEditor } from './ModelEntriesEditor';
 import styles from './sharedForm.module.scss';
+import { ModelPrioritiesField } from './ModelPrioritiesField';
 
 const COLLAPSED_LIMIT = 10;
 
@@ -508,6 +509,12 @@ export function ApiKeyEntriesEditor({
                     />
                   </div>
                 </div>
+                <ModelPrioritiesField
+                  id={'api-key-entry-' + idx + '-modelPriorities'}
+                  value={entry.modelPrioritiesText ?? '{}'}
+                  disabled={mutating}
+                  onChange={(value) => onUpdate(idx, { modelPrioritiesText: value })}
+                />
                 <div className={styles.field}>
                   <label className={styles.label}>{t('providersPage.form.apiKey')}</label>
                   <div className={styles.passwordField}>

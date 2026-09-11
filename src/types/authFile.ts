@@ -49,6 +49,7 @@ export interface AuthFileItem {
   lastRefresh?: string | number;
   modified?: number;
   priority?: number;
+  modelPriorities?: Record<string, number>;
   weight?: number;
   note?: string;
   success?: unknown;

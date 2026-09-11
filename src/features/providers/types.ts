@@ -194,6 +194,8 @@ export interface ApiKeyEntryInput {
   disabled: boolean;
   proxyUrl: string;
   weight?: number;
+  modelPriorities?: Record<string, number>;
+  modelPrioritiesText?: string;
   authIndex?: string;
 }
 
@@ -225,6 +227,7 @@ export interface ProviderEntryFormInput {
   providerPayloadFilterRules?: PayloadFilterRule[];
   priority?: number;
   weight?: number;
+  modelPrioritiesText?: string;
 
   /** 高级折叠区 */
   models: ModelEntryInput[];
