@@ -1,5 +1,17 @@
-import type { AuthFileModelItem } from './constants';
+import { normalizeProviderKey, type AuthFileModelItem } from './constants';
 import type { OAuthModelAliasEntry, UsageQuotaSnapshot } from '@/types';
+
+/** Looks up the alias list for one provider, matching on the normalized key. */
+export function aliasesForProvider(
+  aliases: Record<string, OAuthModelAliasEntry[]>,
+  provider: string
+): OAuthModelAliasEntry[] {
+  const normalizedProvider = normalizeProviderKey(provider);
+  const providerEntry = Object.entries(aliases).find(
+    ([key]) => normalizeProviderKey(key) === normalizedProvider
+  );
+  return providerEntry?.[1] ?? [];
+}
 
 export function mergeAuthFileModels(
   primary: readonly AuthFileModelItem[],

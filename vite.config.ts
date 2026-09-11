@@ -43,6 +43,19 @@ export default defineConfig({
       removeViteModuleLoader: true
     })
   ],
+  // Dev-only: forward proxy calls to a local backend so the dev server is
+  // same-origin and needs no connection settings. `bun run dev:mock` points
+  // this at scripts/mock-api.mjs. Set MOCK_API_TARGET to override the host.
+  server: process.env.MOCK_API_TARGET
+    ? {
+        proxy: Object.fromEntries(
+          ['/v0', '/v1'].map((prefix) => [
+            prefix,
+            { target: process.env.MOCK_API_TARGET, changeOrigin: true }
+          ])
+        )
+      }
+    : undefined,
   define: {
     __APP_VERSION__: JSON.stringify(getVersion())
   },

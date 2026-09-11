@@ -2,52 +2,93 @@
 @use '../../styles/mixins' as *;
 
 .page {
-  position: relative;
-  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   width: 100%;
-  max-width: 1320px;
-  margin: 0 auto;
-  padding: 22px 24px 56px;
+  min-width: 0;
+  padding: 0;
   box-sizing: border-box;
   color: var(--text-primary);
 }
 
 .ambient {
-  position: absolute;
-  z-index: -1;
-  top: -40px;
-  left: 3%;
-  width: 72%;
-  height: 350px;
-  pointer-events: none;
-  background:
-    radial-gradient(
-      circle at 24% 18%,
-      color-mix(in srgb, #db6d46 14%, transparent),
-      transparent 48%
-    ),
-    radial-gradient(
-      circle at 72% 14%,
-      color-mix(in srgb, #5c8d82 15%, transparent),
-      transparent 52%
-    );
-  filter: blur(8px);
-  opacity: 0.8;
+  display: none;
 }
 
+/* 页头与 AI 提供商/凭证库同语汇：标题左、动作右上、下方一行 meta。 */
 .hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(290px, 380px);
-  gap: 28px;
-  align-items: end;
-  padding: 24px 0 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.heroRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  flex-wrap: wrap;
 }
 
 .heroCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 420px;
   min-width: 0;
 }
 
-.eyebrow,
+/* 动作区：白底描边刷新 + 墨色药丸主行动，与提供商页同一对按钮。 */
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.heroAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color $transition-fast,
+    border-color $transition-fast;
+}
+
+.heroAction:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  background: var(--bg-tertiary);
+}
+
+.heroAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.heroActionPrimary {
+  border-color: var(--primary-color);
+  color: var(--primary-contrast);
+  background: var(--primary-color);
+}
+
+.heroActionPrimary:hover:not(:disabled) {
+  border-color: var(--primary-hover);
+  background: var(--primary-hover);
+}
+
+/* Only in-panel kickers keep the tracked-uppercase treatment; the page header
+   uses the shared title + telemetry vocabulary instead. */
 .cardKicker {
   display: inline-flex;
   align-items: center;
@@ -61,42 +102,57 @@
   text-transform: uppercase;
 }
 
-.eyebrow {
-  color: #bd5c3e;
-}
-
 .hero h1 {
-  max-width: 700px;
-  margin: 13px 0 10px;
-  font-size: clamp(38px, 5.2vw, 68px);
-  font-weight: 760;
-  letter-spacing: -0.055em;
-  line-height: 0.98;
-  text-wrap: balance;
+  max-width: 760px;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(26px, 3.2vw, 30px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
-.heroCopy p {
-  max-width: 650px;
+/* ▍cursor + mono telemetry line: same structure as the vault and quota headers. */
+.heroMeta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   margin: 0;
   color: var(--text-secondary);
-  font-size: 15px;
-  line-height: 1.65;
+  font-family: $font-mono;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
-.heroActions {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-top: 22px;
+.heroMeta::before {
+  align-self: center;
+  margin-right: 1px;
+  color: var(--viz-success);
+  font-size: 13px;
+  line-height: 1;
+  content: '▍';
 }
 
-.heroActions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+.heroMetaDot {
+  color: var(--text-quaternary);
+  user-select: none;
+}
+
+.heroNote {
+  max-width: 760px;
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .textLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 4px;
   color: var(--text-secondary);
   font-size: 13px;
   text-decoration: none;
@@ -107,44 +163,36 @@
   color: var(--text-primary);
 }
 
-.strategyCard {
-  position: relative;
-  overflow: hidden;
-  padding: 20px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 84%, #bd5c3e 16%);
-  border-radius: 18px;
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--bg-primary) 82%, #bd5c3e 18%),
-      var(--bg-secondary)
-    ),
-    var(--bg-secondary);
-  box-shadow: 0 18px 48px color-mix(in srgb, #5d4b41 12%, transparent);
+.heroActions :global(.btn) {
+  height: 34px;
 }
 
-.strategyCard::after {
-  position: absolute;
-  right: -34px;
-  bottom: -46px;
-  width: 150px;
-  height: 150px;
-  border: 1px solid color-mix(in srgb, #bd5c3e 28%, transparent);
-  border-radius: 50%;
-  content: '';
-  box-shadow:
-    0 0 0 14px color-mix(in srgb, #bd5c3e 7%, transparent),
-    0 0 0 28px color-mix(in srgb, #bd5c3e 5%, transparent);
+/* 横向一条：策略选择器 + 三步骤说明并排，不再占满横向空间的单列卡片。 */
+.strategyCard {
+  display: flex;
+  align-items: center;
+  gap: 16px 24px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: $radius-lg;
+  background: var(--bg-primary);
+  box-shadow: var(--shadow);
+  box-sizing: border-box;
 }
 
 .strategyCardTopline {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-  color: #bd5c3e;
+  gap: 10px;
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+.strategySelect {
+  flex: 0 1 320px;
+  min-width: 220px;
 }
 
 .strategyCard :global(.select-wrap) {
@@ -153,11 +201,10 @@
 }
 
 .strategyFlow {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  gap: 8px;
-  margin-top: 17px;
+  display: flex;
+  align-items: center;
+  gap: 6px 16px;
+  flex-wrap: wrap;
   color: var(--text-secondary);
   font-family: $font-mono;
   font-size: 11px;
@@ -166,7 +213,17 @@
 
 .strategyFlow span {
   padding-left: 10px;
-  border-left: 2px solid color-mix(in srgb, #bd5c3e 42%, transparent);
+  border-left: 2px solid var(--primary-30);
+}
+
+@media (max-width: 900px) {
+  .strategyCard {
+    align-items: stretch;
+  }
+
+  .strategySelect {
+    flex: 1 1 100%;
+  }
 }
 
 .errorBanner,
@@ -175,12 +232,12 @@
   align-items: center;
   gap: 10px;
   padding: 12px 15px;
-  border-radius: 12px;
+  border-radius: $radius-md;
   font-size: 13px;
 }
 
 .errorBanner {
-  margin-bottom: 15px;
+  margin-bottom: 0;
   border: 1px solid color-mix(in srgb, var(--error-color) 30%, var(--border-color));
   color: var(--error-color);
   background: color-mix(in srgb, var(--error-color) 6%, var(--bg-secondary));
@@ -193,8 +250,7 @@
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 14px;
 }
 
 .metricCard {
@@ -202,21 +258,19 @@
   grid-template-columns: 1fr auto;
   grid-template-rows: auto auto;
   gap: 6px 12px;
-  min-height: 96px;
-  padding: 16px 17px;
+  min-height: 120px;
+  padding: 16px 18px;
   border: 1px solid var(--border-color);
-  border-radius: 15px;
-  background: color-mix(in srgb, var(--bg-secondary) 92%, var(--bg-primary));
+  border-radius: $radius-lg;
+  background: var(--bg-primary);
+  box-shadow: var(--shadow);
   box-sizing: border-box;
 }
 
 .metricCard > span {
   align-self: end;
   color: var(--text-secondary);
-  font-family: $font-mono;
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: 13px;
 }
 
 .metricCard strong {
@@ -237,50 +291,45 @@
 }
 
 .metricAccent {
-  border-color: color-mix(in srgb, #bd5c3e 38%, var(--border-color));
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, #bd5c3e 9%, var(--bg-secondary)),
-    var(--bg-secondary)
-  );
+  border-color: var(--primary-30);
+  background: linear-gradient(135deg, var(--primary-8), var(--bg-primary));
 }
 
 .metricAccent strong {
-  color: #bd5c3e;
+  color: var(--primary-color);
 }
 
 .notice {
-  margin-bottom: 18px;
-  border: 1px dashed color-mix(in srgb, #5c8d82 40%, var(--border-color));
+  border: 1px solid var(--border-color);
   color: var(--text-secondary);
-  background: color-mix(in srgb, #5c8d82 6%, var(--bg-secondary));
+  background: var(--bg-primary);
 }
 
 .notice svg {
   flex: 0 0 auto;
-  color: #5c8d82;
+  color: var(--info-color);
 }
 
 .workspace {
   display: grid;
   grid-template-columns: 255px minmax(0, 1fr);
-  gap: 14px;
+  gap: 16px;
   align-items: start;
 }
 
 .modelRail,
 .poolPanel {
   border: 1px solid var(--border-color);
-  border-radius: 18px;
-  background: var(--bg-secondary);
-  box-shadow: 0 10px 32px color-mix(in srgb, #4d4038 8%, transparent);
+  border-radius: $radius-lg;
+  background: var(--bg-primary);
+  box-shadow: var(--shadow);
 }
 
 .modelRail {
   position: sticky;
-  top: 18px;
+  top: 16px;
   min-height: 420px;
-  padding: 18px 12px 14px;
+  padding: 16px 12px 14px;
 }
 
 .railHeading,
@@ -293,14 +342,14 @@
 
 .railHeading {
   padding: 0 6px 15px;
-  color: #5c8d82;
+  color: var(--primary-color);
 }
 
 .railHeading h2,
 .poolHeader h2 {
   margin: 7px 0 0;
   color: var(--text-primary);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.035em;
 }
@@ -312,14 +361,14 @@
   margin: 0 2px 12px;
   padding: 9px 10px;
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: $radius-md;
   color: var(--text-tertiary);
-  background: color-mix(in srgb, var(--bg-primary) 60%, var(--bg-secondary));
+  background: var(--bg-secondary);
 }
 
 .searchBox:focus-within {
-  border-color: color-mix(in srgb, #5c8d82 60%, var(--border-color));
-  box-shadow: 0 0 0 3px color-mix(in srgb, #5c8d82 12%, transparent);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-8);
 }
 
 .searchBox input {
@@ -374,17 +423,17 @@
 
 .modelItem:hover {
   color: var(--text-primary);
-  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  background: var(--bg-tertiary);
 }
 
 .modelItemActive {
-  border-color: color-mix(in srgb, #5c8d82 38%, var(--border-color));
+  border-color: var(--primary-30);
   color: var(--text-primary);
-  background: color-mix(in srgb, #5c8d82 10%, var(--bg-secondary));
+  background: var(--primary-8);
 }
 
 .modelItemActive b {
-  color: #5c8d82;
+  color: var(--primary-color);
 }
 
 .emptyRail {
@@ -408,8 +457,8 @@
   align-self: center;
   padding: 6px 9px;
   border-radius: 999px;
-  color: #5c8d82;
-  background: color-mix(in srgb, #5c8d82 10%, var(--bg-secondary));
+  color: var(--primary-color);
+  background: var(--primary-8);
   font-family: $font-mono;
   font-size: 11px;
   white-space: nowrap;
@@ -435,7 +484,7 @@
   padding: 10px 20px;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-tertiary);
-  background: color-mix(in srgb, var(--bg-primary) 52%, var(--bg-secondary));
+  background: var(--bg-secondary);
   font-family: $font-mono;
   font-size: 10px;
   letter-spacing: 0.06em;
@@ -447,7 +496,7 @@
 }
 
 .groupBlock {
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .groupRow {
@@ -463,7 +512,7 @@
 }
 
 .groupRow:hover {
-  background: color-mix(in srgb, #5c8d82 4%, var(--bg-secondary));
+  background: var(--primary-8);
 }
 
 .groupExpand {
@@ -479,8 +528,8 @@
 }
 
 .groupExpand:hover {
-  border-color: color-mix(in srgb, #5c8d82 50%, var(--border-color));
-  color: #5c8d82;
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .groupIdentity {
@@ -497,11 +546,31 @@
   width: 31px;
   height: 31px;
   border-radius: 9px;
-  color: #fff;
-  background: #5c8d82;
+  color: var(--primary-contrast);
+  background: var(--primary-color);
   font-family: $font-mono;
   font-size: 10px;
   font-weight: 700;
+}
+
+/* 品牌图标：与凭证库同一套资源，无图标时才回落到首字母方块。 */
+.groupMarkImage {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-secondary);
+}
+
+.groupMarkImage img {
+  width: 100%;
+  height: 100%;
+  padding: 20%;
+  object-fit: contain;
+  border-radius: inherit;
+  box-sizing: border-box;
 }
 
 .groupIdentity div {
@@ -548,33 +617,48 @@
 }
 
 .groupReady {
-  color: #3d8c72;
+  color: var(--viz-success);
 }
 
 .groupDisabled {
   color: var(--text-tertiary);
 }
 
-.mixedBadge {
-  padding: 3px 5px;
-  border-radius: 999px;
-  color: #b87931;
-  background: color-mix(in srgb, #b87931 10%, var(--bg-secondary));
-  font-family: $font-mono;
-  font-size: 9px;
+.groupHint,
+.groupError {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  border-bottom: 1px dashed var(--border-color);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.groupHint {
+  color: var(--amber-text);
+}
+
+.groupError {
+  color: var(--error-color);
+}
+
+.groupHint svg,
+.groupError svg {
+  flex: 0 0 auto;
 }
 
 .groupChildren {
   display: grid;
   margin-left: 46px;
-  border-top: 1px dashed color-mix(in srgb, var(--border-color) 84%, transparent);
-  background: color-mix(in srgb, var(--bg-primary) 25%, var(--bg-secondary));
+  border-top: 1px dashed var(--border-color);
+  background: var(--bg-secondary);
 }
 
 .groupChildren .candidateRow {
   min-height: 72px;
   padding-block: 10px;
-  border-bottom-color: color-mix(in srgb, var(--border-color) 50%, transparent);
+  border-bottom-color: var(--border-color);
 }
 
 .detailValue {
@@ -589,12 +673,12 @@
 .candidateRow {
   min-height: 94px;
   padding: 13px 20px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+  border-bottom: 1px solid var(--border-color);
   transition: background-color $transition-fast;
 }
 
 .candidateRow:hover {
-  background: color-mix(in srgb, #5c8d82 4%, var(--bg-secondary));
+  background: var(--primary-8);
 }
 
 .rowDisabled {
@@ -612,9 +696,9 @@
   place-items: center;
   width: 25px;
   height: 25px;
-  border: 1px solid color-mix(in srgb, #bd5c3e 38%, var(--border-color));
+  border: 1px solid var(--primary-30);
   border-radius: 50%;
-  color: #bd5c3e;
+  color: var(--primary-color);
   font-family: $font-mono;
   font-size: 11px;
 }
@@ -645,11 +729,15 @@
   width: 21px;
   height: 21px;
   border-radius: 6px;
-  color: #fff;
-  background: #5c8d82;
+  color: var(--primary-contrast);
+  background: var(--primary-color);
   font-family: $font-mono;
   font-size: 9px;
   font-weight: 700;
+}
+
+.credentialTopline .groupMarkImage {
+  border-radius: 6px;
 }
 
 .providerName {
@@ -703,7 +791,7 @@
 .moreModels {
   display: block;
   margin-top: 5px;
-  color: #5c8d82;
+  color: var(--primary-color);
   font-size: 10px;
 }
 
@@ -731,8 +819,8 @@
 }
 
 .numberInput:focus {
-  border-color: #bd5c3e;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #bd5c3e 12%, transparent);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-8);
 }
 
 .status {
@@ -744,11 +832,11 @@
 }
 
 .statusReady {
-  color: #3d8c72;
+  color: var(--viz-success);
 }
 
 .statusWarning {
-  color: #b87931;
+  color: var(--amber-text);
 }
 
 .statusDisabled {
@@ -790,7 +878,7 @@
 }
 
 .emptyPool svg {
-  color: #5c8d82;
+  color: var(--primary-color);
 }
 
 .emptyPool strong {
@@ -809,7 +897,7 @@
 }
 
 .loadingState svg {
-  color: #bd5c3e;
+  color: var(--primary-color);
 }
 
 .spin {
@@ -866,10 +954,16 @@
 
 @media (max-width: 900px) {
   .hero {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .heroCopy {
+    flex: none;
+    width: 100%;
   }
 
   .strategyCard {
+    flex: none;
     max-width: none;
   }
 
@@ -898,7 +992,7 @@
 
 @media (max-width: 720px) {
   .page {
-    padding: 14px 13px 40px;
+    gap: 16px;
   }
 
   .metrics {

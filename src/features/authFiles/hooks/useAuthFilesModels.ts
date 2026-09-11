@@ -6,6 +6,7 @@ import { useQuotaStore } from '@/stores/useQuotaStore';
 import type { AuthFileItem, OAuthModelAliasEntry } from '@/types';
 import { normalizeProviderKey, type AuthFileModelItem } from '@/features/authFiles/constants';
 import {
+  aliasesForProvider,
   applyOAuthModelAliases,
   mergeAuthFileModels,
   modelsFromUsageQuotaSnapshot,
@@ -13,17 +14,6 @@ import {
 import { parseUsageQuotaSnapshot } from '@/utils/quota';
 
 type ModelsError = 'unsupported' | null;
-
-const aliasesForProvider = (
-  aliases: Record<string, OAuthModelAliasEntry[]>,
-  provider: string
-): OAuthModelAliasEntry[] => {
-  const normalizedProvider = normalizeProviderKey(provider);
-  const providerEntry = Object.entries(aliases).find(
-    ([key]) => normalizeProviderKey(key) === normalizedProvider
-  );
-  return providerEntry?.[1] ?? [];
-};
 
 const getFreebuffQuotaModels = (
   item: AuthFileItem,

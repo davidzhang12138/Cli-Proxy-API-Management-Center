@@ -12,7 +12,8 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives",
     "verify": "bun run test && bun run lint && bun run build",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,scss}\"",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "dev:mock": "MOCK_API_TARGET=http://localhost:8317 node scripts/mock-api.mjs & MOCK_API_TARGET=http://localhost:8317 vite"
   },
   "dependencies": {
     "@codemirror/lang-yaml": "^6.1.3",

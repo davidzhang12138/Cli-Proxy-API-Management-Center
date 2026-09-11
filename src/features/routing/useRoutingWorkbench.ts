@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authFilesApi } from '@/services/api/authFiles';
 import { configApi } from '@/services/api/config';
-import { modelsApi } from '@/services/api/models';
 import { providersApi } from '@/services/api/providers';
-import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
-import { useAuthStore } from '@/stores';
+import { normalizeProviderKey } from '@/features/authFiles/constants';
+import { aliasesForProvider, applyOAuthModelAliases } from '@/features/authFiles/modelCatalog';
 import type {
   ApiKeyEntry,
   AuthFileItem,
   GeminiKeyConfig,
   ModelAlias,
+  OAuthModelAliasEntry,
   OpenAIProviderConfig,
   ProviderKeyConfig,
 } from '@/types';
+import { buildGroupCoverage } from '@/utils/routingCoverage';
 import { maskApiKey } from '@/utils/format';
 
 export type RoutingStrategy = 'round-robin' | 'weighted-round-robin' | 'fill-first';
@@ -46,10 +47,10 @@ export interface RoutingGroup {
   candidates: RoutingCandidate[];
   models: string[];
   priority: number;
-  mixedPriority: boolean;
-  enabled: boolean;
+  uniformPriority: boolean;
   editable: boolean;
   updatePriority: (priority: number) => Promise<void>;
+  updateCandidatePriority: (candidateId: string, priority: number) => Promise<void>;
 }
 
 export interface RoutingSnapshot {
@@ -66,13 +67,32 @@ export interface UseRoutingWorkbenchResult {
   refreshing: boolean;
   error: string;
   savingStrategy: boolean;
-  savingCandidateId: string | null;
+  /** providerKey -> model ids actually declared by that group's credentials. */
+  modelCoverage: Map<string, string[]>;
   refresh: () => Promise<void>;
   updateStrategy: (strategy: RoutingStrategy) => Promise<void>;
-  updateCandidate: (candidate: RoutingCandidate, next: RoutingCandidateUpdate) => Promise<void>;
 }
 
 const DEFAULT_STRATEGY: RoutingStrategy = 'round-robin';
+
+/** Credentials per provider family can number in the hundreds; keep the fan-out bounded. */
+const MODEL_FETCH_CONCURRENCY = 6;
+
+async function runWithConcurrency<T>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (cursor < items.length) {
+        const index = cursor++;
+        await worker(items[index]);
+      }
+    })
+  );
+}
 
 const normalizeStrategy = (value: unknown): RoutingStrategy => {
   const normalized = String(value ?? '')
@@ -166,18 +186,22 @@ const buildStandardCandidate = (
   };
 };
 
-const buildOAuthCandidate = (file: AuthFileItem, models: string[]): RoutingCandidate => {
-  const provider = String(file.type ?? file.provider ?? 'unknown')
-    .trim()
-    .toLowerCase();
+const buildOAuthCandidate = (file: AuthFileItem): RoutingCandidate => {
+  const provider = normalizeProviderKey(String(file.type ?? file.provider ?? 'unknown'));
   const identity = String(file.email ?? file.projectId ?? file.name).trim();
   const runtimeOnly = isRuntimeOnly(file);
   const enabled = file.disabled !== true && file.unavailable !== true;
   const warning = Boolean(file.statusMessage) || file.status === 'error';
+  // The models a credential actually serves come from its own catalog endpoint,
+  // not the proxy-wide /v1/models list (which is per API key, not per file). It
+  // is fetched lazily when the group is expanded; until then, none are claimed.
+  const models: string[] = [];
 
   return {
     id: `oauth:${file.name}`,
     provider,
+    // Same key as the config-declared keys for this provider: the workbench's
+    // point is one group per provider family, spanning OAuth and API keys.
     providerKey: provider,
     source: 'oauth',
     identity,
@@ -247,40 +271,63 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
     : [buildCandidate(null, 0)];
 };
 
-const buildRoutingGroups = (
-  candidates: RoutingCandidate[],
-  modelCatalog: string[]
-): RoutingGroup[] => {
-  const grouped = new Map<string, RoutingCandidate[]>();
-  candidates.forEach((candidate) => {
-    const current = grouped.get(candidate.providerKey) ?? [];
-    current.push(candidate);
-    grouped.set(candidate.providerKey, current);
-  });
+interface GroupRecord {
+  group: RoutingGroup;
+  coverage: string[];
+}
 
-  return [...grouped.entries()].map(([id, groupCandidates]) => {
-    const priorities = new Set(groupCandidates.map((candidate) => candidate.priority));
-    const models = new Set<string>();
-    groupCandidates.forEach((candidate) => candidate.models.forEach((model) => models.add(model)));
-    if (models.size === 0) modelCatalog.forEach((model) => models.add(model));
-    const editableCandidates = groupCandidates.filter((candidate) => candidate.editable);
-    return {
-      id,
-      provider: groupCandidates[0]?.provider ?? id,
-      providerKey: id,
-      candidates: groupCandidates,
-      models: [...models].sort((left, right) => left.localeCompare(right)),
-      priority: Math.max(...groupCandidates.map((candidate) => candidate.priority), 0),
-      mixedPriority: priorities.size > 1,
-      enabled: groupCandidates.some((candidate) => candidate.enabled),
-      editable: editableCandidates.length > 0,
-      updatePriority: async (priority: number) => {
-        for (const candidate of editableCandidates) {
+/**
+ * Groups credentials by provider. Pass the catalog to let unscoped credentials
+ * (those declaring no models) inherit it; omit it to report declared models only.
+ */
+const groupRecords = (candidates: RoutingCandidate[], catalog?: string[]): GroupRecord[] =>
+  buildGroupCoverage(candidates, catalog).map(
+    ({ id, provider, candidates: groupCandidates, coverage }) => ({
+      coverage,
+      group: {
+        id,
+        provider,
+        providerKey: id,
+        candidates: groupCandidates,
+        models: coverage,
+        priority: Math.max(...groupCandidates.map((candidate) => candidate.priority), 0),
+        uniformPriority:
+          new Set(groupCandidates.map((candidate) => candidate.priority)).size <= 1,
+        editable: groupCandidates.some((candidate) => candidate.editable),
+        updatePriority: async (priority: number) => {
+          for (const candidate of groupCandidates) {
+            if (candidate.editable && candidate.priority !== priority) {
+              await candidate.update({ priority });
+            }
+          }
+        },
+        updateCandidatePriority: async (candidateId: string, priority: number) => {
+          const candidate = groupCandidates.find(
+            (item) => item.id === candidateId && item.editable
+          );
+          if (!candidate) throw new Error('Credential is not editable');
           await candidate.update({ priority });
-        }
+        },
       },
-    };
-  });
+    })
+  );
+
+const snapshotFrom = (
+  candidates: RoutingCandidate[],
+  catalog: string[],
+  strategy: RoutingStrategy,
+  fetchedAt: number
+): RoutingSnapshot => {
+  const models = new Set(catalog);
+  candidates.forEach((candidate) => candidate.models.forEach((model) => models.add(model)));
+  const modelList = [...models].sort((left, right) => left.localeCompare(right));
+  return {
+    candidates,
+    groups: groupRecords(candidates, modelList).map((record) => record.group),
+    models: modelList,
+    strategy,
+    fetchedAt,
+  };
 };
 
 interface BaseSnapshotResult {
@@ -314,85 +361,106 @@ const loadBaseSnapshot = async (): Promise<BaseSnapshotResult> => {
   (config.openaiCompatibility ?? []).forEach((provider) => {
     candidates.push(...buildOpenAICompatCandidates(provider));
   });
-  candidates.push(...(authFiles.files ?? []).map((file) => buildOAuthCandidate(file, [])));
-
-  const configuredModels = new Set<string>();
-  candidates.forEach((candidate) =>
-    candidate.models.forEach((model) => configuredModels.add(model))
-  );
-  const models = [...configuredModels].sort((left, right) => left.localeCompare(right));
+  candidates.push(...(authFiles.files ?? []).map((file) => buildOAuthCandidate(file)));
 
   return {
-    snapshot: {
+    snapshot: snapshotFrom(
       candidates,
-      groups: buildRoutingGroups(candidates, models),
-      models,
-      strategy: normalizeStrategy(config.routingStrategy ?? strategy),
-      fetchedAt: Date.now(),
-    },
-  };
-};
-
-const applyGlobalModelCatalog = (
-  snapshot: RoutingSnapshot,
-  modelCatalog: string[]
-): RoutingSnapshot => {
-  const candidates = snapshot.candidates.map((candidate) =>
-    candidate.source === 'oauth' ? { ...candidate, models: modelCatalog } : candidate
-  );
-  const models = new Set(modelCatalog);
-  candidates.forEach((candidate) => candidate.models.forEach((model) => models.add(model)));
-  const modelList = [...models].sort((left, right) => left.localeCompare(right));
-  return {
-    ...snapshot,
-    candidates,
-    groups: buildRoutingGroups(candidates, modelList),
-    models: modelList,
+      [],
+      normalizeStrategy(config.routingStrategy ?? strategy),
+      Date.now()
+    ),
   };
 };
 
 export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
-  const apiBase = useAuthStore((state) => state.apiBase);
-  const getApiKeysForModels = useApiKeysForModels();
   const [snapshot, setSnapshot] = useState<RoutingSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [savingStrategy, setSavingStrategy] = useState(false);
-  const [savingCandidateId, setSavingCandidateId] = useState<string | null>(null);
+  const aliasesRef = useRef<Record<string, OAuthModelAliasEntry[]>>({});
+
+  const modelCoverage = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (snapshot) {
+      groupRecords(snapshot.candidates).forEach((record) =>
+        map.set(record.group.id, record.coverage)
+      );
+    }
+    return map;
+  }, [snapshot]);
+
+  /**
+   * Per-credential model catalogs. Each auth file has its own endpoint, and the
+   * pool hides groups with no models, so coverage has to be known up front
+   * rather than on expand — one bounded round of requests per credential, then
+   * cached for the session.
+   *
+   * ponytail: the cache is never invalidated, so a catalog edited elsewhere
+   * stays stale until reload. Add a TTL or invalidate on auth-file writes if
+   * that starts to matter.
+   */
+  const modelsCacheRef = useRef<Map<string, string[]>>(new Map());
+
+  const loadOAuthModels = useCallback(async (candidates: RoutingCandidate[]) => {
+    const oauth = candidates.filter((candidate) => candidate.source === 'oauth');
+    if (oauth.length === 0) return;
+
+    const missing = oauth.filter((candidate) => !modelsCacheRef.current.has(candidate.id));
+    if (missing.length > 0) {
+      if (Object.keys(aliasesRef.current).length === 0) {
+        aliasesRef.current = await authFilesApi.getOauthModelAlias().catch(() => ({}));
+      }
+      await runWithConcurrency(missing, MODEL_FETCH_CONCURRENCY, async (candidate) => {
+        const name = candidate.id.replace(/^oauth:/, '');
+        const provider = normalizeProviderKey(candidate.provider);
+        let models: string[] = [];
+        try {
+          const raw = await authFilesApi.getModelsForAuthFile(name);
+          models = [
+            ...new Set(
+              applyOAuthModelAliases(raw, aliasesForProvider(aliasesRef.current, provider))
+                .map((model) => model.id)
+                .filter(Boolean)
+            ),
+          ].sort((left, right) => left.localeCompare(right));
+        } catch {
+          // A credential with no catalog endpoint simply claims no models.
+        }
+        modelsCacheRef.current.set(candidate.id, models);
+      });
+    }
+
+    setSnapshot((current) => {
+      if (!current) return current;
+      return snapshotFrom(
+        current.candidates.map((candidate) =>
+          candidate.source === 'oauth'
+            ? { ...candidate, models: modelsCacheRef.current.get(candidate.id) ?? [] }
+            : candidate
+        ),
+        [],
+        current.strategy,
+        current.fetchedAt
+      );
+    });
+  }, []);
+
   const refresh = useCallback(async () => {
     setRefreshing(true);
     setError('');
     try {
       const result = await loadBaseSnapshot();
       setSnapshot(result.snapshot);
-      setLoading(false);
-      setRefreshing(false);
-      if (apiBase) {
-        void (async () => {
-          try {
-            const apiKeys = await getApiKeysForModels();
-            if (!apiKeys[0]) return;
-            const models = await modelsApi.fetchModels(apiBase, apiKeys[0]);
-            const modelCatalog = models.map((model) => model.name).filter(Boolean);
-            if (modelCatalog.length > 0) {
-              setSnapshot((current) =>
-                current ? applyGlobalModelCatalog(current, modelCatalog) : current
-              );
-            }
-          } catch {
-            // Config-declared models remain visible when the global proxy catalog is unavailable.
-          }
-        })();
-      }
-      return;
+      await loadOAuthModels(result.snapshot.candidates);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [apiBase, getApiKeysForModels]);
+  }, [loadOAuthModels]);
 
   useEffect(() => {
     void refresh();
@@ -408,27 +476,14 @@ export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
     }
   }, []);
 
-  const updateCandidate = useCallback(
-    async (candidate: RoutingCandidate, next: RoutingCandidateUpdate) => {
-      setSavingCandidateId(candidate.id);
-      try {
-        await candidate.update(next);
-      } finally {
-        setSavingCandidateId(null);
-      }
-    },
-    []
-  );
-
   return {
     snapshot,
     loading,
     refreshing,
     error,
     savingStrategy,
-    savingCandidateId,
+    modelCoverage,
     refresh,
     updateStrategy,
-    updateCandidate,
   };
 }

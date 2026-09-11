@@ -292,11 +292,11 @@
     "group_count": "{{count}} 个调度组",
     "group_candidate_count": "{{count}} 个凭证 · 展开查看明细",
     "toggle_group": "展开或收起凭证明细",
-    "mixed_priority": "组内不一致",
     "candidate": "候选凭证",
     "group": "调度组",
     "models": "模型覆盖",
     "priority": "Priority",
+    "mixed_priority": "组内不一致",
     "weight": "Weight",
     "rank": "顺位",
     "status_ready": "可用",
@@ -310,10 +310,11 @@
     "updated_at": "最近同步 {{time}}",
     "default_weight_hint": "空权重按 1 参与；0 表示加权策略下排除。",
     "invalid_priority": "优先级必须是整数。",
-    "invalid_weight": "权重必须是 0 到 1,000,000 之间的整数。",
     "saved": "调度参数已保存",
     "strategy_saved": "调度策略已更新",
-    "save_failed": "保存失败"
+    "save_failed": "保存失败",
+    "group_priority_hint": "组内优先级不一致：上方保存会把本组全部凭证统一为该值；要保留分层请展开后逐条保存。",
+    "group_priority_blocked": "组内优先级不一致，已阻止整组覆盖。请展开后逐条保存，或先统一为同一数值。"
   },
   "auth_files": {
     "title": "认证文件管理",

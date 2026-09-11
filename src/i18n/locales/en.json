@@ -292,11 +292,11 @@
     "group_count": "{{count}} routing groups",
     "group_candidate_count": "{{count}} credentials · expand for detail",
     "toggle_group": "Expand or collapse credential details",
-    "mixed_priority": "Mixed in group",
     "candidate": "Credential",
     "group": "Routing group",
     "models": "Model coverage",
     "priority": "Priority",
+    "mixed_priority": "Mixed in group",
     "weight": "Weight",
     "rank": "Rank",
     "status_ready": "Ready",
@@ -310,10 +310,11 @@
     "updated_at": "Last sync {{time}}",
     "default_weight_hint": "Blank weight behaves as 1; 0 excludes a credential from weighted routing.",
     "invalid_priority": "Priority must be an integer.",
-    "invalid_weight": "Weight must be an integer from 0 to 1,000,000.",
     "saved": "Scheduling values saved",
     "strategy_saved": "Routing strategy updated",
-    "save_failed": "Save failed"
+    "save_failed": "Save failed",
+    "group_priority_hint": "Priorities differ inside this group: saving above unifies every credential to one value. Keep the layering and save per credential instead.",
+    "group_priority_blocked": "Group priorities differ; group-wide overwrite blocked. Save each credential individually, or unify them to one value first."
   },
   "auth_files": {
     "title": "Auth Files Management",
