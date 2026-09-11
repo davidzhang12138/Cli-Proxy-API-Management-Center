@@ -38,6 +38,9 @@ import { ModelEntriesEditor } from './ModelEntriesEditor';
 import styles from './sharedForm.module.scss';
 import { CLAUDE_API_BASE_URL } from '../../claudeApi';
 import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
+import { PayloadFilterRulesEditor } from '@/features/config/components/blocks/PayloadFilterRulesEditor';
+import { PayloadRulesEditor } from '@/features/config/components/blocks/PayloadRulesEditor';
+import { parseProviderPayload } from '../../providerPayload';
 
 /** 模块级常量，免得每次渲染都给 picker 一个新数组引用。 */
 const DISABLE_ALL_RULES = [DISABLE_ALL_RULE];
@@ -93,6 +96,11 @@ function buildInitialForm(
       forwardUserAgent: brand === 'openaiCompatibility' ? false : undefined,
       quotaBackoffMin: '',
       quotaBackoffMax: '',
+      providerPayloadDefaultRules: [],
+      providerPayloadDefaultRawRules: [],
+      providerPayloadOverrideRules: [],
+      providerPayloadOverrideRawRules: [],
+      providerPayloadFilterRules: [],
       priority: undefined,
       weight: undefined,
       models: [emptyModel()],
@@ -119,6 +127,7 @@ function buildInitialForm(
   const raw = resource.raw;
   if (brand === 'openaiCompatibility') {
     const cfg = raw as OpenAIProviderConfig;
+    const providerPayload = parseProviderPayload(cfg.payload);
     return {
       apiKey: '',
       name: cfg.name ?? '',
@@ -130,6 +139,11 @@ function buildInitialForm(
       forwardUserAgent: cfg.forwardUserAgent === true,
       quotaBackoffMin: cfg.quotaBackoffMin ?? '',
       quotaBackoffMax: cfg.quotaBackoffMax ?? '',
+      providerPayloadDefaultRules: providerPayload.defaultRules,
+      providerPayloadDefaultRawRules: providerPayload.defaultRawRules,
+      providerPayloadOverrideRules: providerPayload.overrideRules,
+      providerPayloadOverrideRawRules: providerPayload.overrideRawRules,
+      providerPayloadFilterRules: providerPayload.filterRules,
       priority: cfg.priority,
       models: cfg.models?.length
         ? cfg.models.map((m) => ({
@@ -535,6 +549,12 @@ export function BaseProviderForm({
   const quotaBackoffCount = [form.quotaBackoffMin, form.quotaBackoffMax].filter(
     (v) => v && v.trim()
   ).length;
+  const providerPayloadCount =
+    (form.providerPayloadDefaultRules?.length ?? 0) +
+    (form.providerPayloadDefaultRawRules?.length ?? 0) +
+    (form.providerPayloadOverrideRules?.length ?? 0) +
+    (form.providerPayloadOverrideRawRules?.length ?? 0) +
+    (form.providerPayloadFilterRules?.length ?? 0);
   const supportsModelImage = brand === 'openaiCompatibility';
   const singleConnectivity =
     brand === 'codex' || brand === 'xai'
@@ -879,6 +899,76 @@ export function BaseProviderForm({
                   {t('providersPage.form.quotaBackoffMaxHint')}
                 </small>
               </div>
+            </div>
+          </Collapsible>
+        ) : null}
+
+        {brand === 'openaiCompatibility' ? (
+          <Collapsible
+            label={t('providersPage.form.providerPayloadSection')}
+            hint={String(providerPayloadCount)}
+            defaultOpen={providerPayloadCount > 0}
+          >
+            <div className={styles.section}>
+              <Collapsible
+                label={t('config_management.visual.sections.payload.override_rules')}
+                hint={t('config_management.visual.sections.payload.override_rules_desc')}
+                defaultOpen={Boolean(form.providerPayloadOverrideRules?.length)}
+              >
+                <PayloadRulesEditor
+                  value={form.providerPayloadOverrideRules ?? []}
+                  disabled={mutating}
+                  protocolFirst
+                  onChange={(value) => updateField('providerPayloadOverrideRules', value)}
+                />
+              </Collapsible>
+              <Collapsible
+                label={t('config_management.visual.sections.payload.override_raw_rules')}
+                hint={t('config_management.visual.sections.payload.override_raw_rules_desc')}
+                defaultOpen={Boolean(form.providerPayloadOverrideRawRules?.length)}
+              >
+                <PayloadRulesEditor
+                  value={form.providerPayloadOverrideRawRules ?? []}
+                  disabled={mutating}
+                  protocolFirst
+                  rawJsonValues
+                  onChange={(value) => updateField('providerPayloadOverrideRawRules', value)}
+                />
+              </Collapsible>
+              <Collapsible
+                label={t('config_management.visual.sections.payload.default_rules')}
+                hint={t('config_management.visual.sections.payload.default_rules_desc')}
+                defaultOpen={Boolean(form.providerPayloadDefaultRules?.length)}
+              >
+                <PayloadRulesEditor
+                  value={form.providerPayloadDefaultRules ?? []}
+                  disabled={mutating}
+                  onChange={(value) => updateField('providerPayloadDefaultRules', value)}
+                />
+              </Collapsible>
+              <Collapsible
+                label={t('config_management.visual.sections.payload.default_raw_rules')}
+                hint={t('config_management.visual.sections.payload.default_raw_rules_desc')}
+                defaultOpen={Boolean(form.providerPayloadDefaultRawRules?.length)}
+              >
+                <PayloadRulesEditor
+                  value={form.providerPayloadDefaultRawRules ?? []}
+                  disabled={mutating}
+                  rawJsonValues
+                  onChange={(value) => updateField('providerPayloadDefaultRawRules', value)}
+                />
+              </Collapsible>
+              <Collapsible
+                label={t('config_management.visual.sections.payload.filter_rules')}
+                hint={t('config_management.visual.sections.payload.filter_rules_desc')}
+                defaultOpen={Boolean(form.providerPayloadFilterRules?.length)}
+              >
+                <PayloadFilterRulesEditor
+                  value={form.providerPayloadFilterRules ?? []}
+                  disabled={mutating}
+                  onChange={(value) => updateField('providerPayloadFilterRules', value)}
+                />
+              </Collapsible>
             </div>
           </Collapsible>
         ) : null}

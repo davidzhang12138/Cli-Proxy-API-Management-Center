@@ -124,4 +124,27 @@ describe('OpenAI-compatible endpoint overrides', () => {
       },
     ]);
   });
+
+  test('round-trips provider-scoped payload rules without changing the model alias', () => {
+    const config = buildOpenAIConfig({
+      ...modalForm(),
+      providerPayloadOverrideRules: [
+        {
+          id: 'rule-1',
+          models: [{ id: 'model-1', name: 'kimi-k3', protocol: 'openai', fromProtocol: 'claude' }],
+          params: [{ id: 'param-1', path: 'max_tokens', valueType: 'number', value: '16384' }],
+        },
+      ],
+    });
+
+    expect(config.payload).toEqual({
+      override: [
+        {
+          models: [{ name: 'kimi-k3', protocol: 'openai', 'from-protocol': 'claude' }],
+          params: { max_tokens: 16384 },
+        },
+      ],
+    });
+    expect(config.apiKeyEntries[0]?.models?.[0]?.alias).toBe('modal-model');
+  });
 });

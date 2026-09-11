@@ -27,6 +27,7 @@ import {
 } from './adapters';
 import { PROVIDER_BRAND_ORDER } from './descriptors';
 import { buildThinkingFromLevels } from './thinkingLevels';
+import { serializeProviderPayload } from './providerPayload';
 import type {
   ProviderBrand,
   ProviderEntryFormInput,
@@ -238,6 +239,13 @@ export const buildOpenAIConfig = (
 ): OpenAIProviderConfig => {
   const headers = headersFromEntries(input.headers);
   const models = buildModelAliases(input.models, true);
+  const providerPayload = serializeProviderPayload({
+    defaultRules: input.providerPayloadDefaultRules ?? [],
+    defaultRawRules: input.providerPayloadDefaultRawRules ?? [],
+    overrideRules: input.providerPayloadOverrideRules ?? [],
+    overrideRawRules: input.providerPayloadOverrideRawRules ?? [],
+    filterRules: input.providerPayloadFilterRules ?? [],
+  });
   const apiKeyEntries =
     input.apiKeyEntries
       ?.map((entry, index) => {
@@ -267,6 +275,7 @@ export const buildOpenAIConfig = (
     forwardUserAgent: input.forwardUserAgent === true,
     quotaBackoffMin: input.quotaBackoffMin?.trim() || undefined,
     quotaBackoffMax: input.quotaBackoffMax?.trim() || undefined,
+    payload: providerPayload,
     headers: Object.keys(headers).length ? headers : undefined,
     models: models.length ? models : undefined,
     priority: input.priority,

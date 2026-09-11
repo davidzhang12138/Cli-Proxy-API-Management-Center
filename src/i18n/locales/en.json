@@ -2033,6 +2033,7 @@
       "quotaBackoffMinHint": "Min 429 quota cooldown, e.g. 30s / 5m / 1h / 2h30m",
       "quotaBackoffMax": "Quota backoff max",
       "quotaBackoffMaxHint": "Max 429 quota cooldown, e.g. 30m / 1h / 2h30m",
+      "providerPayloadSection": "Provider payload rules",
       "modelEntry": "Model #{{index}}",
       "weight": "Scheduling weight",
       "weightHint": "Default 1 · ≤ 0 is excluded · maximum 1,000,000",

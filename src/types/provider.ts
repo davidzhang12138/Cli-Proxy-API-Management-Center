@@ -29,6 +29,14 @@ export interface CloakConfig {
   cacheUserId?: boolean;
 }
 
+export interface ProviderPayloadConfig {
+  default?: unknown[];
+  'default-raw'?: unknown[];
+  override?: unknown[];
+  'override-raw'?: unknown[];
+  filter?: unknown[];
+}
+
 export interface GeminiKeyConfig {
   apiKey: string;
   priority?: number;
@@ -68,6 +76,7 @@ export interface OpenAIProviderConfig {
   apiKeyEntries: ApiKeyEntry[];
   disabled?: boolean;
   headers?: Record<string, string>;
+  payload?: ProviderPayloadConfig;
   /** Forward the downstream User-Agent to the OpenAI-compatible upstream. */
   forwardUserAgent?: boolean;
   models?: ModelAlias[];

@@ -599,7 +599,7 @@ function parsePayloadModelEntries(raw: unknown, idPrefix: string): PayloadRule['
   });
 }
 
-function parsePayloadRules(rules: unknown): PayloadRule[] {
+export function parsePayloadRules(rules: unknown): PayloadRule[] {
   if (!Array.isArray(rules)) return [];
 
   return rules.map((rule, index) => {
@@ -624,7 +624,7 @@ function parsePayloadRules(rules: unknown): PayloadRule[] {
   });
 }
 
-function parsePayloadFilterRules(rules: unknown): PayloadFilterRule[] {
+export function parsePayloadFilterRules(rules: unknown): PayloadFilterRule[] {
   if (!Array.isArray(rules)) return [];
 
   return rules.map((rule, index) => {
@@ -639,7 +639,7 @@ function parsePayloadFilterRules(rules: unknown): PayloadFilterRule[] {
   });
 }
 
-function parseRawPayloadRules(rules: unknown): PayloadRule[] {
+export function parseRawPayloadRules(rules: unknown): PayloadRule[] {
   if (!Array.isArray(rules)) return [];
 
   return rules.map((rule, index) => {
@@ -758,7 +758,7 @@ function serializePayloadModelsForYaml(
     });
 }
 
-function serializePayloadRulesForYaml(rules: PayloadRule[]): Array<Record<string, unknown>> {
+export function serializePayloadRulesForYaml(rules: PayloadRule[]): Array<Record<string, unknown>> {
   return rules
     .map((rule) => {
       const models = serializePayloadModelsForYaml(rule.models);
@@ -774,7 +774,7 @@ function serializePayloadRulesForYaml(rules: PayloadRule[]): Array<Record<string
     .filter((rule) => rule.models.length > 0);
 }
 
-function serializePayloadFilterRulesForYaml(
+export function serializePayloadFilterRulesForYaml(
   rules: PayloadFilterRule[]
 ): Array<Record<string, unknown>> {
   return rules
@@ -790,7 +790,9 @@ function serializePayloadFilterRulesForYaml(
     .filter((rule) => rule.models.length > 0);
 }
 
-function serializeRawPayloadRulesForYaml(rules: PayloadRule[]): Array<Record<string, unknown>> {
+export function serializeRawPayloadRulesForYaml(
+  rules: PayloadRule[]
+): Array<Record<string, unknown>> {
   return rules
     .map((rule) => {
       const models = serializePayloadModelsForYaml(rule.models);

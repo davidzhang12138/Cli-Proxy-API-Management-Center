@@ -252,6 +252,7 @@ const normalizeOpenAIProvider = (
   if (!baseUrl && !apiKeyEntries.some((entry) => entry.baseUrl?.trim())) return null;
 
   const headers = normalizeHeaders(provider.headers);
+  const payload = normalizeRecord(provider.payload);
   const models = normalizeModelAliases(provider.models);
   const priority = provider.priority;
   const testModel = provider['test-model'];
@@ -291,6 +292,7 @@ const normalizeOpenAIProvider = (
   const prefix = normalizePrefix(provider.prefix);
   if (prefix) result.prefix = prefix;
   if (headers) result.headers = headers;
+  if (payload) result.payload = payload;
   if (models.length) result.models = models;
   if (priority !== undefined) result.priority = Number(priority);
   if (testModel) result.testModel = String(testModel);

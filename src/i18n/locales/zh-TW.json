@@ -2005,6 +2005,7 @@
       },
       "headers": "請求標頭",
       "headersHint": "每行一條,格式 Key: Value",
+      "providerPayloadSection": "Provider 請求體規則",
       "modelEntry": "模型 #{{index}}",
       "weight": "調度權重",
       "weightHint": "預設 1 · ≤ 0 時不參與 · 最大 1,000,000",

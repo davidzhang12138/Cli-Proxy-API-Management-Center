@@ -30,6 +30,7 @@ const PROVIDER_COMMON_KEY_FIELDS = [
   'base-url',
   'proxy-url',
   'headers',
+  'payload',
   'models',
   'excluded-models',
   'disable-cooling',
@@ -451,6 +452,7 @@ const serializeOpenAIProvider = (provider: OpenAIProviderConfig) => {
   if (headers) payload.headers = headers;
   const models = serializeModelAliases(provider.models, true);
   if (models && models.length) payload.models = models;
+  if (provider.payload) payload.payload = provider.payload;
   if (provider.priority !== undefined) payload.priority = provider.priority;
   if (provider.testModel) payload['test-model'] = provider.testModel;
   if (provider.disableCooling) payload['disable-cooling'] = true;

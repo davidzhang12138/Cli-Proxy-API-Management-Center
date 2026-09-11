@@ -2033,6 +2033,7 @@
       "quotaBackoffMinHint": "429 配额冷却下限,支持 30s / 5m / 1h / 2h30m",
       "quotaBackoffMax": "配额退避上限",
       "quotaBackoffMaxHint": "429 配额冷却上限,支持 30m / 1h / 2h30m",
+      "providerPayloadSection": "Provider 请求体规则",
       "modelEntry": "模型 #{{index}}",
       "weight": "调度权重",
       "weightHint": "默认 1 · ≤ 0 时不参与 · 最大 1,000,000",

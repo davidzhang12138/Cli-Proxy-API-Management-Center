@@ -3,6 +3,7 @@
  */
 
 import type { GeminiKeyConfig, OpenAIProviderConfig, ProviderKeyConfig } from '@/types';
+import type { PayloadFilterRule, PayloadRule } from '@/types/visualConfig';
 import type { ThinkingLevel } from './thinkingLevels';
 
 export type ProviderBrand =
@@ -217,6 +218,11 @@ export interface ProviderEntryFormInput {
   forwardUserAgent?: boolean;
   quotaBackoffMin?: string;
   quotaBackoffMax?: string;
+  providerPayloadDefaultRules?: PayloadRule[];
+  providerPayloadDefaultRawRules?: PayloadRule[];
+  providerPayloadOverrideRules?: PayloadRule[];
+  providerPayloadOverrideRawRules?: PayloadRule[];
+  providerPayloadFilterRules?: PayloadFilterRule[];
   priority?: number;
   weight?: number;
 
