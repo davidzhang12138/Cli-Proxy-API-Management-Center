@@ -22,6 +22,8 @@ import { TYPE_COLORS } from '@/utils/quota';
 export type { ResolvedTheme, ThemeColors, TypeColorSet } from '@/types';
 export type AuthFileModelItem = {
   id: string;
+  /** Original upstream model ID when this row is rendered through an OAuth alias. */
+  sourceId?: string;
   display_name?: string;
   type?: string;
   owned_by?: string;

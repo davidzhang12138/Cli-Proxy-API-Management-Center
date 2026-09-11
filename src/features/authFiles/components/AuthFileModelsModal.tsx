@@ -104,7 +104,7 @@ export function AuthFileModelsModal(props: AuthFileModelsModalProps) {
       ) : (
         <div className={styles.list}>
           {models.map((model) => {
-            const excludedModel = isModelExcluded(model.id, fileType, excluded);
+            const excludedModel = isModelExcluded(model.sourceId ?? model.id, fileType, excluded);
             const check = checks[model.id];
             return (
               <div

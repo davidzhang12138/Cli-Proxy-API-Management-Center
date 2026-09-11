@@ -822,16 +822,17 @@ export const authFilesApi = {
     const normalizedChannel = normalizeOAuthProviderKey(String(channel ?? ''));
 
     try {
+      await apiClient.delete(
+        `${OAUTH_MODEL_ALIAS_ENDPOINT}?channel=${encodeURIComponent(normalizedChannel)}`
+      );
+    } catch (err: unknown) {
+      const status = getStatusCode(err);
+      if (status !== 405) throw err;
+      // Older servers may not expose DELETE; PATCH keeps the compatibility path.
       await apiClient.patch(OAUTH_MODEL_ALIAS_ENDPOINT, {
         channel: normalizedChannel,
         aliases: [],
       });
-    } catch (err: unknown) {
-      const status = getStatusCode(err);
-      if (status !== 405) throw err;
-      await apiClient.delete(
-        `${OAUTH_MODEL_ALIAS_ENDPOINT}?channel=${encodeURIComponent(normalizedChannel)}`
-      );
     }
   },
 

@@ -62,7 +62,13 @@ describe('mergeAuthFileModels', () => {
         [{ id: 'deepseek-v4-flash', type: 'freebuff' }],
         [{ name: 'deepseek-v4-flash', alias: 'deepseek-v4.1-flash-t' }]
       )
-    ).toEqual([{ id: 'deepseek-v4.1-flash-t', type: 'freebuff' }]);
+    ).toEqual([
+      {
+        id: 'deepseek-v4.1-flash-t',
+        sourceId: 'deepseek-v4-flash',
+        type: 'freebuff',
+      },
+    ]);
   });
 
   test('rewrites quota model IDs using non-fork aliases', () => {
@@ -71,7 +77,7 @@ describe('mergeAuthFileModels', () => {
         { resources: [{ models: ['deepseek-v4-flash'] }] },
         [{ name: 'deepseek-v4-flash', alias: 'deepseek-v4.1-flash-t' }]
       )
-    ).toEqual([{ id: 'deepseek-v4.1-flash-t' }]);
+    ).toEqual([{ id: 'deepseek-v4.1-flash-t', sourceId: 'deepseek-v4-flash' }]);
   });
 
   test('keeps the original model for fork aliases', () => {
@@ -82,7 +88,29 @@ describe('mergeAuthFileModels', () => {
       )
     ).toEqual([
       { id: 'deepseek-v4-flash', type: 'freebuff' },
-      { id: 'deepseek-v4.1-flash-t', type: 'freebuff' },
+      {
+        id: 'deepseek-v4.1-flash-t',
+        sourceId: 'deepseek-v4-flash',
+        type: 'freebuff',
+      },
+    ]);
+  });
+
+  test('lets a non-fork alias replace a colliding model ID and keeps the source ID', () => {
+    expect(
+      applyOAuthModelAliases(
+        [
+          { id: 'deepseek-v4-pro' },
+          { id: 'deepseek-v4-pro-0813', display_name: 'DeepSeek V4 Pro 0813' },
+        ],
+        [{ name: 'deepseek-v4-pro-0813', alias: 'deepseek-v4-pro' }]
+      )
+    ).toEqual([
+      {
+        id: 'deepseek-v4-pro',
+        sourceId: 'deepseek-v4-pro-0813',
+        display_name: 'DeepSeek V4 Pro 0813',
+      },
     ]);
   });
 });

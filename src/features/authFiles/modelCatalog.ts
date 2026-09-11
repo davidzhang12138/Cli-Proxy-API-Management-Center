@@ -42,6 +42,12 @@ export function applyOAuthModelAliases(
 
   const output: AuthFileModelItem[] = [];
   const seen = new Set<string>();
+  const nonForkAliasTargets = new Set<string>();
+  aliasesByName.forEach((entries) => {
+    entries.forEach((entry) => {
+      if (entry.fork !== true) nonForkAliasTargets.add(entry.alias.toLowerCase());
+    });
+  });
   const append = (model: AuthFileModelItem) => {
     const id = model.id.trim();
     if (!id) return;
@@ -57,6 +63,7 @@ export function applyOAuthModelAliases(
 
     const entries = aliasesByName.get(id.toLowerCase());
     if (!entries || entries.length === 0) {
+      if (nonForkAliasTargets.has(id.toLowerCase())) return;
       append(model);
       return;
     }
@@ -70,7 +77,11 @@ export function applyOAuthModelAliases(
       if (!alias || alias.toLowerCase() === id.toLowerCase() || seen.has(alias.toLowerCase())) {
         return;
       }
-      const aliasedModel: AuthFileModelItem = { ...model, id: alias };
+      const aliasedModel: AuthFileModelItem = {
+        ...model,
+        id: alias,
+        sourceId: model.sourceId ?? id,
+      };
       append(aliasedModel);
       addedAlias = true;
     });
