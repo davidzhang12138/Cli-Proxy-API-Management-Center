@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { authFilesApi } from '@/services/api/authFiles';
 import { configApi } from '@/services/api/config';
+import { modelsApi } from '@/services/api/models';
 import { providersApi } from '@/services/api/providers';
+import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
+import { useAuthStore } from '@/stores';
 import type {
   ApiKeyEntry,
   AuthFileItem,
@@ -16,8 +19,8 @@ export type RoutingStrategy = 'round-robin' | 'weighted-round-robin' | 'fill-fir
 export type RoutingCandidateSource = 'oauth' | 'api-key' | 'openai-compat';
 
 export interface RoutingCandidateUpdate {
-  priority: number;
-  weight: number | null;
+  priority?: number;
+  weight?: number | null;
 }
 
 export interface RoutingCandidate {
@@ -36,8 +39,23 @@ export interface RoutingCandidate {
   update: (next: RoutingCandidateUpdate) => Promise<void>;
 }
 
+export interface RoutingGroup {
+  id: string;
+  provider: string;
+  providerKey: string;
+  candidates: RoutingCandidate[];
+  models: string[];
+  priority: number;
+  mixedPriority: boolean;
+  enabled: boolean;
+  editable: boolean;
+  updatePriority: (priority: number) => Promise<void>;
+}
+
 export interface RoutingSnapshot {
   candidates: RoutingCandidate[];
+  groups: RoutingGroup[];
+  models: string[];
   strategy: RoutingStrategy;
   fetchedAt: number;
 }
@@ -69,15 +87,6 @@ const modelNames = (models?: ModelAlias[]): string[] => {
   const seen = new Set<string>();
   (models ?? []).forEach((model) => {
     const value = String(model.alias ?? model.name ?? '').trim();
-    if (value) seen.add(value);
-  });
-  return [...seen].sort((left, right) => left.localeCompare(right));
-};
-
-const authModelNames = (models: Array<{ id?: string }> | undefined): string[] => {
-  const seen = new Set<string>();
-  (models ?? []).forEach((model) => {
-    const value = String(model.id ?? '').trim();
     if (value) seen.add(value);
   });
   return [...seen].sort((left, right) => left.localeCompare(right));
@@ -147,8 +156,10 @@ const buildStandardCandidate = (
     update: async (next) => {
       const updated = {
         ...config,
-        priority: next.priority === 0 ? undefined : next.priority,
-        weight: next.weight === null ? undefined : next.weight,
+        priority: next.priority === undefined || next.priority === 0 ? undefined : next.priority,
+        ...(next.weight === undefined
+          ? {}
+          : { weight: next.weight === null ? undefined : next.weight }),
       };
       await standardUpdate(provider, apiKey, config.baseUrl, updated);
     },
@@ -216,13 +227,15 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
           currentIndex === entryIndex
             ? {
                 ...current,
-                weight: next.weight === null ? undefined : next.weight,
+                ...(next.weight === undefined
+                  ? {}
+                  : { weight: next.weight === null ? undefined : next.weight }),
               }
             : current
         );
         await providersApi.updateOpenAIProvider(provider.name, sourceIndex, {
           ...provider,
-          priority: next.priority === 0 ? undefined : next.priority,
+          priority: next.priority === undefined || next.priority === 0 ? undefined : next.priority,
           apiKeyEntries: nextEntries,
         });
       },
@@ -234,21 +247,47 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
     : [buildCandidate(null, 0)];
 };
 
-const loadOAuthCandidates = async (files: AuthFileItem[]): Promise<RoutingCandidate[]> => {
-  const results = await Promise.all(
-    files.map(async (file) => {
-      try {
-        const models = await authFilesApi.getModelsForAuthFile(file.name);
-        return buildOAuthCandidate(file, authModelNames(models));
-      } catch {
-        return buildOAuthCandidate(file, []);
-      }
-    })
-  );
-  return results;
+const buildRoutingGroups = (
+  candidates: RoutingCandidate[],
+  modelCatalog: string[]
+): RoutingGroup[] => {
+  const grouped = new Map<string, RoutingCandidate[]>();
+  candidates.forEach((candidate) => {
+    const current = grouped.get(candidate.providerKey) ?? [];
+    current.push(candidate);
+    grouped.set(candidate.providerKey, current);
+  });
+
+  return [...grouped.entries()].map(([id, groupCandidates]) => {
+    const priorities = new Set(groupCandidates.map((candidate) => candidate.priority));
+    const models = new Set<string>();
+    groupCandidates.forEach((candidate) => candidate.models.forEach((model) => models.add(model)));
+    if (models.size === 0) modelCatalog.forEach((model) => models.add(model));
+    const editableCandidates = groupCandidates.filter((candidate) => candidate.editable);
+    return {
+      id,
+      provider: groupCandidates[0]?.provider ?? id,
+      providerKey: id,
+      candidates: groupCandidates,
+      models: [...models].sort((left, right) => left.localeCompare(right)),
+      priority: Math.max(...groupCandidates.map((candidate) => candidate.priority), 0),
+      mixedPriority: priorities.size > 1,
+      enabled: groupCandidates.some((candidate) => candidate.enabled),
+      editable: editableCandidates.length > 0,
+      updatePriority: async (priority: number) => {
+        for (const candidate of editableCandidates) {
+          await candidate.update({ priority });
+        }
+      },
+    };
+  });
 };
 
-const loadSnapshot = async (): Promise<RoutingSnapshot> => {
+interface BaseSnapshotResult {
+  snapshot: RoutingSnapshot;
+}
+
+const loadBaseSnapshot = async (): Promise<BaseSnapshotResult> => {
   const [config, authFiles, strategy] = await Promise.all([
     configApi.getConfig(),
     authFilesApi.list(),
@@ -275,35 +314,85 @@ const loadSnapshot = async (): Promise<RoutingSnapshot> => {
   (config.openaiCompatibility ?? []).forEach((provider) => {
     candidates.push(...buildOpenAICompatCandidates(provider));
   });
-  candidates.push(...(await loadOAuthCandidates(authFiles.files ?? [])));
+  candidates.push(...(authFiles.files ?? []).map((file) => buildOAuthCandidate(file, [])));
+
+  const configuredModels = new Set<string>();
+  candidates.forEach((candidate) =>
+    candidate.models.forEach((model) => configuredModels.add(model))
+  );
+  const models = [...configuredModels].sort((left, right) => left.localeCompare(right));
 
   return {
+    snapshot: {
+      candidates,
+      groups: buildRoutingGroups(candidates, models),
+      models,
+      strategy: normalizeStrategy(config.routingStrategy ?? strategy),
+      fetchedAt: Date.now(),
+    },
+  };
+};
+
+const applyGlobalModelCatalog = (
+  snapshot: RoutingSnapshot,
+  modelCatalog: string[]
+): RoutingSnapshot => {
+  const candidates = snapshot.candidates.map((candidate) =>
+    candidate.source === 'oauth' ? { ...candidate, models: modelCatalog } : candidate
+  );
+  const models = new Set(modelCatalog);
+  candidates.forEach((candidate) => candidate.models.forEach((model) => models.add(model)));
+  const modelList = [...models].sort((left, right) => left.localeCompare(right));
+  return {
+    ...snapshot,
     candidates,
-    strategy: normalizeStrategy(config.routingStrategy ?? strategy),
-    fetchedAt: Date.now(),
+    groups: buildRoutingGroups(candidates, modelList),
+    models: modelList,
   };
 };
 
 export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
+  const apiBase = useAuthStore((state) => state.apiBase);
+  const getApiKeysForModels = useApiKeysForModels();
   const [snapshot, setSnapshot] = useState<RoutingSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [savingStrategy, setSavingStrategy] = useState(false);
   const [savingCandidateId, setSavingCandidateId] = useState<string | null>(null);
-
   const refresh = useCallback(async () => {
     setRefreshing(true);
     setError('');
     try {
-      setSnapshot(await loadSnapshot());
+      const result = await loadBaseSnapshot();
+      setSnapshot(result.snapshot);
+      setLoading(false);
+      setRefreshing(false);
+      if (apiBase) {
+        void (async () => {
+          try {
+            const apiKeys = await getApiKeysForModels();
+            if (!apiKeys[0]) return;
+            const models = await modelsApi.fetchModels(apiBase, apiKeys[0]);
+            const modelCatalog = models.map((model) => model.name).filter(Boolean);
+            if (modelCatalog.length > 0) {
+              setSnapshot((current) =>
+                current ? applyGlobalModelCatalog(current, modelCatalog) : current
+              );
+            }
+          } catch {
+            // Config-declared models remain visible when the global proxy catalog is unavailable.
+          }
+        })();
+      }
+      return;
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [apiBase, getApiKeysForModels]);
 
   useEffect(() => {
     void refresh();

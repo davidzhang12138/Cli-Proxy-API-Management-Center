@@ -415,7 +415,15 @@
   white-space: nowrap;
 }
 
-.tableHead,
+.tableHead {
+  display: grid;
+  grid-template-columns:
+    34px minmax(180px, 1.3fr) minmax(160px, 1fr) 100px minmax(120px, 0.7fr)
+    76px;
+  gap: 12px;
+  align-items: center;
+}
+
 .candidateRow {
   display: grid;
   grid-template-columns: 40px minmax(180px, 1.45fr) minmax(130px, 1fr) 94px 94px 116px 76px;
@@ -436,6 +444,146 @@
 
 .candidateList {
   display: grid;
+}
+
+.groupBlock {
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+}
+
+.groupRow {
+  display: grid;
+  grid-template-columns:
+    34px minmax(180px, 1.3fr) minmax(160px, 1fr) 100px minmax(120px, 0.7fr)
+    76px;
+  gap: 12px;
+  align-items: center;
+  min-height: 84px;
+  padding: 13px 20px;
+  transition: background-color $transition-fast;
+}
+
+.groupRow:hover {
+  background: color-mix(in srgb, #5c8d82 4%, var(--bg-secondary));
+}
+
+.groupExpand {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.groupExpand:hover {
+  border-color: color-mix(in srgb, #5c8d82 50%, var(--border-color));
+  color: #5c8d82;
+}
+
+.groupIdentity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.groupMark {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  color: #fff;
+  background: #5c8d82;
+  font-family: $font-mono;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.groupIdentity div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.groupIdentity strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupIdentity span {
+  color: var(--text-tertiary);
+  font-family: $font-mono;
+  font-size: 10px;
+}
+
+.groupModels {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: $font-mono;
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupPriorityCell {
+  display: flex;
+  align-items: center;
+}
+
+.groupState {
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+  font-size: 11px;
+}
+
+.groupReady {
+  color: #3d8c72;
+}
+
+.groupDisabled {
+  color: var(--text-tertiary);
+}
+
+.mixedBadge {
+  padding: 3px 5px;
+  border-radius: 999px;
+  color: #b87931;
+  background: color-mix(in srgb, #b87931 10%, var(--bg-secondary));
+  font-family: $font-mono;
+  font-size: 9px;
+}
+
+.groupChildren {
+  display: grid;
+  margin-left: 46px;
+  border-top: 1px dashed color-mix(in srgb, var(--border-color) 84%, transparent);
+  background: color-mix(in srgb, var(--bg-primary) 25%, var(--bg-secondary));
+}
+
+.groupChildren .candidateRow {
+  min-height: 72px;
+  padding-block: 10px;
+  border-bottom-color: color-mix(in srgb, var(--border-color) 50%, transparent);
+}
+
+.detailValue {
+  display: inline-block;
+  width: 100%;
+  color: var(--text-secondary);
+  font-family: $font-mono;
+  font-size: 12px;
+  text-align: center;
 }
 
 .candidateRow {
@@ -690,14 +838,28 @@
     grid-template-columns: 220px minmax(0, 1fr);
   }
 
-  .tableHead,
   .candidateRow {
     grid-template-columns: 32px minmax(160px, 1.25fr) minmax(120px, 1fr) 76px 76px 100px 64px;
     gap: 8px;
   }
 
-  .candidateRow,
+  .candidateRow {
+    padding-inline: 14px;
+  }
+
   .tableHead {
+    grid-template-columns:
+      30px minmax(150px, 1.2fr) minmax(120px, 1fr) 78px minmax(100px, 0.7fr)
+      64px;
+    gap: 8px;
+    padding-inline: 14px;
+  }
+
+  .groupRow {
+    grid-template-columns:
+      30px minmax(150px, 1.2fr) minmax(120px, 1fr) 78px minmax(100px, 0.7fr)
+      64px;
+    gap: 8px;
     padding-inline: 14px;
   }
 }
@@ -751,6 +913,32 @@
     grid-template-columns: 28px minmax(0, 1fr) 72px 72px;
     gap: 9px;
     padding: 14px;
+  }
+
+  .groupRow {
+    grid-template-columns: 28px minmax(0, 1fr) 76px;
+    gap: 9px;
+    padding: 13px 14px;
+  }
+
+  .groupModels {
+    grid-column: 2 / -1;
+  }
+
+  .groupPriorityCell {
+    grid-column: 2 / 3;
+  }
+
+  .groupState {
+    grid-column: 3 / -1;
+  }
+
+  .groupRow .actionCell {
+    grid-column: 2 / -1;
+  }
+
+  .groupChildren {
+    margin-left: 14px;
   }
 
   .rankCell {
