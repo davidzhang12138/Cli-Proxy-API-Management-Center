@@ -867,8 +867,14 @@
   font-size: 11px;
 }
 
-.emptyPool,
-.loadingState {
+/* 首次加载：与凭证库一致，占位块替代表格行，页头与筛选栏保持可见。 */
+.poolSkeleton {
+  display: grid;
+  gap: 8px;
+  padding: 12px 20px;
+}
+
+.emptyPool {
   display: grid;
   place-items: center;
   gap: 9px;
@@ -890,14 +896,6 @@
   max-width: 300px;
   font-size: 12px;
   line-height: 1.55;
-}
-
-.loadingState {
-  min-height: 55vh;
-}
-
-.loadingState svg {
-  color: var(--primary-color);
 }
 
 .spin {

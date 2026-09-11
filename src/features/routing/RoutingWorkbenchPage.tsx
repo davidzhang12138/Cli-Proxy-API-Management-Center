@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
+import { Skeleton } from '@/components/ui/Skeleton';
 import {
   IconAlertTriangle,
   IconCheckCircle2,
   IconChevronDown,
   IconChevronUp,
   IconInfo,
-  IconLoader2,
   IconModelCluster,
   IconNetwork,
   IconRefreshCw,
@@ -535,16 +535,11 @@ export function RoutingWorkbenchPage() {
     [showNotification, t, workbench]
   );
 
-  if (workbench.loading && !workbench.snapshot) {
-    return (
-      <div className={styles.page}>
-        <div className={styles.loadingState}>
-          <IconLoader2 className={styles.spin} size={22} />
-          <span>{t('routing_page.loading')}</span>
-        </div>
-      </div>
-    );
-  }
+  // Matches the other pages' convention: keep the header and its telemetry, and
+  // skeleton the content region instead of taking over the whole viewport.
+  const firstLoad = workbench.loading && !workbench.snapshot;
+  const selectedModelLabel =
+    selectedModel === ALL_MODELS ? t('routing_page.all_candidates') : selectedModel;
 
   return (
     <div className={styles.page}>
@@ -622,26 +617,27 @@ export function RoutingWorkbenchPage() {
       ) : null}
 
       <section className={styles.metrics} aria-label={t('routing_page.metrics_label')}>
-        <div className={`${styles.metricCard} ${styles.metricAccent}`}>
-          <span>{t('routing_page.metric_active')}</span>
-          <strong>{activeCount}</strong>
-          <small>{t('routing_page.metric_active_hint', { total: candidates.length })}</small>
-        </div>
-        <div className={styles.metricCard}>
-          <span>{t('routing_page.metric_models')}</span>
-          <strong>{models.length}</strong>
-          <small>{t('routing_page.metric_models_hint')}</small>
-        </div>
-        <div className={styles.metricCard}>
-          <span>{t('routing_page.metric_providers')}</span>
-          <strong>{providerCount}</strong>
-          <small>{t('routing_page.metric_providers_hint')}</small>
-        </div>
-        <div className={styles.metricCard}>
-          <span>{t('routing_page.metric_priority')}</span>
-          <strong>{highestPriority}</strong>
-          <small>{t('routing_page.metric_priority_hint')}</small>
-        </div>
+        {firstLoad
+          ? Array.from({ length: 4 }, (_, index) => (
+              <Skeleton key={index} height={120} rounded={14} />
+            ))
+          : (
+              [
+                ['metric_active', activeCount, t('routing_page.metric_active_hint', { total: candidates.length })],
+                ['metric_models', models.length, t('routing_page.metric_models_hint')],
+                ['metric_providers', providerCount, t('routing_page.metric_providers_hint')],
+                ['metric_priority', highestPriority, t('routing_page.metric_priority_hint')],
+              ] as const
+            ).map(([label, value, hint], index) => (
+              <div
+                key={label}
+                className={`${styles.metricCard} ${index === 0 ? styles.metricAccent : ''}`}
+              >
+                <span>{t(`routing_page.${label}`)}</span>
+                <strong>{value}</strong>
+                <small>{hint}</small>
+              </div>
+            ))}
       </section>
 
       <div className={styles.notice}>
@@ -676,19 +672,23 @@ export function RoutingWorkbenchPage() {
             <b>{coveredGroups.length}</b>
           </button>
           <div className={styles.modelList}>
-            {models.map((model) => (
-              <button
-                type="button"
-                key={model}
-                className={`${styles.modelItem} ${selectedModel === model ? styles.modelItemActive : ''}`}
-                onClick={() => setSelectedModel(model)}
-              >
-                <span title={model}>{model}</span>
-                <b>{modelCounts.get(model) ?? 0}</b>
-              </button>
-            ))}
+            {firstLoad
+              ? Array.from({ length: 6 }, (_, index) => (
+                  <Skeleton key={index} height={32} rounded={9} />
+                ))
+              : models.map((model) => (
+                  <button
+                    type="button"
+                    key={model}
+                    className={`${styles.modelItem} ${selectedModel === model ? styles.modelItemActive : ''}`}
+                    onClick={() => setSelectedModel(model)}
+                  >
+                    <span title={model}>{model}</span>
+                    <b>{modelCounts.get(model) ?? 0}</b>
+                  </button>
+                ))}
           </div>
-          {models.length === 0 ? (
+          {!firstLoad && models.length === 0 ? (
             <p className={styles.emptyRail}>{t('routing_page.no_models')}</p>
           ) : null}
         </aside>
@@ -697,9 +697,7 @@ export function RoutingWorkbenchPage() {
           <div className={styles.poolHeader}>
             <div>
               <span className={styles.cardKicker}>{t('routing_page.pool_kicker')}</span>
-              <h2>
-                {selectedModel === ALL_MODELS ? t('routing_page.all_candidates') : selectedModel}
-              </h2>
+              <h2>{selectedModelLabel}</h2>
             </div>
             <span className={styles.poolCount}>
               {t('routing_page.group_count', { count: visibleGroups.length })}
@@ -716,7 +714,13 @@ export function RoutingWorkbenchPage() {
           </div>
 
           <div className={styles.candidateList}>
-            {visibleGroups.length === 0 ? (
+            {firstLoad ? (
+              <div className={styles.poolSkeleton} aria-hidden="true">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <Skeleton key={index} height={94} rounded={0} />
+                ))}
+              </div>
+            ) : visibleGroups.length === 0 ? (
               <div className={styles.emptyPool}>
                 <IconModelCluster size={25} />
                 <strong>{t('routing_page.empty_title')}</strong>
