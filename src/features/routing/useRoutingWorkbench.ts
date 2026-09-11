@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authFilesApi } from '@/services/api/authFiles';
 import { configApi } from '@/services/api/config';
+import { modelsApi } from '@/services/api/models';
 import { providersApi } from '@/services/api/providers';
-import { normalizeProviderKey } from '@/features/authFiles/constants';
+import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
+import { useAuthStore } from '@/stores';
+import { isModelExcluded, normalizeProviderKey } from '@/features/authFiles/constants';
 import { aliasesForProvider, applyOAuthModelAliases } from '@/features/authFiles/modelCatalog';
 import type {
   ApiKeyEntry,
@@ -313,6 +316,12 @@ const snapshotFrom = (
 
 interface BaseSnapshotResult {
   snapshot: RoutingSnapshot;
+  /**
+   * Provider -> models the operator excluded from OAuth routing. These are the
+   * models /model-definitions returns but the proxy will never route to, so the
+   * pool must not advertise them as served.
+   */
+  oauthExcludedModels: Record<string, string[]>;
 }
 
 const loadBaseSnapshot = async (): Promise<BaseSnapshotResult> => {
@@ -351,10 +360,13 @@ const loadBaseSnapshot = async (): Promise<BaseSnapshotResult> => {
       normalizeStrategy(config.routingStrategy ?? strategy),
       Date.now()
     ),
+    oauthExcludedModels: config.oauthExcludedModels ?? {},
   };
 };
 
 export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
+  const apiBase = useAuthStore((state) => state.apiBase);
+  const getApiKeysForModels = useApiKeysForModels();
   const [snapshot, setSnapshot] = useState<RoutingSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -392,8 +404,31 @@ export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
     return aliasesRef.current;
   }, []);
 
+  /**
+   * Models the proxy will actually route to. /model-definitions answers "what
+   * does this provider offer"; this answers "what can a client request right
+   * now", so the pool intersects the two. Unavailable (no key, fetch failed)
+   * means no filtering rather than hiding everything.
+   */
+  const loadServedModels = useCallback(async (): Promise<Set<string> | null> => {
+    if (!apiBase) return null;
+    try {
+      const apiKeys = await getApiKeysForModels();
+      if (!apiKeys[0]) return null;
+      const models = await modelsApi.fetchModels(apiBase, apiKeys[0]);
+      const names = models.map((model) => model.name).filter(Boolean);
+      return names.length > 0 ? new Set(names) : null;
+    } catch {
+      return null;
+    }
+  }, [apiBase, getApiKeysForModels]);
+
   const loadOAuthModels = useCallback(
-    async (candidates: RoutingCandidate[]) => {
+    async (
+      candidates: RoutingCandidate[],
+      excluded: Record<string, string[]>,
+      served: Set<string> | null
+    ) => {
       const providers = [
         ...new Set(
           candidates
@@ -409,6 +444,8 @@ export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
           const cached = providerModelsRef.current.get(provider);
           if (cached) return [provider, await cached] as const;
 
+          // Cached unfiltered: exclusions are applied on read so that editing
+          // them takes effect without refetching the catalog.
           const pending = (async () => {
             const aliases = await loadAliases();
             const raw = await authFilesApi
@@ -427,7 +464,18 @@ export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
           return [provider, await pending] as const;
         })
       );
-      const catalog = new Map(resolved);
+      // The definition catalog lists everything the provider offers. Keep only
+      // what the proxy actually serves and what the operator did not exclude
+      // (exclusions support `*` wildcards).
+      const catalog = new Map(
+        resolved.map(([provider, models]) => [
+          provider,
+          models.filter(
+            (model) =>
+              !isModelExcluded(model, provider, excluded) && (!served || served.has(model))
+          ),
+        ])
+      );
 
       setSnapshot((current) => {
         if (!current) return current;
@@ -455,14 +503,15 @@ export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
     try {
       const result = await loadBaseSnapshot();
       setSnapshot(result.snapshot);
-      await loadOAuthModels(result.snapshot.candidates);
+      const served = await loadServedModels();
+      await loadOAuthModels(result.snapshot.candidates, result.oauthExcludedModels, served);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [loadOAuthModels]);
+  }, [loadOAuthModels, loadServedModels]);
 
   useEffect(() => {
     void refresh();

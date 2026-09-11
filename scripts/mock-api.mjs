@@ -12,6 +12,11 @@ const PORT = Number(process.env.MOCK_API_PORT ?? 8317);
 
 const CONFIG = {
   'routing-strategy': 'round-robin',
+  // Exercises exclusion filtering: an exact id and a wildcard.
+  'oauth-excluded-models': {
+    claude: ['claude-sonnet-4-6'],
+    gemini: ['gemini-3-flash*'],
+  },
   'codex-api-key': [
     { 'api-key': 'sk-codex-aaaaaaaaAAAAAAAAAAAAAAAA', priority: 5, 'base-url': 'https://codex.example.com' },
     { 'api-key': 'sk-codex-bbbbbbbbBBBBBBBBBBBBBBBB', priority: 5 },
@@ -24,7 +29,11 @@ const CONFIG = {
   'gemini-api-key': [
     { 'api-key': 'AIzaSyGeminiKEY1111111111111111111', priority: 4, weight: 2 },
   ],
-  'xai-api-key': [{ 'api-key': 'xai-1111111111111111111111111111', priority: 1 }],
+  // excluded models `*` is how a config-declared key is disabled, so a provider
+  // whose only key carries it must drop out of the pool entirely.
+  'xai-api-key': [
+    { 'api-key': 'xai-1111111111111111111111111111', priority: 1, 'excluded-models': ['*'] },
+  ],
   'openai-compatibility': [
     {
       name: 'hypercharm',
@@ -54,6 +63,18 @@ const AUTH_FILES = {
     { name: 'vertex-runtime.json', type: 'vertex', email: 'vertex@example.com', runtimeOnly: true },
   ],
 };
+
+// What the proxy reports as routable via /v1/models. Deliberately only a subset
+// of what /model-definitions advertises, so the intersection is observable:
+// gemini-3.7-flash-high is offered but not served, so it must not be listed.
+const SERVED = [
+  'gemini-3-flash',
+  'claude-opus-4-6',
+  'claude-opus-4-6-thinking',
+  'gpt-5-codex',
+  'kimi-k3',
+  'deepseek-v4-pro',
+];
 
 const CATALOG = [
   'claude-opus-4-6-thinking',
@@ -124,6 +145,7 @@ const server = createServer(async (req, res) => {
     if (path.endsWith('/api-keys')) return json(res, { 'api-keys': ['sk-mgmt-mock'] });
     if (path.endsWith('/oauth-model-alias')) return json(res, OAUTH_ALIASES);
     if (path.endsWith('/routing/strategy')) return json(res, { strategy: CONFIG['routing-strategy'] });
+    if (path === '/v1/models') return json(res, { data: SERVED.map((id) => ({ id })) });
     if (path.endsWith('/models')) return json(res, { data: CATALOG.map((id) => ({ id })) });
     return json(res, {});
   }

@@ -415,9 +415,11 @@
 
 .modelItem b {
   flex: 0 0 auto;
-  color: var(--text-tertiary);
+  /* 记数要能读清：tertiary 在浅底上近乎不可见（10px 尤其）。 */
+  color: var(--text-secondary);
   font-family: $font-mono;
-  font-size: 10px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 

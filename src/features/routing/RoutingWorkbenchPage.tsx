@@ -383,20 +383,19 @@ export function RoutingWorkbenchPage() {
     () => workbench.snapshot?.candidates ?? [],
     [workbench.snapshot?.candidates]
   );
-  const models = useMemo(() => workbench.snapshot?.models ?? [], [workbench.snapshot?.models]);
-
-  useEffect(() => {
-    if (selectedModel !== ALL_MODELS && !models.includes(selectedModel)) {
-      setSelectedModel(ALL_MODELS);
-    }
-  }, [models, selectedModel]);
-
   const modelCoverage = useMemo(() => workbench.modelCoverage, [workbench.modelCoverage]);
 
   const groups = useMemo(() => workbench.snapshot?.groups ?? [], [workbench.snapshot?.groups]);
-  /** A group with no known model cannot serve anything, so it stays out of the pool. */
+  /**
+   * The pool only lists groups that can actually serve traffic: one with no
+   * known model serves nothing, and one whose credentials are all disabled is
+   * not in the pool either.
+   */
   const coveredGroups = useMemo(
-    () => groups.filter((group) => (modelCoverage.get(group.id) ?? []).length > 0),
+    () =>
+      groups.filter(
+        (group) => groupEnabled(group) && (modelCoverage.get(group.id) ?? []).length > 0
+      ),
     [groups, modelCoverage]
   );
   const visibleGroups = useMemo(() => {
@@ -416,26 +415,42 @@ export function RoutingWorkbenchPage() {
         )
       : scoped;
 
+    // Every group here is enabled, so only priority decides the order.
     return [...searched].sort((left, right) => {
-      const leftEnabled = groupEnabled(left);
-      const rightEnabled = groupEnabled(right);
-      if (leftEnabled !== rightEnabled) return leftEnabled ? -1 : 1;
       if (left.priority !== right.priority) return right.priority - left.priority;
       return left.id.localeCompare(right.id);
     });
   }, [coveredGroups, modelCoverage, query, selectedModel]);
 
-  /** How many groups can actually serve each model — matches the group list, not credential rows. */
+  /**
+   * Model index, scoped to the pool: a model is listed only if a still-visible
+   * (enabled) group serves it, and the value is the number of such groups. This
+   * keeps the rail from advertising models whose only groups were hidden.
+   */
   const modelCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    modelCoverage.forEach((coverage) =>
-      coverage.forEach((model) => counts.set(model, (counts.get(model) ?? 0) + 1))
+    coveredGroups.forEach((group) =>
+      (modelCoverage.get(group.id) ?? []).forEach((model) =>
+        counts.set(model, (counts.get(model) ?? 0) + 1)
+      )
     );
     return counts;
-  }, [modelCoverage]);
+  }, [coveredGroups, modelCoverage]);
+
+  const reachableModels = useMemo(
+    () => [...modelCounts.keys()].sort((left, right) => left.localeCompare(right)),
+    [modelCounts]
+  );
+
+  // A selected model that no visible group serves would show an empty pool.
+  useEffect(() => {
+    if (selectedModel !== ALL_MODELS && !modelCounts.has(selectedModel)) {
+      setSelectedModel(ALL_MODELS);
+    }
+  }, [modelCounts, selectedModel]);
 
   const activeCount = candidates.filter((candidate) => candidate.enabled).length;
-  const providerCount = new Set(candidates.map((candidate) => candidate.providerKey)).size;
+  const providerCount = coveredGroups.length;
   const highestPriority = candidates.reduce(
     (current, candidate) => (candidate.enabled ? Math.max(current, candidate.priority) : current),
     0
@@ -624,7 +639,7 @@ export function RoutingWorkbenchPage() {
           : (
               [
                 ['metric_active', activeCount, t('routing_page.metric_active_hint', { total: candidates.length })],
-                ['metric_models', models.length, t('routing_page.metric_models_hint')],
+                ['metric_models', reachableModels.length, t('routing_page.metric_models_hint')],
                 ['metric_providers', providerCount, t('routing_page.metric_providers_hint')],
                 ['metric_priority', highestPriority, t('routing_page.metric_priority_hint')],
               ] as const
@@ -676,7 +691,7 @@ export function RoutingWorkbenchPage() {
               ? Array.from({ length: 6 }, (_, index) => (
                   <Skeleton key={index} height={32} rounded={9} />
                 ))
-              : models.map((model) => (
+              : reachableModels.map((model) => (
                   <button
                     type="button"
                     key={model}
@@ -688,7 +703,7 @@ export function RoutingWorkbenchPage() {
                   </button>
                 ))}
           </div>
-          {!firstLoad && models.length === 0 ? (
+          {!firstLoad && reachableModels.length === 0 ? (
             <p className={styles.emptyRail}>{t('routing_page.no_models')}</p>
           ) : null}
         </aside>
