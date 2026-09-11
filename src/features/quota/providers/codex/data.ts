@@ -37,6 +37,7 @@ import {
 } from '@/utils/quota';
 import { normalizeAuthIndex } from '@/utils/authIndex';
 import type { QuotaProviderData } from '../types';
+import { buildCodexQuotaStateFromUsageQuota } from '../usageQuotaSnapshot';
 
 const CODEX_RESET_CREDITS_REQUEST_TIMEOUT_MS = 8000;
 
@@ -482,4 +483,8 @@ export const CODEX_CONFIG: QuotaProviderData<CodexQuotaState, CodexQuotaData> = 
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    const state = buildCodexQuotaStateFromUsageQuota(file);
+    return state ? { status: 'success', ...state } : null;
+  },
 };

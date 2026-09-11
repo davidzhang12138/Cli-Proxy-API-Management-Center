@@ -31,6 +31,7 @@ import {
 } from '@/utils/quota';
 import { normalizeAuthIndex } from '@/utils/authIndex';
 import type { QuotaProviderData } from '../types';
+import { buildAntigravityQuotaStateFromUsageQuota } from '../usageQuotaSnapshot';
 
 export type AntigravityQuotaData = {
   groups: AntigravityQuotaGroup[];
@@ -226,4 +227,8 @@ export const ANTIGRAVITY_CONFIG: QuotaProviderData<AntigravityQuotaState, Antigr
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    const state = buildAntigravityQuotaStateFromUsageQuota(file);
+    return state ? { status: 'success', ...state } : null;
+  },
 };

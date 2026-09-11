@@ -30,6 +30,7 @@ import {
 } from '@/utils/quota';
 import { normalizeAuthIndex } from '@/utils/authIndex';
 import type { QuotaProviderData } from '../types';
+import { buildClaudeQuotaStateFromUsageQuota } from '../usageQuotaSnapshot';
 
 export type ClaudeQuotaData = {
   windows: ClaudeQuotaWindow[];
@@ -223,4 +224,8 @@ export const CLAUDE_CONFIG: QuotaProviderData<ClaudeQuotaState, ClaudeQuotaData>
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    const state = buildClaudeQuotaStateFromUsageQuota(file);
+    return state ? { status: 'success', ...state } : null;
+  },
 };

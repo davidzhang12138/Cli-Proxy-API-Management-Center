@@ -16,6 +16,7 @@ import {
 } from '@/utils/quota';
 import { normalizeAuthIndex } from '@/utils/authIndex';
 import type { QuotaProviderData } from '../types';
+import { buildKimiQuotaStateFromUsageQuota } from '../usageQuotaSnapshot';
 
 const fetchKimiQuota = async (file: AuthFileItem, t: TFunction): Promise<KimiQuotaRow[]> => {
   const rawAuthIndex = file['auth_index'] ?? file.authIndex;
@@ -58,4 +59,8 @@ export const KIMI_CONFIG: QuotaProviderData<KimiQuotaState, KimiQuotaRow[]> = {
     error: message,
     errorStatus: status,
   }),
+  buildSnapshotState: (file) => {
+    const state = buildKimiQuotaStateFromUsageQuota(file);
+    return state ? { status: 'success', ...state } : null;
+  },
 };

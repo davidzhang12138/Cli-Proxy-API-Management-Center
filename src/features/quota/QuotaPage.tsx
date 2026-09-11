@@ -90,9 +90,12 @@ export function QuotaPage() {
       });
       snapshotsByType.forEach((snapshots, type) => {
         getQuotaSetter(QUOTA_ADAPTERS[type])((prev) => {
-          const missingEntries = Object.entries(snapshots).filter(([name]) => !prev[name]);
-          return missingEntries.length > 0
-            ? { ...prev, ...Object.fromEntries(missingEntries) }
+          const recoverableEntries = Object.entries(snapshots).filter(([name]) => {
+            const current = prev[name];
+            return !current || current.status === 'idle' || current.status === 'error';
+          });
+          return recoverableEntries.length > 0
+            ? { ...prev, ...Object.fromEntries(recoverableEntries) }
             : prev;
         });
       });
@@ -244,7 +247,7 @@ export function QuotaPage() {
   const pendingRefreshRef = useRef(false);
   const prevLoadingRef = useRef(loading);
 
-  // 刷新全部：先重取文件列表，待其落定（loading 下降沿）再批量拉当前页额度
+  // Refresh every quota-capable credential after the file list has settled.
   const handleRefreshAll = useCallback(() => {
     if (disableControls) return;
     pendingRefreshRef.current = true;
@@ -259,8 +262,8 @@ export function QuotaPage() {
     if (loading || !wasLoading) return;
 
     pendingRefreshRef.current = false;
-    void loadQuota(pageItems);
-  }, [loading, loadQuota, pageItems]);
+    void loadQuota(entries);
+  }, [entries, loading, loadQuota]);
 
   const canUseActions = !disableControls && !loading;
 
