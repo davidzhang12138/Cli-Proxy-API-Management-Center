@@ -75,25 +75,6 @@ export interface UseRoutingWorkbenchResult {
 
 const DEFAULT_STRATEGY: RoutingStrategy = 'round-robin';
 
-/** Credentials per provider family can number in the hundreds; keep the fan-out bounded. */
-const MODEL_FETCH_CONCURRENCY = 6;
-
-async function runWithConcurrency<T>(
-  items: readonly T[],
-  limit: number,
-  worker: (item: T) => Promise<void>
-): Promise<void> {
-  let cursor = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (cursor < items.length) {
-        const index = cursor++;
-        await worker(items[index]);
-      }
-    })
-  );
-}
-
 const normalizeStrategy = (value: unknown): RoutingStrategy => {
   const normalized = String(value ?? '')
     .trim()
@@ -379,7 +360,7 @@ export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [savingStrategy, setSavingStrategy] = useState(false);
-  const aliasesRef = useRef<Record<string, OAuthModelAliasEntry[]>>({});
+  const aliasesRef = useRef<Promise<Record<string, OAuthModelAliasEntry[]>> | null>(null);
 
   const modelCoverage = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -392,60 +373,81 @@ export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
   }, [snapshot]);
 
   /**
-   * Per-credential model catalogs. Each auth file has its own endpoint, and the
-   * pool hides groups with no models, so coverage has to be known up front
-   * rather than on expand — one bounded round of requests per credential, then
-   * cached for the session.
+   * OAuth model coverage comes from /model-definitions/{provider}, which returns
+   * the catalog for a whole provider family in one request. Listing credentials
+   * (1053 of them on a real install) must never mean one request per credential.
    *
-   * ponytail: the cache is never invalidated, so a catalog edited elsewhere
-   * stays stale until reload. Add a TTL or invalidate on auth-file writes if
-   * that starts to matter.
+   * ponytail: the provider catalogs are fetched once per session and not
+   * invalidated, so a catalog edited elsewhere stays stale until reload.
    */
-  const modelsCacheRef = useRef<Map<string, string[]>>(new Map());
+  // Promises, not results: the ref has to be populated synchronously, or a
+  // second call arriving mid-flight (StrictMode, a refresh during load) starts
+  // the same batch again.
+  const providerModelsRef = useRef(new Map<string, Promise<string[]>>());
 
-  const loadOAuthModels = useCallback(async (candidates: RoutingCandidate[]) => {
-    const oauth = candidates.filter((candidate) => candidate.source === 'oauth');
-    if (oauth.length === 0) return;
-
-    const missing = oauth.filter((candidate) => !modelsCacheRef.current.has(candidate.id));
-    if (missing.length > 0) {
-      if (Object.keys(aliasesRef.current).length === 0) {
-        aliasesRef.current = await authFilesApi.getOauthModelAlias().catch(() => ({}));
-      }
-      await runWithConcurrency(missing, MODEL_FETCH_CONCURRENCY, async (candidate) => {
-        const name = candidate.id.replace(/^oauth:/, '');
-        const provider = normalizeProviderKey(candidate.provider);
-        let models: string[] = [];
-        try {
-          const raw = await authFilesApi.getModelsForAuthFile(name);
-          models = [
-            ...new Set(
-              applyOAuthModelAliases(raw, aliasesForProvider(aliasesRef.current, provider))
-                .map((model) => model.id)
-                .filter(Boolean)
-            ),
-          ].sort((left, right) => left.localeCompare(right));
-        } catch {
-          // A credential with no catalog endpoint simply claims no models.
-        }
-        modelsCacheRef.current.set(candidate.id, models);
-      });
+  const loadAliases = useCallback(() => {
+    if (!aliasesRef.current) {
+      aliasesRef.current = authFilesApi.getOauthModelAlias().catch(() => ({}));
     }
-
-    setSnapshot((current) => {
-      if (!current) return current;
-      return snapshotFrom(
-        current.candidates.map((candidate) =>
-          candidate.source === 'oauth'
-            ? { ...candidate, models: modelsCacheRef.current.get(candidate.id) ?? [] }
-            : candidate
-        ),
-        [],
-        current.strategy,
-        current.fetchedAt
-      );
-    });
+    return aliasesRef.current;
   }, []);
+
+  const loadOAuthModels = useCallback(
+    async (candidates: RoutingCandidate[]) => {
+      const providers = [
+        ...new Set(
+          candidates
+            .filter((candidate) => candidate.source === 'oauth')
+            .map((candidate) => normalizeProviderKey(candidate.provider))
+            .filter(Boolean)
+        ),
+      ];
+      if (providers.length === 0) return;
+
+      const resolved = await Promise.all(
+        providers.map(async (provider) => {
+          const cached = providerModelsRef.current.get(provider);
+          if (cached) return [provider, await cached] as const;
+
+          const pending = (async () => {
+            const aliases = await loadAliases();
+            const raw = await authFilesApi
+              .getModelDefinitions(provider)
+              // A provider with no definition endpoint simply claims no models.
+              .catch(() => []);
+            return [
+              ...new Set(
+                applyOAuthModelAliases(raw, aliasesForProvider(aliases, provider))
+                  .map((model) => model.id)
+                  .filter(Boolean)
+              ),
+            ].sort((left, right) => left.localeCompare(right));
+          })();
+          providerModelsRef.current.set(provider, pending);
+          return [provider, await pending] as const;
+        })
+      );
+      const catalog = new Map(resolved);
+
+      setSnapshot((current) => {
+        if (!current) return current;
+        return snapshotFrom(
+          current.candidates.map((candidate) =>
+            candidate.source === 'oauth'
+              ? {
+                  ...candidate,
+                  models: catalog.get(normalizeProviderKey(candidate.provider)) ?? [],
+                }
+              : candidate
+          ),
+          [],
+          current.strategy,
+          current.fetchedAt
+        );
+      });
+    },
+    [loadAliases]
+  );
 
   const refresh = useCallback(async () => {
     setRefreshing(true);

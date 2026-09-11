@@ -66,15 +66,14 @@ const CATALOG = [
   'gpt-5-codex',
 ];
 
-// Per-credential catalogs. Deliberately different per file so the model column
-// proves it is reading each credential's own endpoint.
-const FILE_MODELS = {
-  'antigravity-acct.json': ['gemini-3-flash', 'gemini-3.7-flash-high'],
-  'codex-team.json': ['gpt-5-codex', 'kimi-k3'],
-  'freebuff.json': ['claude-opus-4-6', 'claude-sonnet-4-6'],
-  'hyper.json': ['gemini-3-flash'],
-  'morphllm.json': ['deepseek-v4-pro'],
-  'vertex-runtime.json': ['gemini-3-flash'],
+// Per-provider catalogs, served by the same batch endpoint the real backend
+// exposes. Distinct per provider so the model column proves it reads them.
+const PROVIDER_MODELS = {
+  gemini: ['gemini-3-flash', 'gemini-3.7-flash-high'],
+  codex: ['gpt-5-codex', 'kimi-k3'],
+  claude: ['claude-opus-4-6', 'claude-sonnet-4-6'],
+  vertex: ['gemini-3-flash'],
+  openai: ['deepseek-v4-pro'],
 };
 
 const OAUTH_ALIASES = {
@@ -115,10 +114,10 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'GET') {
     if (path.endsWith('/config')) return json(res, CONFIG);
-    if (path.endsWith('/auth-files/models')) {
-      const name = decodeURIComponent((req.url.split('?')[1] ?? '').replace(/^name=/, ''));
-      console.log(`GET auth-files/models?name=${name}`);
-      return json(res, { models: (FILE_MODELS[name] ?? []).map((id) => ({ id })) });
+    if (path.includes('/model-definitions/')) {
+      const provider = decodeURIComponent(path.split('/model-definitions/')[1] ?? '');
+      console.log(`GET model-definitions/${provider}`);
+      return json(res, { models: (PROVIDER_MODELS[provider] ?? []).map((id) => ({ id })) });
     }
     if (path.endsWith('/auth-files')) return json(res, AUTH_FILES);
     if (path.endsWith('/auth-quotas')) return json(res, { quotas: {} });
