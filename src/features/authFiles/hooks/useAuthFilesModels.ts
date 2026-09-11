@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { authFilesApi } from '@/services/api';
 import { useNotificationStore } from '@/stores';
 import { useQuotaStore } from '@/stores/useQuotaStore';
-import type { AuthFileItem } from '@/types';
+import type { AuthFileItem, OAuthModelAliasEntry } from '@/types';
 import { normalizeProviderKey, type AuthFileModelItem } from '@/features/authFiles/constants';
 import {
+  applyOAuthModelAliases,
   mergeAuthFileModels,
   modelsFromUsageQuotaSnapshot,
 } from '@/features/authFiles/modelCatalog';
@@ -13,14 +14,31 @@ import { parseUsageQuotaSnapshot } from '@/utils/quota';
 
 type ModelsError = 'unsupported' | null;
 
-const getFreebuffQuotaModels = (item: AuthFileItem): AuthFileModelItem[] => {
+const aliasesForProvider = (
+  aliases: Record<string, OAuthModelAliasEntry[]>,
+  provider: string
+): OAuthModelAliasEntry[] => {
+  const normalizedProvider = normalizeProviderKey(provider);
+  const providerEntry = Object.entries(aliases).find(
+    ([key]) => normalizeProviderKey(key) === normalizedProvider
+  );
+  return providerEntry?.[1] ?? [];
+};
+
+const getFreebuffQuotaModels = (
+  item: AuthFileItem,
+  aliases: Record<string, OAuthModelAliasEntry[]>
+): AuthFileModelItem[] => {
   const provider = normalizeProviderKey(String(item.type ?? item.provider ?? ''));
   if (provider !== 'freebuff') return [];
 
   const cachedQuota = useQuotaStore.getState().freebuffQuota[item.name];
   const itemSnapshot = parseUsageQuotaSnapshot(item.usage_quota ?? item.usageQuota);
 
-  return modelsFromUsageQuotaSnapshot(cachedQuota ? cachedQuota.snapshot : itemSnapshot);
+  return modelsFromUsageQuotaSnapshot(
+    cachedQuota ? cachedQuota.snapshot : itemSnapshot,
+    aliasesForProvider(aliases, provider)
+  );
 };
 
 export type UseAuthFilesModelsResult = {
@@ -81,7 +99,7 @@ export function useAuthFilesModels(): UseAuthFilesModelsResult {
       setModelsFileName(item.name);
       setModelsFileType(item.type || '');
       setModelsAuthIndex(String(item.authIndex ?? item.auth_index ?? '').trim());
-      const quotaModels = getFreebuffQuotaModels(item);
+      const quotaModels = getFreebuffQuotaModels(item, {});
       setModelsList(quotaModels);
       setModelsError(null);
       setModelsModalOpen(true);
@@ -100,10 +118,17 @@ export function useAuthFilesModels(): UseAuthFilesModelsResult {
 
       setModelsLoading(true);
       try {
-        const models = await authFilesApi.getModelsForAuthFile(item.name);
-        const mergedModels = mergeAuthFileModels(models, getFreebuffQuotaModels(item));
+        const [models, aliases] = await Promise.all([
+          authFilesApi.getModelsForAuthFile(item.name),
+          authFilesApi.getOauthModelAlias().catch(() => ({})),
+        ]);
+        const provider = normalizeProviderKey(String(item.type ?? item.provider ?? ''));
+        const providerAliases = aliasesForProvider(aliases, provider);
+        const normalizedModels = applyOAuthModelAliases(models, providerAliases);
+        const normalizedQuotaModels = getFreebuffQuotaModels(item, aliases);
+        const mergedModels = mergeAuthFileModels(normalizedModels, normalizedQuotaModels);
         if (isCacheCurrent()) {
-          modelsCacheRef.current.set(cacheKey, models);
+          modelsCacheRef.current.set(cacheKey, normalizedModels);
           if (isRequestCurrent()) setModelsList(mergedModels);
         }
       } catch (err) {

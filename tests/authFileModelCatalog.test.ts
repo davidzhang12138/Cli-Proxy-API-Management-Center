@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  applyOAuthModelAliases,
   mergeAuthFileModels,
   modelsFromUsageQuotaSnapshot,
 } from '../src/features/authFiles/modelCatalog';
@@ -53,5 +54,35 @@ describe('mergeAuthFileModels', () => {
         ],
       })
     ).toEqual([{ id: 'model-a' }, { id: 'model-b' }, { id: 'shared-model' }]);
+  });
+
+  test('hides the original model when a non-fork alias is configured', () => {
+    expect(
+      applyOAuthModelAliases(
+        [{ id: 'deepseek-v4-flash', type: 'freebuff' }],
+        [{ name: 'deepseek-v4-flash', alias: 'deepseek-v4.1-flash-t' }]
+      )
+    ).toEqual([{ id: 'deepseek-v4.1-flash-t', type: 'freebuff' }]);
+  });
+
+  test('rewrites quota model IDs using non-fork aliases', () => {
+    expect(
+      modelsFromUsageQuotaSnapshot(
+        { resources: [{ models: ['deepseek-v4-flash'] }] },
+        [{ name: 'deepseek-v4-flash', alias: 'deepseek-v4.1-flash-t' }]
+      )
+    ).toEqual([{ id: 'deepseek-v4.1-flash-t' }]);
+  });
+
+  test('keeps the original model for fork aliases', () => {
+    expect(
+      applyOAuthModelAliases(
+        [{ id: 'deepseek-v4-flash', type: 'freebuff' }],
+        [{ name: 'deepseek-v4-flash', alias: 'deepseek-v4.1-flash-t', fork: true }]
+      )
+    ).toEqual([
+      { id: 'deepseek-v4-flash', type: 'freebuff' },
+      { id: 'deepseek-v4.1-flash-t', type: 'freebuff' },
+    ]);
   });
 });
