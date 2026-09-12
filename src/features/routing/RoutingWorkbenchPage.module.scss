@@ -1052,16 +1052,29 @@
   }
 
   .modelList {
-    display: flex;
-    max-height: none;
-    overflow-x: auto;
-    padding-bottom: 3px;
+    display: grid;
+    max-height: min(38dvh, 300px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+    touch-action: pan-y;
+    padding: 2px 2px 3px;
   }
 
   .modelItem {
-    flex: 0 0 auto;
-    width: auto;
-    max-width: 220px;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    min-height: 40px;
+  }
+
+  .modelItem span {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
   }
 }
 
