@@ -6,7 +6,11 @@ import { providersApi } from '@/services/api/providers';
 import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
 import { useAuthStore } from '@/stores';
 import { isModelExcluded, normalizeProviderKey } from '@/features/authFiles/constants';
-import { aliasesForProvider, applyOAuthModelAliases } from '@/features/authFiles/modelCatalog';
+import {
+  aliasesForProvider,
+  applyOAuthModelAliases,
+  mergeAuthFileModels,
+} from '@/features/authFiles/modelCatalog';
 import type {
   ApiKeyEntry,
   AuthFileItem,
@@ -571,12 +575,10 @@ export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
   }, [snapshot]);
 
   /**
-   * OAuth model coverage comes from /model-definitions/{provider}, which returns
-   * the catalog for a whole provider family in one request. Listing credentials
-   * (1053 of them on a real install) must never mean one request per credential.
-   *
-   * ponytail: the provider catalogs are fetched once per session and not
-   * invalidated, so a catalog edited elsewhere stays stale until reload.
+   * Cache one merged catalog per OAuth provider. The static provider catalog is
+   * useful as a fallback, but it can lag behind account-visible IDs (for example
+   * Hyper's runtime `deepseek-v4.1-flash`). One representative enabled account
+   * supplements it without returning to one request per credential.
    */
   // Promises, not results: the ref has to be populated synchronously, or a
   // second call arriving mid-flight (StrictMode, a refresh during load) starts
@@ -634,10 +636,27 @@ export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
           // them takes effect without refetching the catalog.
           const pending = (async () => {
             const aliases = await loadAliases();
-            const raw = await authFilesApi
-              .getModelDefinitions(provider)
-              // A provider with no definition endpoint simply claims no models.
-              .catch(() => []);
+            const representative = candidates.find(
+              (candidate) =>
+                candidate.source === 'oauth' &&
+                candidate.enabled &&
+                normalizeProviderKey(candidate.provider) === provider &&
+                candidate.detail.trim() !== ''
+            );
+            const [staticModels, runtimeModels] = await Promise.all([
+              authFilesApi
+                .getModelDefinitions(provider)
+                // A provider with no definition endpoint simply claims no static models.
+                .catch(() => []),
+              representative
+                ? authFilesApi
+                    .getModelsForAuthFile(representative.detail)
+                    // Runtime model discovery is best-effort; keep static coverage
+                    // when an individual account cannot be queried.
+                    .catch(() => [])
+                : Promise.resolve([]),
+            ]);
+            const raw = mergeAuthFileModels(runtimeModels, staticModels);
             return [
               ...new Set(
                 applyOAuthModelAliases(raw, aliasesForProvider(aliases, provider))

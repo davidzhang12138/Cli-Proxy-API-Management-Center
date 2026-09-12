@@ -21,6 +21,15 @@ describe('mergeAuthFileModels', () => {
     ]);
   });
 
+  test('supplements a stale static catalog with the runtime model id', () => {
+    expect(
+      mergeAuthFileModels(
+        [{ id: 'deepseek-v4.1-flash' }],
+        [{ id: 'deepseek-v4-flash' }]
+      )
+    ).toEqual([{ id: 'deepseek-v4-flash' }, { id: 'deepseek-v4.1-flash' }]);
+  });
+
   test('deduplicates model IDs case-insensitively and trims them', () => {
     expect(
       mergeAuthFileModels(
