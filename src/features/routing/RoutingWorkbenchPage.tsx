@@ -160,9 +160,8 @@ function GroupRow({
   onCandidatePrioritySave: (candidateId: string) => void;
 }) {
   const { t } = useTranslation();
-  const dirty = draftPriority !== String(priority);
+  const dirty = draftPriority !== String(priority) || !uniformPriority;
   const enabled = group.candidates.some((candidate) => candidate.enabled);
-  const priorityLocked = !uniformPriority;
   const visibleCandidates = scopedCandidates(group, selectedModel);
   const displayedCoverage = selectedModel ? [selectedModel] : coverage;
   return (
@@ -204,8 +203,8 @@ function GroupRow({
             type="number"
             step="1"
             value={draftPriority}
-            disabled={!group.editable || saving || priorityLocked}
-            aria-describedby={priorityLocked ? `group-priority-note-${group.id}` : undefined}
+            disabled={!group.editable || saving}
+            aria-describedby={!uniformPriority ? `group-priority-note-${group.id}` : undefined}
             aria-label={
               selectedModel
                 ? t('routing_page.model_priority_for_model', { model: selectedModel })
@@ -233,7 +232,7 @@ function GroupRow({
             <Button
               size="sm"
               variant={dirty ? 'primary' : 'secondary'}
-              disabled={!dirty || saving || priorityLocked}
+              disabled={!dirty || saving}
               loading={saving}
               onClick={onSave}
             >
@@ -557,11 +556,6 @@ export function RoutingWorkbenchPage() {
   const saveGroup = useCallback(
     async (group: RoutingGroup) => {
       const model = selectedModelValue;
-      const uniformPriority = groupUniformForModel(group, model);
-      if (!uniformPriority) {
-        showNotification(t('routing_page.group_priority_blocked'), 'error');
-        return;
-      }
       const value = getGroupDraft(group, model);
       const priority = model ? parseInteger(value, null) : parseInteger(value, 0);
       if (!model && priority === null) {
@@ -813,7 +807,7 @@ export function RoutingWorkbenchPage() {
             onClick={() => setSelectedModel(ALL_MODELS)}
           >
             <span>{t('routing_page.all_models')}</span>
-            <b>{coveredGroups.length}</b>
+            <b>{reachableModels.length}</b>
           </button>
           <div className={styles.modelList}>
             {firstLoad

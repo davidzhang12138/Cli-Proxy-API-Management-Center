@@ -152,6 +152,68 @@ const nextModelPriorities = (
   return next;
 };
 
+interface CandidateUpdateTask {
+  candidate: RoutingCandidate;
+  run: () => Promise<void>;
+}
+
+const runConcurrentTasks = async (
+  tasks: Array<() => Promise<void>>,
+  concurrency: number
+): Promise<unknown[]> => {
+  if (tasks.length === 0) return [];
+
+  let nextIndex = 0;
+  const failures: unknown[] = [];
+  const worker = async () => {
+    while (nextIndex < tasks.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      try {
+        await tasks[index]();
+      } catch (cause: unknown) {
+        failures.push(cause);
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(Math.max(1, concurrency), tasks.length) }, () => worker())
+  );
+  return failures;
+};
+
+const throwFirstUpdateFailure = (failures: unknown[]): void => {
+  if (failures.length === 0) return;
+  const first = failures[0];
+  if (first instanceof Error) throw first;
+  throw new Error(String(first));
+};
+
+/**
+ * Auth-file patches are independent and can be submitted together. Config API
+ * key updates rewrite a shared provider list, so keep those serial to avoid
+ * concurrent full-config PUTs overwriting one another.
+ */
+const saveCandidateUpdates = async (tasks: CandidateUpdateTask[]): Promise<void> => {
+  const oauthTasks = tasks.filter(({ candidate }) => candidate.source === 'oauth');
+  const configTasks = tasks.filter(({ candidate }) => candidate.source !== 'oauth');
+  const failures = await runConcurrentTasks(
+    oauthTasks.map(({ run }) => run),
+    8
+  );
+
+  for (const task of configTasks) {
+    try {
+      await task.run();
+    } catch (cause: unknown) {
+      failures.push(cause);
+    }
+  }
+
+  throwFirstUpdateFailure(failures);
+};
+
 const candidateServesModel = (
   candidate: RoutingCandidate,
   model: string,
@@ -357,11 +419,16 @@ const groupRecords = (candidates: RoutingCandidate[], catalog?: string[]): Group
           new Set(groupCandidates.map((candidate) => candidate.priority)).size <= 1,
         editable: groupCandidates.some((candidate) => candidate.editable),
         updatePriority: async (priority: number) => {
-          for (const candidate of groupCandidates) {
-            if (candidate.editable && candidate.priority !== priority) {
-              await candidate.update({ priority });
-            }
-          }
+          const tasks = groupCandidates
+            .filter((candidate) => candidate.editable && candidate.priority !== priority)
+            .map((candidate) => ({
+              candidate,
+              run: async () => {
+                await candidate.update({ priority });
+                candidate.priority = priority;
+              },
+            }));
+          await saveCandidateUpdates(tasks);
         },
         updateCandidatePriority: async (candidateId: string, priority: number) => {
           const candidate = groupCandidates.find(
@@ -390,15 +457,26 @@ const groupRecords = (candidates: RoutingCandidate[], catalog?: string[]): Group
           candidate.modelPriorities = modelPriorities;
         },
         updateModelPriority: async (model: string, priority: number | null) => {
-          for (const candidate of groupCandidates) {
-            if (!candidate.editable) continue;
-            if (!candidateServesModel(candidate, model, coverage)) continue;
-            const modelPriorities = nextModelPriorities(candidate.modelPriorities, model, priority);
-            await candidate.update({
-              modelPriorities,
+          const tasks = groupCandidates
+            .filter(
+              (candidate) =>
+                candidate.editable && candidateServesModel(candidate, model, coverage)
+            )
+            .map((candidate) => {
+              const modelPriorities = nextModelPriorities(
+                candidate.modelPriorities,
+                model,
+                priority
+              );
+              return {
+                candidate,
+                run: async () => {
+                  await candidate.update({ modelPriorities });
+                  candidate.modelPriorities = modelPriorities;
+                },
+              };
             });
-            candidate.modelPriorities = modelPriorities;
-          }
+          await saveCandidateUpdates(tasks);
         },
       },
     })
