@@ -35,6 +35,32 @@ const providerLabel = (provider: string): string =>
 
 const normalizeText = (value: unknown): string => String(value ?? '').trim();
 
+const recordValue = (value: unknown, key: string): string => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  return normalizeText((value as Record<string, unknown>)[key]);
+};
+
+const resolveAuthProviderKey = (file: AuthFileItem, provider: string): string => {
+  const providerKey =
+    normalizeText(file['provider_key']) ||
+    recordValue(file.attributes, 'provider_key') ||
+    recordValue(file.metadata, 'provider_key');
+  const compatName =
+    normalizeText(file['compat_name']) ||
+    recordValue(file.attributes, 'compat_name') ||
+    recordValue(file.metadata, 'compat_name');
+  const normalized = provider.toLowerCase();
+  const isCompatible =
+    normalized === 'openai' ||
+    normalized === 'openai-compatibility' ||
+    normalized.startsWith('openai-compatible-') ||
+    providerKey.toLowerCase().startsWith('openai-compatible-') ||
+    Boolean(compatName);
+  if (!isCompatible) return provider;
+  const key = (providerKey || compatName || provider).toLowerCase();
+  return key.startsWith('openai-compatible-') ? key : `openai-compatible-${key}`;
+};
+
 const modelsFromAliases = (models: ModelAlias[] | undefined): BenchmarkModel[] => {
   const seen = new Set<string>();
   const result: BenchmarkModel[] = [];
@@ -174,6 +200,7 @@ const buildOAuthTarget = (
   catalog: Record<string, string[]>
 ): BenchmarkTarget => {
   const provider = normalizeProviderKey(normalizeText(file.type ?? file.provider));
+  const providerKey = resolveAuthProviderKey(file, provider);
   const protocol = providerProtocol(provider);
   const authIndex = normalizeText(file.authIndex ?? file.auth_index) || undefined;
   const accountId =
@@ -194,7 +221,7 @@ const buildOAuthTarget = (
   const supported = Boolean(authIndex || normalizeText(file.name));
   return {
     id: `oauth:${normalizeText(file.name)}`,
-    providerKey: provider,
+    providerKey,
     label: `${providerLabel(provider)} · ${authFileIdentity(file) || 'auth file'}`,
     source: 'oauth',
     identity: authFileIdentity(file),

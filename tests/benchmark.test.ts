@@ -136,6 +136,26 @@ describe('benchmark target discovery', () => {
     expect(target.supported).toBe(true);
     expect(target.authFileName).toBe('missing.json');
   });
+
+  test('uses the backend OpenAI-compatible provider key for OAuth auth files', () => {
+    const [target] = buildBenchmarkTargets(
+      {},
+      [
+        {
+          name: 'ollama-auth.json',
+          type: 'openai-compatibility',
+          authIndex: 'ollama-auth',
+          attributes: {
+            provider_key: 'openai-compatible-ollama',
+            compat_name: 'ollama',
+          },
+        },
+      ],
+      { 'openai-compatibility': ['deepseek-v4.1-flash'] }
+    );
+    expect(target.providerKey).toBe('openai-compatible-ollama');
+    expect(target.supported).toBe(true);
+  });
 });
 
 describe('benchmark scoring helpers', () => {
