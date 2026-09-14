@@ -289,6 +289,19 @@ export const hasKnownUsageQuotaSnapshot = (value: unknown): boolean => {
   return Boolean(snapshot?.known && !snapshot.error);
 };
 
+/**
+ * Instant the backend's quota probe ran, as epoch ms.
+ *
+ * Null when the payload carries no timestamp — callers read that as "this
+ * snapshot cannot say how old it is", not "taken at the epoch".
+ */
+export const usageQuotaCheckedAtMs = (value: unknown): number | null => {
+  const snapshot = parseUsageQuotaSnapshot(value);
+  if (!snapshot?.checkedAt) return null;
+  const ms = Date.parse(snapshot.checkedAt);
+  return Number.isFinite(ms) ? ms : null;
+};
+
 export const buildKiroQuotaDataFromUsageQuota = (value: unknown): KiroQuotaData | null => {
   const snapshot = parseUsageQuotaSnapshot(value);
   if (!snapshot || !snapshot.known || snapshot.error) return null;

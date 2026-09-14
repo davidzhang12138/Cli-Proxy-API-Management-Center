@@ -62,9 +62,17 @@ const resolveUpdater = <T>(updater: QuotaUpdater<T>, prev: T): T => {
   return updater;
 };
 
-const resolveQuotaCacheExpiryAt = (_value: TimedQuotaState, cachedAt: number) => {
-  return cachedAt + QUOTA_CACHE_FALLBACK_TTL_MS;
-};
+/**
+ * When an entry stops being treated as fresh: write time + the fallback TTL.
+ *
+ * Deliberately independent of any provider reset time. Expiring per-window
+ * meant one short-cycle resource (Antigravity reports 33) purged a card whose
+ * other resources were still good for a week — see 0d8fffb. Staleness is now
+ * handled by comparing the backend's `checked_at` against the cache on load
+ * (shouldApplySnapshot), so this is only a backstop for credentials the backend
+ * can no longer probe.
+ */
+const resolveQuotaCacheExpiryAt = (cachedAt: number) => cachedAt + QUOTA_CACHE_FALLBACK_TTL_MS;
 
 const isFreshQuotaState = (value: TimedQuotaState | undefined, now: number) => {
   if (!value || value.status === 'loading') return false;
@@ -73,7 +81,7 @@ const isFreshQuotaState = (value: TimedQuotaState | undefined, now: number) => {
   }
   const cachedAt =
     typeof value._cachedAt === 'number' && Number.isFinite(value._cachedAt) ? value._cachedAt : now;
-  return resolveQuotaCacheExpiryAt(value, cachedAt) > now;
+  return resolveQuotaCacheExpiryAt(cachedAt) > now;
 };
 
 const sanitizeQuotaMap = <T extends TimedQuotaState>(quotaMap: Record<string, T>) => {
@@ -93,7 +101,7 @@ const sanitizeQuotaMap = <T extends TimedQuotaState>(quotaMap: Record<string, T>
       const cacheExpiresAt =
         typeof value._cacheExpiresAt === 'number' && Number.isFinite(value._cacheExpiresAt)
           ? value._cacheExpiresAt
-          : resolveQuotaCacheExpiryAt(value, cachedAt);
+          : resolveQuotaCacheExpiryAt(cachedAt);
 
       return [
         [
@@ -130,7 +138,7 @@ const stampQuotaMap = <T extends TimedQuotaState>(
         prevValue === value && isFreshQuotaState(prevValue, now) ? prevValue._cachedAt : now;
       const normalizedCachedAt =
         typeof cachedAt === 'number' && Number.isFinite(cachedAt) ? cachedAt : now;
-      const cacheExpiresAt = resolveQuotaCacheExpiryAt(value, normalizedCachedAt);
+      const cacheExpiresAt = resolveQuotaCacheExpiryAt(normalizedCachedAt);
 
       return [[key, { ...value, _cachedAt: normalizedCachedAt, _cacheExpiresAt: cacheExpiresAt }]];
     })
@@ -149,6 +157,23 @@ const sanitizePersistedQuotaState = (
   freebuffQuota: sanitizeQuotaMap(state.freebuffQuota ?? {}),
   hyperQuota: sanitizeQuotaMap(state.hyperQuota ?? {}),
 });
+
+/**
+ * Drop entries whose TTL has passed, for the in-session purge timer.
+ *
+ * Unlike `sanitizeQuotaMap`, in-flight entries are kept: that function decides
+ * what is worth *persisting*, where a half-finished fetch is noise, but the
+ * timer runs mid-session where deleting a `loading` entry blanks a card the
+ * user is watching and the arriving response has nowhere to land.
+ */
+const purgeStaleQuotaMap = <T extends TimedQuotaState>(quotaMap: Record<string, T>) => {
+  const now = Date.now();
+  return Object.fromEntries(
+    Object.entries(quotaMap).flatMap(([key, value]) =>
+      value && (value.status === 'loading' || isFreshQuotaState(value, now)) ? [[key, value]] : []
+    )
+  ) as Record<string, T>;
+};
 
 export const useQuotaStore = create<QuotaStoreState>()(
   persist(
@@ -214,18 +239,16 @@ export const useQuotaStore = create<QuotaStoreState>()(
           hyperQuota: {},
             })),
       purgeStaleEntries: () =>
-        set((state) =>
-          sanitizePersistedQuotaState({
-            antigravityQuota: state.antigravityQuota,
-            claudeQuota: state.claudeQuota,
-            codexQuota: state.codexQuota,
-            kiroQuota: state.kiroQuota,
-            kimiQuota: state.kimiQuota,
-            xaiQuota: state.xaiQuota,
-            freebuffQuota: state.freebuffQuota,
-            hyperQuota: state.hyperQuota,
-          })
-        ),
+        set((state) => ({
+          antigravityQuota: purgeStaleQuotaMap(state.antigravityQuota),
+          claudeQuota: purgeStaleQuotaMap(state.claudeQuota),
+          codexQuota: purgeStaleQuotaMap(state.codexQuota),
+          kiroQuota: purgeStaleQuotaMap(state.kiroQuota),
+          kimiQuota: purgeStaleQuotaMap(state.kimiQuota),
+          xaiQuota: purgeStaleQuotaMap(state.xaiQuota),
+          freebuffQuota: purgeStaleQuotaMap(state.freebuffQuota),
+          hyperQuota: purgeStaleQuotaMap(state.hyperQuota),
+        })),
     }),
     {
       name: STORAGE_KEY_QUOTA,

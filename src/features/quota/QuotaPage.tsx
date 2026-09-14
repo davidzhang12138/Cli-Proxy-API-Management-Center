@@ -20,6 +20,7 @@ import { useNow } from '@/hooks/useNow';
 import { useRevealGroup } from '@/hooks/motion';
 import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, ResolvedTheme } from '@/types';
+import { usageQuotaCheckedAtMs } from '@/utils/quota';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
 import { QuotaHeader } from './components/QuotaHeader';
 import { QuotaCard } from './components/QuotaCard';
@@ -39,6 +40,7 @@ import {
   filterEntriesByTab,
   paginate,
   resolveQuotaDisplayName,
+  shouldApplySnapshot,
   sortQuotaEntries,
   type QuotaFileEntry,
 } from './logic';
@@ -81,19 +83,20 @@ export function QuotaPage() {
       setFiles(nextFiles);
 
       const snapshotsByType = new Map<QuotaProviderType, Record<string, QuotaCardState>>();
+      const snapshotsCheckedAt = new Map<string, number | null>();
       classifyQuotaFiles(nextFiles).forEach((entry) => {
         const snapshot = QUOTA_ADAPTERS[entry.type].buildSnapshotState?.(entry.file);
         if (!snapshot) return;
         const snapshots = snapshotsByType.get(entry.type) ?? {};
         snapshots[entry.file.name] = snapshot;
         snapshotsByType.set(entry.type, snapshots);
+        snapshotsCheckedAt.set(entry.file.name, usageQuotaCheckedAtMs(entry.file.usage_quota));
       });
       snapshotsByType.forEach((snapshots, type) => {
         getQuotaSetter(QUOTA_ADAPTERS[type])((prev) => {
-          const recoverableEntries = Object.entries(snapshots).filter(([name]) => {
-            const current = prev[name];
-            return !current || current.status === 'idle' || current.status === 'error';
-          });
+          const recoverableEntries = Object.entries(snapshots).filter(([name]) =>
+            shouldApplySnapshot(prev[name], snapshotsCheckedAt.get(name) ?? null)
+          );
           return recoverableEntries.length > 0
             ? { ...prev, ...Object.fromEntries(recoverableEntries) }
             : prev;
@@ -112,6 +115,17 @@ export function QuotaPage() {
   useEffect(() => {
     void loadFiles();
   }, [loadFiles]);
+
+  // Drop entries past their TTL so a long-lived SPA session stops rendering
+  // them. The 7-day fallback means this rarely fires in a single sitting, but
+  // credentials deleted mid-session would otherwise linger in the persisted
+  // cache. In-flight entries are skipped — see purgeStaleQuotaMap.
+  useEffect(() => {
+    const purge = useQuotaStore.getState().purgeStaleEntries;
+    purge();
+    const timer = setInterval(purge, 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   /* ---------- 额度缓存 ----------
    * 排在归类/排序之前：「最快恢复优先」要读它算排序键。 */

@@ -7,11 +7,12 @@ import {
   useQuotaStore,
 } from '@/stores';
 import type { AuthFileItem } from '@/types';
-import { getStatusFromError, resolveQuotaErrorMessage } from '@/utils/quota';
+import { getStatusFromError, resolveQuotaErrorMessage, usageQuotaCheckedAtMs } from '@/utils/quota';
 import { isRuntimeOnlyAuthFile, type QuotaProviderType } from '@/features/authFiles/constants';
 import { Button } from '@/components/ui/Button';
 import { IconRefreshCw } from '@/components/ui/icons';
 import { bindQuotaClasses } from '@/features/quota/types';
+import { shouldApplySnapshot } from '@/features/quota/logic';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '@/features/quota/providers';
 import styles from './AuthFileQuota.module.scss';
 
@@ -58,14 +59,19 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     (state) => state[adapter.storeSetter] as unknown as QuotaMapUpdater
   );
   const snapshotQuota = adapter.buildSnapshotState?.(file);
+  const snapshotCheckedAtMs = usageQuotaCheckedAtMs(file.usage_quota);
 
+  // Refresh the cached state whenever the backend's snapshot is newer than what
+  // the card is showing — see shouldApplySnapshot for why status alone can't
+  // decide this.
   useEffect(() => {
-    if (quota || !snapshotQuota) return;
+    if (!snapshotQuota) return;
+    if (!shouldApplySnapshot(quota, snapshotCheckedAtMs)) return;
     updateQuotaState((prev) => ({
       ...prev,
       [file.name]: snapshotQuota,
     }));
-  }, [file.name, quota, snapshotQuota, updateQuotaState]);
+  }, [file.name, quota, snapshotQuota, snapshotCheckedAtMs, updateQuotaState]);
 
   const displayQuota = quota ?? snapshotQuota;
 

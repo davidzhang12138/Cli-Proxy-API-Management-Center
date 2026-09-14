@@ -3,6 +3,12 @@ import { ANTIGRAVITY_CONFIG } from '@/features/quota/providers/antigravity/data'
 import { CLAUDE_CONFIG } from '@/features/quota/providers/claude/data';
 import { CODEX_CONFIG } from '@/features/quota/providers/codex/data';
 import { KIMI_CONFIG } from '@/features/quota/providers/kimi/data';
+import { shouldApplySnapshot } from '@/features/quota/logic';
+import { usageQuotaCheckedAtMs } from '@/utils/quota';
+import { useQuotaStore } from '@/stores';
+import type { AntigravityQuotaState } from '@/types';
+
+const HOUR_MS = 60 * 60 * 1000;
 
 describe('management quota snapshot hydration', () => {
   test('hydrates Codex windows from a persisted management snapshot', () => {
@@ -126,5 +132,108 @@ describe('management quota snapshot hydration', () => {
       limit: 100,
       periodHours: 168,
     });
+  });
+});
+
+// The reported bug: a card rendered a stale snapshot, the backend re-probed and
+// returned newer numbers, and the hydration guard dropped them because the
+// cached entry was already `success`.
+describe('stale snapshot replacement', () => {
+  const now = 1_800_000_000_000;
+  const snapshotAt = (iso: string) => ({ known: true, checked_at: iso, resources: [] });
+
+  test('a backend snapshot newer than the cached success replaces it', () => {
+    const cachedAt = now - 3 * HOUR_MS;
+    const checked = usageQuotaCheckedAtMs(
+      snapshotAt(new Date(now - HOUR_MS).toISOString())
+    );
+    expect(shouldApplySnapshot({ status: 'success', _cachedAt: cachedAt }, checked, now)).toBe(true);
+  });
+
+  test('an older backend snapshot leaves the cached success alone', () => {
+    const cachedAt = now - HOUR_MS;
+    const checked = usageQuotaCheckedAtMs(
+      snapshotAt(new Date(now - 3 * HOUR_MS).toISOString())
+    );
+    expect(shouldApplySnapshot({ status: 'success', _cachedAt: cachedAt }, checked, now)).toBe(false);
+  });
+
+  test('a snapshot predating the fix still fills idle, error and missing entries', () => {
+    const checked = usageQuotaCheckedAtMs(snapshotAt(new Date(now - 5 * HOUR_MS).toISOString()));
+    expect(shouldApplySnapshot(undefined, checked, now)).toBe(true);
+    expect(shouldApplySnapshot({ status: 'idle' }, checked, now)).toBe(true);
+    expect(shouldApplySnapshot({ status: 'error' }, checked, now)).toBe(true);
+  });
+
+  test('an unstamped snapshot cannot displace a success but still fills a gap', () => {
+    expect(shouldApplySnapshot({ status: 'success', _cachedAt: now }, null, now)).toBe(false);
+    expect(shouldApplySnapshot(undefined, null, now)).toBe(true);
+  });
+
+  test('a snapshot without checked_at parses to null', () => {
+    expect(usageQuotaCheckedAtMs({ known: true, resources: [] })).toBeNull();
+    expect(usageQuotaCheckedAtMs(null)).toBeNull();
+    expect(usageQuotaCheckedAtMs({ known: true, checked_at: 'not-a-date' })).toBeNull();
+  });
+
+  test('a backend clock running ahead does not out-rank the write it caused', () => {
+    // checked_at is in the future relative to the browser: without clamping,
+    // the same snapshot would re-apply on every render.
+    const checked = now + 2 * HOUR_MS;
+    expect(shouldApplySnapshot({ status: 'success', _cachedAt: now }, checked, now)).toBe(false);
+  });
+
+  test('a cached success with no stamp is replaced (pre-stamp persisted data)', () => {
+    const checked = usageQuotaCheckedAtMs(snapshotAt(new Date(now).toISOString()));
+    expect(shouldApplySnapshot({ status: 'success' }, checked, now)).toBe(true);
+  });
+});
+
+// purgeStaleEntries was reached only from the retired section shell; restoring
+// the timer call must not blank a card that is mid-fetch.
+describe('quota cache purge', () => {
+  // Injected via setState rather than the setter: the setters re-stamp every
+  // write, so an already-expired entry can only be reached by landing one in
+  // state directly — which is exactly what loading the persisted cache does.
+  const write = (entries: Record<string, unknown>) => {
+    useQuotaStore.setState({
+      antigravityQuota: entries as Record<string, AntigravityQuotaState>,
+    });
+    useQuotaStore.getState().purgeStaleEntries();
+    return useQuotaStore.getState().antigravityQuota;
+  };
+
+  test('keeps a loading entry so an in-flight fetch still has somewhere to land', () => {
+    const after = write({ 'loading.json': { status: 'loading', groups: [] } });
+    expect(Object.keys(after)).toEqual(['loading.json']);
+  });
+
+  test('drops an entry whose TTL has passed', () => {
+    // purgeStaleEntries reads the real clock (isFreshQuotaState owns it), so
+    // these stamps are relative to now rather than injected.
+    const realNow = Date.now();
+    const expired = realNow - 24 * HOUR_MS;
+    const after = write({
+      'expired.json': {
+        status: 'success',
+        groups: [],
+        _cachedAt: expired,
+        _cacheExpiresAt: expired,
+      },
+    });
+    expect(Object.keys(after)).toEqual([]);
+  });
+
+  test('keeps a fresh entry', () => {
+    const realNow = Date.now();
+    const after = write({
+      'fresh.json': {
+        status: 'success',
+        groups: [],
+        _cachedAt: realNow,
+        _cacheExpiresAt: realNow + 7 * 24 * HOUR_MS,
+      },
+    });
+    expect(Object.keys(after)).toEqual(['fresh.json']);
   });
 });

@@ -64,6 +64,34 @@ export function filterEntriesByTab(entries: QuotaFileEntry[], tab: QuotaTabId): 
 }
 
 /**
+ * Whether a freshly fetched backend snapshot should replace the cached card
+ * state for one credential.
+ *
+ * The backend re-probes credentials on its own schedule, so its snapshot can be
+ * strictly newer than whatever the card last rendered — a hand-triggered
+ * success from a moment ago, or a persisted entry from days back. Timestamps
+ * decide that; status alone cannot, which is what let a persisted `success`
+ * pin the card until the 7-day cache fallback expired.
+ *
+ * A snapshot carrying no `checked_at` cannot be ordered against the cache, so
+ * it only fills gaps rather than displacing a timestamped success.
+ */
+export function shouldApplySnapshot(
+  current: { status?: string; _cachedAt?: number } | undefined,
+  snapshotCheckedAtMs: number | null,
+  nowMs: number = Date.now()
+): boolean {
+  if (!current || current.status !== 'success') return true;
+  if (snapshotCheckedAtMs === null) return false;
+  const cachedAt = current._cachedAt;
+  if (typeof cachedAt !== 'number' || !Number.isFinite(cachedAt)) return true;
+  // Clamp to the local clock: a backend running ahead of the browser would
+  // otherwise keep looking newer than the write it just caused, re-applying
+  // the same snapshot on every render.
+  return Math.min(snapshotCheckedAtMs, nowMs) > cachedAt;
+}
+
+/**
  * Order the grid by whichever credential recovers first.
  *
  * The instant is injected rather than read here: quota lives in the store and

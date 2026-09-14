@@ -175,8 +175,21 @@ export interface UsageQuotaResource {
   unlimited?: boolean;
 }
 
+/**
+ * Timestamps the quota cache stamps onto every entry it stores, so callers can
+ * tell how old a rendered card is (see useQuotaStore). Optional because states
+ * constructed outside the store — fixtures, `buildSnapshotState` output — have
+ * not been stamped yet.
+ */
+export interface QuotaCacheStamp {
+  /** Epoch ms the entry was last written by the cache. */
+  _cachedAt?: number;
+  /** Epoch ms the entry stops being treated as fresh. */
+  _cacheExpiresAt?: number;
+}
+
 /** Unified management quota snapshots used by providers without a public quota API. */
-export interface UsageQuotaProviderState {
+export interface UsageQuotaProviderState extends QuotaCacheStamp {
   status: 'idle' | 'loading' | 'success' | 'error';
   snapshot: UsageQuotaSnapshot | null;
   error?: string;
@@ -321,7 +334,7 @@ export interface ClaudeQuotaWindow {
   periodHours?: number | null;
 }
 
-export interface ClaudeQuotaState {
+export interface ClaudeQuotaState extends QuotaCacheStamp {
   status: 'idle' | 'loading' | 'success' | 'error';
   windows: ClaudeQuotaWindow[];
   extraUsage?: ClaudeExtraUsage | null;
@@ -372,7 +385,7 @@ export interface AntigravityQuotaBucket {
   periodHours?: number | null;
 }
 
-export interface AntigravityQuotaState {
+export interface AntigravityQuotaState extends QuotaCacheStamp {
   status: 'idle' | 'loading' | 'success' | 'error';
   groups: AntigravityQuotaGroup[];
   subscription?: AntigravityQuotaSubscription | null;
@@ -395,7 +408,7 @@ export interface CodexQuotaWindow {
   periodHours?: number | null;
 }
 
-export interface CodexQuotaState {
+export interface CodexQuotaState extends QuotaCacheStamp {
   status: 'idle' | 'loading' | 'success' | 'error';
   windows: CodexQuotaWindow[];
   planType?: string | null;
@@ -466,7 +479,7 @@ export interface KimiQuotaRow {
   periodHours?: number | null;
 }
 
-export interface KimiQuotaState {
+export interface KimiQuotaState extends QuotaCacheStamp {
   status: 'idle' | 'loading' | 'success' | 'error';
   rows: KimiQuotaRow[];
   error?: string;
@@ -518,7 +531,7 @@ export interface KiroQuotaPayload {
   usageBreakdownList?: KiroUsageBreakdown[];
 }
 
-export interface KiroQuotaState {
+export interface KiroQuotaState extends QuotaCacheStamp {
   status: 'idle' | 'loading' | 'success' | 'error';
   baseUsage: number | null;
   baseLimit: number | null;
@@ -627,7 +640,7 @@ export interface XaiRateLimitQuota {
   exhausted: boolean;
 }
 
-export interface XaiQuotaState {
+export interface XaiQuotaState extends QuotaCacheStamp {
   status: 'idle' | 'loading' | 'success' | 'error';
   billing: XaiBillingSummary | null;
   resources: XaiRateLimitQuota[];
