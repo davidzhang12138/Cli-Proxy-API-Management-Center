@@ -1,5 +1,6 @@
 import { useMemo, type CSSProperties } from 'react';
 import type { AuthFileItem } from '@/types';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { hasAuthFileStatusWarning } from '@/features/authFiles/constants';
 import type { AuthFileStatusBarData } from '@/features/authFiles/hooks/useAuthFilesStatusBarCache';
 import styles from './VaultPulse.module.scss';
@@ -56,7 +57,7 @@ export function VaultPulse({ files, statusBarCache }: VaultPulseProps) {
             (statusData?.totalSuccess ?? 0) + (statusData?.totalFailure ?? 0) > 0;
           state = hasTraffic ? 'live' : 'idle';
         }
-        return { key: file.name, state, disabled };
+        return { key: getQuotaCacheKey(file), state, disabled };
       }),
     [files, statusBarCache]
   );

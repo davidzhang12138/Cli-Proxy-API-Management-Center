@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { copyToClipboard } from '@/utils/clipboard';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import {
   QUOTA_PROVIDER_TYPES,
   clampCardPageSize,
@@ -16,6 +17,7 @@ import {
   isProblemAuthFile,
   isRuntimeOnlyAuthFile,
   normalizeProviderKey,
+  type AuthFileQuotaFilter,
   type QuotaProviderType,
   type ResolvedTheme,
 } from '@/features/authFiles/constants';
@@ -184,6 +186,8 @@ export function AuthFilesPage() {
   )
     ? (normalizedFilter as QuotaProviderType)
     : null;
+  const activeQuotaFilter: AuthFileQuotaFilter =
+    normalizedFilter === 'all' ? 'all' : quotaFilterType;
   const pageSize = compactMode ? pageSizeByMode.compact : pageSizeByMode.regular;
   const problemOnly = statusFilterMode === 'problem';
   const disabledOnly = statusFilterMode === 'disabled';
@@ -563,7 +567,7 @@ export function AuthFilesPage() {
   const gridClasses = [
     styles.grid,
     compactMode ? styles.gridCompact : '',
-    quotaFilterType ? styles.gridQuota : '',
+    activeQuotaFilter ? styles.gridQuota : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -683,7 +687,7 @@ export function AuthFilesPage() {
           <div className={gridClasses}>
             {pageItems.map((file, index) => (
               <AuthFileCard
-                key={file.name}
+                key={getQuotaCacheKey(file)}
                 file={file}
                 compact={compactMode}
                 selected={selectedFiles.has(file.name)}
@@ -692,7 +696,7 @@ export function AuthFilesPage() {
                 deleting={deleting}
                 statusUpdating={statusUpdating}
                 manualRefreshing={manualRefreshing}
-                quotaFilterType={quotaFilterType}
+                quotaFilterType={activeQuotaFilter}
                 statusBarCache={statusBarCache}
                 entranceDelayMs={cardEntranceDelay(index)}
                 onShowModels={showModels}

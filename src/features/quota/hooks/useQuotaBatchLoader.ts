@@ -5,13 +5,14 @@
  * - loadingRef：并发批量加载去重；
  * - requestIdRef：被超越的响应直接丢弃；
  * - cacheGeneration：断线重连后过期请求不得写入新会话缓存。
- * 提交按 provider 分组进行 —— 快的提供商先落地，不等慢的。
+ * 请求使用跨 provider 的并发上限，提交时逐凭证检查失效代次。
  */
 
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { captureQuotaCacheGeneration, commitIfQuotaCacheCurrent } from '@/stores';
 import { getStatusFromError } from '@/utils/quota';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import type { QuotaFileEntry } from '../logic';
 import { QUOTA_BATCH_CONCURRENCY } from '../constants';
 import { QUOTA_ADAPTERS, getQuotaSetter } from '../providers';
@@ -19,6 +20,7 @@ import type { QuotaProviderType } from '../providers/types';
 
 interface BatchFetchResult {
   name: string;
+  cacheKey: string;
   status: 'success' | 'error';
   data?: unknown;
   error?: string;
@@ -77,7 +79,7 @@ export function useQuotaBatchLoader() {
             setQuota((prev) => {
               const nextState = { ...prev };
               entries.forEach(({ file }) => {
-                nextState[file.name] = adapter.buildLoadingState();
+                nextState[getQuotaCacheKey(file)] = adapter.buildLoadingState();
               });
               return nextState;
             });
@@ -86,16 +88,23 @@ export function useQuotaBatchLoader() {
 
         const results = await runWithConcurrency(
           targets,
-          async ({ type, file }): Promise<BatchFetchResult & { type: QuotaProviderType }> => {
+          async ({
+            type,
+            file,
+          }): Promise<(BatchFetchResult & { type: QuotaProviderType }) | null> => {
+            if (!commitIfQuotaCacheCurrent(cacheGeneration, () => undefined, file.name))
+              return null;
             const adapter = QUOTA_ADAPTERS[type];
+            const cacheKey = getQuotaCacheKey(file);
             try {
               const data = await adapter.fetchQuota(file, t);
-              return { type, name: file.name, status: 'success', data };
+              return { type, name: file.name, cacheKey, status: 'success', data };
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : t('common.unknown_error');
               return {
                 type,
                 name: file.name,
+                cacheKey,
                 status: 'error',
                 error: message,
                 errorStatus: getStatusFromError(err),
@@ -112,28 +121,33 @@ export function useQuotaBatchLoader() {
           (BatchFetchResult & { type: QuotaProviderType })[]
         >();
         results.forEach((result) => {
+          if (!result) return;
           const typeResults = resultsByType.get(result.type) ?? [];
           typeResults.push(result);
           resultsByType.set(result.type, typeResults);
         });
 
-        commitIfQuotaCacheCurrent(cacheGeneration, () => {
-          resultsByType.forEach((typeResults, type) => {
-            const adapter = QUOTA_ADAPTERS[type];
-            const setQuota = getQuotaSetter(adapter);
-            setQuota((prev) => {
-              const nextState = { ...prev };
-              typeResults.forEach((result) => {
-                nextState[result.name] =
-                  result.status === 'success'
-                    ? adapter.buildSuccessState(result.data)
-                    : adapter.buildErrorState(
-                        result.error || t('common.unknown_error'),
-                        result.errorStatus
-                      );
-              });
-              return nextState;
+        resultsByType.forEach((typeResults, type) => {
+          const adapter = QUOTA_ADAPTERS[type];
+          const setQuota = getQuotaSetter(adapter);
+          setQuota((prev) => {
+            const nextState = { ...prev };
+            typeResults.forEach((result) => {
+              commitIfQuotaCacheCurrent(
+                cacheGeneration,
+                () => {
+                  nextState[result.cacheKey] =
+                    result.status === 'success'
+                      ? adapter.buildSuccessState(result.data)
+                      : adapter.buildErrorState(
+                          result.error || t('common.unknown_error'),
+                          result.errorStatus
+                        );
+                },
+                result.name
+              );
             });
+            return nextState;
           });
         });
       } finally {

@@ -5,10 +5,13 @@
 
 import type { AuthFileItem } from '@/types';
 import { deriveAuthFileIdentity } from '@/features/authFiles/identity';
+import { getQuotaDisplayName } from '@/utils/quota/identity';
+import { isDevinFile } from '@/utils/quota/validators';
 import { ANTIGRAVITY_CONFIG } from './providers/antigravity/data';
 import { CLAUDE_CONFIG } from './providers/claude/data';
 import { CODEX_CONFIG } from './providers/codex/data';
 import { KIRO_CONFIG } from './providers/kiro/data';
+import { DEVIN_CONFIG } from './providers/devin/data';
 import { KIMI_CONFIG } from './providers/kimi/data';
 import { XAI_CONFIG } from './providers/xai/data';
 import { FREEBUFF_CONFIG } from './providers/freebuff/data';
@@ -21,6 +24,7 @@ const QUOTA_FILTER_MAP: Record<QuotaProviderType, (file: AuthFileItem) => boolea
   claude: CLAUDE_CONFIG.filterFn,
   codex: CODEX_CONFIG.filterFn,
   kiro: KIRO_CONFIG.filterFn,
+  devin: DEVIN_CONFIG.filterFn,
   kimi: KIMI_CONFIG.filterFn,
   xai: XAI_CONFIG.filterFn,
   freebuff: FREEBUFF_CONFIG.filterFn,
@@ -37,7 +41,19 @@ export interface QuotaFileEntry {
  * 没有结构化身份时才回落到去掉 .json 后缀的文件名。
  */
 export const resolveQuotaDisplayName = (file: AuthFileItem): string =>
-  deriveAuthFileIdentity(file).primary;
+  isDevinFile(file) ? getQuotaDisplayName(file) : deriveAuthFileIdentity(file).primary;
+/** A refresh-all intent belongs to the session that requested a successful list read. */
+export function canRefreshQuotaAfterList(
+  requestedSession: number,
+  currentSession: number,
+  filesSession: number | null,
+  hasError: boolean,
+  disabled: boolean
+): boolean {
+  return (
+    !disabled && !hasError && requestedSession === currentSession && filesSession === currentSession
+  );
+}
 
 export const resolveQuotaProviderType = (file: AuthFileItem): QuotaProviderType | null =>
   QUOTA_TAB_ORDER.find((type) => QUOTA_FILTER_MAP[type](file)) ?? null;

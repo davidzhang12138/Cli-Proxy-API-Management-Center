@@ -12,6 +12,7 @@ afterEach(() => {
 
 describe('OAuth management API', () => {
   test('starts Charm Hyper device OAuth with the scoped proxy and exposes device metadata', async () => {
+    const signal = new AbortController().signal;
     let request: { url: string; config?: unknown } | undefined;
     apiClient.get = (async (url: string, config?: unknown) => {
       request = { url, config };
@@ -30,11 +31,12 @@ describe('OAuth management API', () => {
 
     const response = await oauthApi.startAuth('hyper', {
       proxyUrl: '  socks5://127.0.0.1:1080  ',
+      signal,
     });
 
     expect(request).toEqual({
       url: '/hyper-auth-url',
-      config: { params: { 'proxy-url': 'socks5://127.0.0.1:1080' } },
+      config: { params: { 'proxy-url': 'socks5://127.0.0.1:1080' }, signal },
     });
     expect(response).toMatchObject({
       state: 'hyp-123',
@@ -126,6 +128,7 @@ describe('OAuth management API', () => {
   });
 
   test('keeps the existing Freebuff start and dedicated status contracts intact', async () => {
+    const signal = new AbortController().signal;
     const calls: Array<{ method: string; url: string; data?: unknown; config?: unknown }> = [];
     apiClient.get = (async (url: string, config?: unknown) => {
       calls.push({ method: 'GET', url, config });
@@ -137,28 +140,32 @@ describe('OAuth management API', () => {
         expires_at: '2026-08-01T12:00:00Z',
       };
     }) as typeof apiClient.get;
-    apiClient.post = (async (url: string, data?: unknown) => {
-      calls.push({ method: 'POST', url, data });
+    apiClient.post = (async (url: string, data?: unknown, config?: unknown) => {
+      calls.push({ method: 'POST', url, data, config });
       return { status: 'pending' };
     }) as typeof apiClient.post;
 
-    await freebuffAuthApi.startAuth({ proxyUrl: ' direct ' });
-    await freebuffAuthApi.getStatus({
-      fingerprintId: 'fingerprint-id',
-      fingerprintHash: 'fingerprint-hash',
-      expiresAt: '2026-08-01T12:00:00Z',
-      proxyUrl: ' direct ',
-    });
+    await freebuffAuthApi.startAuth({ proxyUrl: ' direct ', signal });
+    await freebuffAuthApi.getStatus(
+      {
+        fingerprintId: 'fingerprint-id',
+        fingerprintHash: 'fingerprint-hash',
+        expiresAt: '2026-08-01T12:00:00Z',
+        proxyUrl: ' direct ',
+      },
+      signal
+    );
 
     expect(calls).toEqual([
       {
         method: 'GET',
         url: '/freebuff-auth-url',
-        config: { params: { 'proxy-url': 'direct' } },
+        config: { params: { 'proxy-url': 'direct' }, signal },
       },
       {
         method: 'POST',
         url: '/freebuff-auth-status',
+        config: { signal },
         data: {
           fingerprintId: 'fingerprint-id',
           fingerprintHash: 'fingerprint-hash',

@@ -3,6 +3,7 @@ import { QUOTA_PAGE_SIZE } from '@/features/quota/constants';
 import {
   buildTabCounts,
   buildVisibleTabIds,
+  canRefreshQuotaAfterList,
   classifyQuotaFiles,
   filterEntriesByTab,
   isQuotaRefreshDisabled,
@@ -29,6 +30,17 @@ const FILES: AuthFileItem[] = [
   file('claude-off.json', 'claude', { disabled: true }), // 停用
 ];
 
+describe('refresh-all list handoff', () => {
+  test('requires a successful list from the same session as the user action', () => {
+    expect(canRefreshQuotaAfterList(1, 1, 1, false, false)).toBe(true);
+    expect(canRefreshQuotaAfterList(1, 1, 1, true, false)).toBe(false);
+    expect(canRefreshQuotaAfterList(1, 2, 2, false, false)).toBe(false);
+    expect(canRefreshQuotaAfterList(2, 2, 1, false, false)).toBe(false);
+    expect(canRefreshQuotaAfterList(1, 1, null, false, false)).toBe(false);
+    expect(canRefreshQuotaAfterList(1, 1, 1, false, true)).toBe(false);
+  });
+});
+
 describe('resolveQuotaProviderType', () => {
   test('maps provider aliases and rejects unsupported or disabled files', () => {
     expect(resolveQuotaProviderType(file('a', 'grok'))).toBe('xai');
@@ -41,6 +53,12 @@ describe('resolveQuotaProviderType', () => {
 });
 
 describe('resolveQuotaDisplayName', () => {
+  test('disambiguates Devin identities without exposing account credentials', () => {
+    expect(
+      resolveQuotaDisplayName(file('shared.json', 'devin', { authIndex: '42', account: 'secret' }))
+    ).toBe('shared.json · 42');
+  });
+
   test.each([
     ['codex-010fc1ef-parrotlokman176@gmail.com-plus.json', 'codex', 'parrotlokman176@gmail.com'],
     ['freebuff-a68142285-gmail-com.json', 'freebuff', 'a68142285@gmail.com'],
@@ -93,6 +111,7 @@ describe('buildTabCounts', () => {
       kimi: 1,
       freebuff: 1,
       hyper: 1,
+      devin: 0,
     });
   });
 

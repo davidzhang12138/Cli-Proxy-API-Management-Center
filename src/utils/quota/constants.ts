@@ -26,6 +26,10 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#fff8e1', text: '#ff8f00' },
     dark: { bg: '#5f3700', text: '#ffe082' },
   },
+  devin: {
+    light: { bg: '#e8f4ff', text: '#155e9b' },
+    dark: { bg: '#123b5d', text: '#8dc9f5' },
+  },
   kimi: {
     light: { bg: '#dce8ff', text: '#0560cf' },
     dark: { bg: '#003880', text: '#70b5ff' },

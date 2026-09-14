@@ -22,6 +22,7 @@ import type {
 } from '@/types';
 import { buildGroupCoverage } from '@/utils/routingCoverage';
 import { maskApiKey } from '@/utils/format';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 
 export type RoutingStrategy = 'round-robin' | 'weighted-round-robin' | 'fill-first';
 export type RoutingCandidateSource = 'oauth' | 'api-key' | 'openai-compat';
@@ -308,7 +309,7 @@ const buildOAuthCandidate = (file: AuthFileItem): RoutingCandidate => {
   const models: string[] = [];
 
   return {
-    id: `oauth:${file.name}`,
+    id: `oauth:${encodeURIComponent(getQuotaCacheKey(file))}`,
     provider,
     // Same key as the config-declared keys for this provider: the workbench's
     // point is one group per provider family, spanning OAuth and API keys.

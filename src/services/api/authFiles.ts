@@ -13,12 +13,14 @@ import type {
 } from '@/types/authFile';
 import type { OAuthModelAliasEntry } from '@/types';
 import { normalizeOAuthProviderKey } from '@/utils/providerKeys';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import {
   normalizeRecentRequestAuthIndex,
   normalizeRecentRequestBuckets,
   normalizeUsageTotal,
 } from '@/utils/recentRequests';
 import { parseTimestampMs } from '@/utils/timestamp';
+import { normalizeAuthFileCooldowns, normalizeCooldownTimestamp } from './authFileCooldowns';
 
 type StatusError = { status?: number };
 type AuthFileStatusResponse = { status: string; disabled: boolean };
@@ -28,6 +30,7 @@ export type AuthFileModelCheckResult = {
   message?: string;
   latency_ms: number;
 };
+export type AuthFileLookup = { name: string; authIndex?: string };
 type AuthFileEntry = AuthFilesResponse['files'][number];
 export type AuthFileFieldsPatch = {
   prefix?: string;
@@ -101,6 +104,10 @@ const normalizeBatchFileNames = (value: unknown): string[] => {
 const buildAuthFilesListParams = (options?: AuthFilesListOptions): Record<string, unknown> => {
   if (!options) return {};
   const params: Record<string, unknown> = {};
+  const name = options.name?.trim();
+  if (name) params.name = name;
+  const authIndex = options.authIndex?.trim();
+  if (authIndex) params.auth_index = authIndex;
   if (typeof options.page === 'number' && Number.isFinite(options.page)) {
     params.page = Math.max(1, Math.round(options.page));
   }
@@ -295,6 +302,8 @@ const mergeAuthFileEntries = (entries: AuthFileEntry[]): AuthFileEntry => {
 
   rest.forEach((entry) => {
     Object.entries(entry).forEach(([key, value]) => {
+      // Cooldown snapshots are atomic: [] and null are meaningful, not missing fields.
+      if (key === 'cooldowns' && Object.prototype.hasOwnProperty.call(merged, key)) return;
       if (!hasMeaningfulValue(merged[key]) && hasMeaningfulValue(value)) {
         merged[key] = value;
       }
@@ -337,7 +346,11 @@ const readRuntimeOnlyField = (entry: AuthFileEntry): boolean => {
  * camelCase 字段上。原始字段全部透传——quota resolvers 仍直接读
  * plan_type / id_token / metadata / attributes 等生字段。
  */
-const normalizeAuthFileEntry = (entry: AuthFileEntry): AuthFileEntry => {
+const normalizeAuthFileEntry = (
+  entry: AuthFileEntry,
+  observedAt: string | undefined,
+  receivedAtMs: number
+): AuthFileEntry => {
   const declaredStatusMessage =
     typeof entry.statusMessage === 'string' ? entry.statusMessage.trim() : '';
   const statusMessage = readTextField(entry, 'status_message') || declaredStatusMessage;
@@ -354,6 +367,7 @@ const normalizeAuthFileEntry = (entry: AuthFileEntry): AuthFileEntry => {
   return {
     ...entry,
     ...buildAuthQuotaSummaryFields(entry),
+    cooldownSnapshot: normalizeAuthFileCooldowns(entry.cooldowns, observedAt, receivedAtMs),
     runtimeOnly: readRuntimeOnlyField(entry),
     authIndex: normalizeRecentRequestAuthIndex(entry['auth_index'] ?? entry.authIndex),
     recentRequests: normalizeRecentRequestBuckets(entry.recent_requests ?? entry.recentRequests),
@@ -370,13 +384,23 @@ const normalizeAuthFileEntry = (entry: AuthFileEntry): AuthFileEntry => {
   };
 };
 
-export const normalizeAuthFilesResponse = (payload: AuthFilesResponse): AuthFilesResponse => {
+export const normalizeAuthFilesResponse = (
+  payload: AuthFilesResponse,
+  receivedAtMs = Date.now()
+): AuthFilesResponse => {
+  const observedAt = normalizeCooldownTimestamp(payload?.observed_at);
   const files = Array.isArray(payload?.files) ? payload.files : [];
   const grouped = new Map<string, AuthFileEntry[]>();
 
   files.forEach((entry) => {
     const name = readTextField(entry, 'name');
-    const key = name || JSON.stringify(entry);
+    const key = name
+      ? getQuotaCacheKey({
+          ...entry,
+          name,
+          authIndex: normalizeRecentRequestAuthIndex(entry['auth_index'] ?? entry.authIndex),
+        })
+      : JSON.stringify(entry);
     const bucket = grouped.get(key);
     if (bucket) {
       bucket.push(entry);
@@ -386,16 +410,23 @@ export const normalizeAuthFilesResponse = (payload: AuthFilesResponse): AuthFile
   });
 
   const normalizedFiles = Array.from(grouped.values()).map((entries) =>
-    normalizeAuthFileEntry(mergeAuthFileEntries(entries))
+    normalizeAuthFileEntry(mergeAuthFileEntries(entries), observedAt, receivedAtMs)
   );
-  normalizedFiles.sort((left, right) =>
-    readTextField(left, 'name').localeCompare(readTextField(right, 'name'), undefined, {
+  normalizedFiles.sort((left, right) => {
+    const nameOrder = readTextField(left, 'name').localeCompare(
+      readTextField(right, 'name'),
+      undefined,
+      { sensitivity: 'accent' }
+    );
+    if (nameOrder !== 0) return nameOrder;
+    return String(left.authIndex ?? '').localeCompare(String(right.authIndex ?? ''), undefined, {
       sensitivity: 'accent',
-    })
-  );
+    });
+  });
 
   return {
     ...payload,
+    observedAt,
     files: normalizedFiles,
     total: payload?.pagination?.total ?? payload?.total ?? normalizedFiles.length,
   };
@@ -662,10 +693,6 @@ export const serializeOauthModelAliases = (
   });
 
 const OAUTH_MODEL_ALIAS_ENDPOINT = '/oauth-model-alias';
-const MANUAL_REFRESH_EXPIRY_OFFSET_MS = 60_000;
-
-export const buildManualRefreshExpiredAt = (nowMs = Date.now()): string =>
-  new Date(nowMs - MANUAL_REFRESH_EXPIRY_OFFSET_MS).toISOString();
 
 export const authFilesApi = {
   list: async (options?: AuthFilesListOptions) => {
@@ -713,11 +740,13 @@ export const authFilesApi = {
   patchFields: (name: string, fields: AuthFileFieldsPatch) =>
     apiClient.patch('/auth-files/fields', { name, ...fields }),
 
-  requestManualRefresh: (name: string) =>
-    apiClient.patch('/auth-files/fields', {
+  requestManualRefresh: async (name: string, authIndex?: string): Promise<void> => {
+    // v7.3.0 returns the complete Auth (including tokens). Never return it to callers.
+    await apiClient.post<unknown>('/auth-files/refresh', {
       name,
-      expired: buildManualRefreshExpiredAt(),
-    }),
+      ...(authIndex ? { auth_index: authIndex } : {}),
+    });
+  },
 
   uploadFiles: async (files: File[]): Promise<AuthFileBatchUploadResult> => {
     const requestedNames = files.map((file) => file.name);

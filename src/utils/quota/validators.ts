@@ -27,6 +27,10 @@ export function isKiroFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'kiro';
 }
 
+export function isDevinFile(file: AuthFileItem): boolean {
+  return resolveAuthProvider(file) === 'devin';
+}
+
 export function isKimiFile(file: AuthFileItem): boolean {
   return resolveAuthProvider(file) === 'kimi';
 }

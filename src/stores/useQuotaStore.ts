@@ -4,10 +4,12 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { getQuotaCacheFileName } from '@/utils/quota/identity';
 import type {
   AntigravityQuotaState,
   ClaudeQuotaState,
   CodexQuotaState,
+  DevinQuotaState,
   FreebuffQuotaState,
   HyperQuotaState,
   KimiQuotaState,
@@ -23,9 +25,11 @@ const QUOTA_CACHE_FALLBACK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface QuotaStoreState {
   cacheGeneration: number;
+  fileGenerations: Record<string, number>;
   antigravityQuota: Record<string, AntigravityQuotaState>;
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
+  devinQuota: Record<string, DevinQuotaState>;
   kiroQuota: Record<string, KiroQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
@@ -34,12 +38,13 @@ interface QuotaStoreState {
   setAntigravityQuota: (updater: QuotaUpdater<Record<string, AntigravityQuotaState>>) => void;
   setClaudeQuota: (updater: QuotaUpdater<Record<string, ClaudeQuotaState>>) => void;
   setCodexQuota: (updater: QuotaUpdater<Record<string, CodexQuotaState>>) => void;
+  setDevinQuota: (updater: QuotaUpdater<Record<string, DevinQuotaState>>) => void;
   setKiroQuota: (updater: QuotaUpdater<Record<string, KiroQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
   setFreebuffQuota: (updater: QuotaUpdater<Record<string, FreebuffQuotaState>>) => void;
   setHyperQuota: (updater: QuotaUpdater<Record<string, HyperQuotaState>>) => void;
-  clearQuotaCache: () => void;
+  clearQuotaCache: (names?: string[]) => void;
   purgeStaleEntries: () => void;
 }
 
@@ -179,9 +184,11 @@ export const useQuotaStore = create<QuotaStoreState>()(
   persist(
     (set) => ({
       cacheGeneration: 0,
+      fileGenerations: {},
       antigravityQuota: {},
       claudeQuota: {},
       codexQuota: {},
+      devinQuota: {},
       kiroQuota: {},
       kimiQuota: {},
       xaiQuota: {},
@@ -201,6 +208,10 @@ export const useQuotaStore = create<QuotaStoreState>()(
       setCodexQuota: (updater) =>
         set((state) => ({
           codexQuota: stampQuotaMap(resolveUpdater(updater, state.codexQuota), state.codexQuota),
+        })),
+      setDevinQuota: (updater) =>
+        set((state) => ({
+          devinQuota: resolveUpdater(updater, state.devinQuota),
         })),
       setKiroQuota: (updater) =>
         set((state) => ({
@@ -226,18 +237,51 @@ export const useQuotaStore = create<QuotaStoreState>()(
           hyperQuota: stampQuotaMap(resolveUpdater(updater, state.hyperQuota), state.hyperQuota),
         })),
 
-      clearQuotaCache: () =>
-        set((state) => ({
-          cacheGeneration: state.cacheGeneration + 1,
-          antigravityQuota: {},
-          claudeQuota: {},
-          codexQuota: {},
-          kiroQuota: {},
-          kimiQuota: {},
-          xaiQuota: {},
-          freebuffQuota: {},
-          hyperQuota: {},
-            })),
+      clearQuotaCache: (names) =>
+        set((state) => {
+          if (names) {
+            if (names.length === 0) return state;
+            const fileGenerations = { ...state.fileGenerations };
+            names.forEach((name) => {
+              fileGenerations[name] = (fileGenerations[name] ?? 0) + 1;
+            });
+            const invalidatedNames = new Set(names);
+            const omitNames = <T>(cache: Record<string, T>): Record<string, T> => {
+              const keysToDelete = Object.keys(cache).filter((key) =>
+                invalidatedNames.has(getQuotaCacheFileName(key))
+              );
+              if (keysToDelete.length === 0) return cache;
+              const next = { ...cache };
+              keysToDelete.forEach((key) => delete next[key]);
+              return next;
+            };
+            return {
+              fileGenerations,
+              antigravityQuota: omitNames(state.antigravityQuota),
+              claudeQuota: omitNames(state.claudeQuota),
+              codexQuota: omitNames(state.codexQuota),
+              devinQuota: omitNames(state.devinQuota),
+              kiroQuota: omitNames(state.kiroQuota),
+              freebuffQuota: omitNames(state.freebuffQuota),
+              hyperQuota: omitNames(state.hyperQuota),
+              kimiQuota: omitNames(state.kimiQuota),
+              xaiQuota: omitNames(state.xaiQuota),
+            };
+          }
+          return {
+            cacheGeneration: state.cacheGeneration + 1,
+            fileGenerations: {},
+            antigravityQuota: {},
+            claudeQuota: {},
+            codexQuota: {},
+            devinQuota: {},
+            kiroQuota: {},
+            freebuffQuota: {},
+            hyperQuota: {},
+            kimiQuota: {},
+            xaiQuota: {},
+          };
+        }),
       purgeStaleEntries: () =>
         set((state) => ({
           antigravityQuota: purgeStaleQuotaMap(state.antigravityQuota),
@@ -271,10 +315,26 @@ export const useQuotaStore = create<QuotaStoreState>()(
   )
 );
 
-export const captureQuotaCacheGeneration = (): number => useQuotaStore.getState().cacheGeneration;
+export const captureQuotaCacheGeneration = (name?: string) => {
+  const { cacheGeneration, fileGenerations } = useQuotaStore.getState();
+  return { cacheGeneration, fileGenerations, name };
+};
 
-export const commitIfQuotaCacheCurrent = (generation: number, commit: () => void): boolean => {
-  if (useQuotaStore.getState().cacheGeneration !== generation) return false;
+export const commitIfQuotaCacheCurrent = (
+  generation: ReturnType<typeof captureQuotaCacheGeneration>,
+  commit: () => void,
+  name: string | undefined = generation.name
+): boolean => {
+  const current = useQuotaStore.getState();
+  if (current.cacheGeneration !== generation.cacheGeneration) return false;
+  // File-scoped requests survive mutations to unrelated credentials.
+  if (name !== undefined) {
+    if ((current.fileGenerations[name] ?? 0) !== (generation.fileGenerations[name] ?? 0)) {
+      return false;
+    }
+  } else if (current.fileGenerations !== generation.fileGenerations) {
+    return false;
+  }
   commit();
   return true;
 };

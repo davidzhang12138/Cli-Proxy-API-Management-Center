@@ -10,6 +10,7 @@ import {
 
 export type BuiltInOAuthProvider =
   | 'codex'
+  | 'devin'
   | 'anthropic'
   | 'antigravity'
   | 'kimi'
@@ -39,10 +40,12 @@ export interface OAuthCallbackResponse {
 
 export interface OAuthStartOptions {
   proxyUrl?: string;
+  signal?: AbortSignal;
 }
 
 export interface FreebuffStartOptions {
   proxyUrl?: string;
+  signal?: AbortSignal;
 }
 
 // 后端返回的原始字段为 snake_case，apiClient 不做命名转换，这里保持一致
@@ -72,7 +75,12 @@ export interface FreebuffStatusResponse {
   error?: string;
 }
 
-const WEBUI_SUPPORTED = new Set<string>(['codex', 'anthropic', 'antigravity', 'xai']);
+export interface OAuthCancelResponse {
+  status: 'ok';
+  cancelled: boolean;
+}
+
+const WEBUI_SUPPORTED = new Set<string>(['codex', 'anthropic', 'antigravity', 'xai', 'devin']);
 
 const normalizeProviderForManagementPath = (provider: string): string => {
   const key = normalizeManagementOAuthProviderKey(provider);
@@ -83,7 +91,7 @@ const normalizeProviderForManagementPath = (provider: string): string => {
 };
 
 export const oauthApi = {
-  startAuth: (provider: OAuthProvider, options?: OAuthStartOptions) => {
+  startAuth: (provider: string, options?: OAuthStartOptions) => {
     const providerKey = normalizeProviderForManagementPath(provider);
     const params: Record<string, string | boolean> = {};
     if (WEBUI_SUPPORTED.has(providerKey)) {
@@ -98,20 +106,29 @@ export const oauthApi = {
     }
     return apiClient.get<OAuthStartResponse>(`/${providerKey}-auth-url`, {
       params: Object.keys(params).length ? params : undefined,
+      ...(options?.signal ? { signal: options.signal } : {}),
     });
   },
 
-  getAuthStatus: (state: string) =>
+  getAuthStatus: (state: string, signal?: AbortSignal) =>
     apiClient.get<{ status: 'ok' | 'wait' | 'error'; error?: string }>(`/get-auth-status`, {
       params: { state },
+      ...(signal ? { signal } : {}),
     }),
 
-  submitCallback: (provider: string, redirectUrl: string) => {
+  cancelSession: (state: string, signal?: AbortSignal) =>
+    apiClient.delete<OAuthCancelResponse>('/oauth-session', {
+      params: { state },
+      ...(signal ? { signal } : {}),
+    }),
+
+  submitCallback: (provider: string, redirectUrl: string, signal?: AbortSignal) => {
     const providerKey = normalizeProviderForManagementPath(provider);
-    return apiClient.post<OAuthCallbackResponse>('/oauth-callback', {
-      provider: providerKey,
-      redirect_url: redirectUrl,
-    });
+    return apiClient.post<OAuthCallbackResponse>(
+      '/oauth-callback',
+      { provider: providerKey, redirect_url: redirectUrl },
+      signal ? { signal } : undefined
+    );
   },
 };
 
@@ -124,10 +141,11 @@ export const freebuffAuthApi = {
     }
     return apiClient.get<FreebuffStartResponse>('/freebuff-auth-url', {
       params: Object.keys(params).length ? params : undefined,
+      ...(options?.signal ? { signal: options.signal } : {}),
     });
   },
 
-  getStatus: (input: FreebuffStatusRequest) => {
+  getStatus: (input: FreebuffStatusRequest, signal?: AbortSignal) => {
     const payload: Record<string, unknown> = {
       fingerprintId: input.fingerprintId,
       fingerprintHash: input.fingerprintHash,
@@ -137,6 +155,10 @@ export const freebuffAuthApi = {
     if (proxyUrl) {
       payload.proxy_url = proxyUrl;
     }
-    return apiClient.post<FreebuffStatusResponse>('/freebuff-auth-status', payload);
+    return apiClient.post<FreebuffStatusResponse>(
+      '/freebuff-auth-status',
+      payload,
+      signal ? { signal } : undefined
+    );
   },
 };

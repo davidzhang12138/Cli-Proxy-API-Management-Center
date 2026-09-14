@@ -76,9 +76,15 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+}
+
+.pageAction {
+  border-radius: $radius-full;
+  white-space: normal;
 }
 
 /* 墨色药丸主按钮（深色主题自动反相） */

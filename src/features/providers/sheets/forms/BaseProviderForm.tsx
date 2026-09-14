@@ -36,7 +36,6 @@ import { ConnectivityStatusIcon } from './ConnectivityStatusIcon';
 import { ApiKeyEntriesEditor } from './ApiKeyEntriesEditor';
 import { ModelEntriesEditor } from './ModelEntriesEditor';
 import styles from './sharedForm.module.scss';
-import { CLAUDE_API_BASE_URL } from '../../claudeApi';
 import { MAX_CREDENTIAL_WEIGHT } from '@/utils/credentialWeight';
 import { PayloadFilterRulesEditor } from '@/features/config/components/blocks/PayloadFilterRulesEditor';
 import { PayloadRulesEditor } from '@/features/config/components/blocks/PayloadRulesEditor';
@@ -78,8 +77,7 @@ const formatJsonObject = (value?: Record<string, unknown>): string => {
   return JSON.stringify(value, null, 2);
 };
 
-const isClaudeLikeBrand = (brand: ProviderBrand): boolean =>
-  brand === 'claude' || brand === 'claudeApi';
+const isClaudeLikeBrand = (brand: ProviderBrand): boolean => brand === 'claude';
 
 function buildInitialForm(
   brand: ProviderBrand,
@@ -90,8 +88,7 @@ function buildInitialForm(
     return {
       apiKey: '',
       name: '',
-      baseUrl:
-        brand === 'claudeApi' ? CLAUDE_API_BASE_URL : brand === 'xai' ? XAI_API_BASE_URL : '',
+      baseUrl: brand === 'xai' ? XAI_API_BASE_URL : '',
       proxyUrl: '',
       prefix: '',
       disabled: false,

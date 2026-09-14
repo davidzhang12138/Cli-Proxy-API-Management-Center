@@ -2,7 +2,7 @@
  * 额度查询页：提供商 tabs + 统一卡网格。
  *
  * 保留的行为契约（重设计不改）：
- * - 点击加载：卡片挂载为 idle，额度只在用户点击/刷新时才打上游；
+ * - 现有提供商保持点击加载；Devin 首次可见时主动查询一次，不轮询；
  * - cacheGeneration 会话隔离 + request-id 去重（见 useQuotaBatchLoader）；
  * - 文件列表变化后按 provider 剪枝额度缓存（已删文件不残留）；
  * - useHeaderRefresh 单槽位：本页唯一注册者，全局刷新 = 重取文件列表。
@@ -21,6 +21,7 @@ import { useRevealGroup } from '@/hooks/motion';
 import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, ResolvedTheme } from '@/types';
 import { usageQuotaCheckedAtMs } from '@/utils/quota';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
 import { QuotaHeader } from './components/QuotaHeader';
 import { QuotaCard } from './components/QuotaCard';
@@ -36,6 +37,7 @@ import {
 import {
   buildTabCounts,
   buildVisibleTabIds,
+  canRefreshQuotaAfterList,
   classifyQuotaFiles,
   filterEntriesByTab,
   paginate,
@@ -47,6 +49,7 @@ import {
 import { nextRecoveryMs } from './resetSchedule';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
+import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
 import { useQuotaActions } from './hooks/useQuotaActions';
 import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
 import { readQuotaUiState, writeQuotaUiState } from './uiState';
@@ -74,13 +77,28 @@ export function QuotaPage() {
 
   /* ---------- 文件列表 ---------- */
 
+  const sessionGeneration = useQuotaStore((state) => state.cacheGeneration);
+  const [filesGeneration, setFilesGeneration] = useState<number | null>(null);
+  const listRequestRef = useRef(0);
   const loadFiles = useCallback(async () => {
+    const requestId = ++listRequestRef.current;
+    if (connectionStatus !== 'connected') {
+      setFiles([]);
+      setFilesGeneration(null);
+      setLoading(false);
+      return;
+    }
+    const isCurrent = () =>
+      requestId === listRequestRef.current &&
+      sessionGeneration === useQuotaStore.getState().cacheGeneration;
     setLoading(true);
     setError('');
     try {
       const data = await authFilesApi.list();
+      if (!isCurrent()) return;
       const nextFiles = data?.files || [];
       setFiles(nextFiles);
+      setFilesGeneration(sessionGeneration);
 
       const snapshotsByType = new Map<QuotaProviderType, Record<string, QuotaCardState>>();
       const snapshotsCheckedAt = new Map<string, number | null>();
@@ -88,9 +106,10 @@ export function QuotaPage() {
         const snapshot = QUOTA_ADAPTERS[entry.type].buildSnapshotState?.(entry.file);
         if (!snapshot) return;
         const snapshots = snapshotsByType.get(entry.type) ?? {};
-        snapshots[entry.file.name] = snapshot;
+        const cacheKey = getQuotaCacheKey(entry.file);
+        snapshots[cacheKey] = snapshot;
         snapshotsByType.set(entry.type, snapshots);
-        snapshotsCheckedAt.set(entry.file.name, usageQuotaCheckedAtMs(entry.file.usage_quota));
+        snapshotsCheckedAt.set(cacheKey, usageQuotaCheckedAtMs(entry.file.usage_quota));
       });
       snapshotsByType.forEach((snapshots, type) => {
         getQuotaSetter(QUOTA_ADAPTERS[type])((prev) => {
@@ -103,17 +122,21 @@ export function QuotaPage() {
         });
       });
     } catch (err: unknown) {
+      if (!isCurrent()) return;
       const message = err instanceof Error ? err.message : t('notification.refresh_failed');
       setError(message);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [t]);
+  }, [connectionStatus, sessionGeneration, t]);
 
   useHeaderRefresh(loadFiles);
 
   useEffect(() => {
     void loadFiles();
+    return () => {
+      listRequestRef.current += 1;
+    };
   }, [loadFiles]);
 
   // Drop entries past their TTL so a long-lived SPA session stops rendering
@@ -134,6 +157,7 @@ export function QuotaPage() {
   const claudeQuota = useQuotaStore((state) => state.claudeQuota);
   const codexQuota = useQuotaStore((state) => state.codexQuota);
   const kiroQuota = useQuotaStore((state) => state.kiroQuota);
+  const devinQuota = useQuotaStore((state) => state.devinQuota);
   const kimiQuota = useQuotaStore((state) => state.kimiQuota);
   const xaiQuota = useQuotaStore((state) => state.xaiQuota);
   const freebuffQuota = useQuotaStore((state) => state.freebuffQuota);
@@ -146,6 +170,7 @@ export function QuotaPage() {
         claude: claudeQuota,
         codex: codexQuota,
         kiro: kiroQuota,
+        devin: devinQuota,
         kimi: kimiQuota,
         xai: xaiQuota,
         freebuff: freebuffQuota,
@@ -155,6 +180,7 @@ export function QuotaPage() {
       antigravityQuota,
       claudeQuota,
       codexQuota,
+      devinQuota,
       freebuffQuota,
       hyperQuota,
       kiroQuota,
@@ -164,7 +190,8 @@ export function QuotaPage() {
   );
 
   const getQuota = useCallback(
-    (entry: QuotaFileEntry): QuotaCardState | undefined => quotaByType[entry.type][entry.file.name],
+    (entry: QuotaFileEntry): QuotaCardState | undefined =>
+      quotaByType[entry.type][getQuotaCacheKey(entry.file)],
     [quotaByType]
   );
 
@@ -225,7 +252,7 @@ export function QuotaPage() {
     let loaded = 0;
     let attention = 0;
     entries.forEach((entry) => {
-      const status = quotaByType[entry.type][entry.file.name]?.status;
+      const status = quotaByType[entry.type][getQuotaCacheKey(entry.file)]?.status;
       if (status === 'success') loaded += 1;
       else if (status === 'error') attention += 1;
     });
@@ -234,11 +261,11 @@ export function QuotaPage() {
 
   // 剪枝：文件列表落定后，各 provider 缓存只保留仍存在的凭证
   useEffect(() => {
-    if (loading) return;
+    if (loading || error || filesGeneration !== sessionGeneration) return;
     const survivorsByType = new Map<QuotaProviderType, Set<string>>(
       QUOTA_TAB_ORDER.map((type) => [type, new Set<string>()])
     );
-    entries.forEach((entry) => survivorsByType.get(entry.type)?.add(entry.file.name));
+    entries.forEach((entry) => survivorsByType.get(entry.type)?.add(getQuotaCacheKey(entry.file)));
 
     QUOTA_TAB_ORDER.forEach((type) => {
       const survivors = survivorsByType.get(type) ?? new Set<string>();
@@ -251,35 +278,60 @@ export function QuotaPage() {
         return next;
       });
     });
-  }, [entries, loading]);
+  }, [entries, error, filesGeneration, loading, sessionGeneration]);
 
   /* ---------- 加载与操作 ---------- */
 
   const { batchLoading, loadQuota } = useQuotaBatchLoader();
   const { resettingQuotaName, refreshQuota, resetQuota } = useQuotaActions(disableControls);
 
-  const pendingRefreshRef = useRef(false);
+  const pendingRefreshRef = useRef<number | null>(null);
   const prevLoadingRef = useRef(loading);
 
   // Refresh every quota-capable credential after the file list has settled.
   const handleRefreshAll = useCallback(() => {
     if (disableControls) return;
-    pendingRefreshRef.current = true;
+    pendingRefreshRef.current = sessionGeneration;
     void loadFiles();
-  }, [disableControls, loadFiles]);
+  }, [disableControls, loadFiles, sessionGeneration]);
 
   useEffect(() => {
     const wasLoading = prevLoadingRef.current;
     prevLoadingRef.current = loading;
 
-    if (!pendingRefreshRef.current) return;
+    const requestedSession = pendingRefreshRef.current;
+    if (requestedSession === null) return;
+    if (requestedSession !== sessionGeneration) {
+      pendingRefreshRef.current = null;
+      return;
+    }
     if (loading || !wasLoading) return;
 
-    pendingRefreshRef.current = false;
-    void loadQuota(entries);
-  }, [entries, loading, loadQuota]);
+    pendingRefreshRef.current = null;
+    if (
+      canRefreshQuotaAfterList(
+        requestedSession,
+        sessionGeneration,
+        filesGeneration,
+        Boolean(error),
+        disableControls
+      )
+    ) {
+      void loadQuota(entries);
+    }
+  }, [disableControls, entries, error, filesGeneration, loading, loadQuota, sessionGeneration]);
 
-  const canUseActions = !disableControls && !loading;
+  useDevinQuotaAutoLoad(
+    pageItems,
+    disableControls ||
+      loading ||
+      batchLoading ||
+      Boolean(error) ||
+      filesGeneration !== sessionGeneration,
+    loadQuota
+  );
+
+  const canUseActions = !disableControls && !loading && filesGeneration === sessionGeneration;
 
   /* ---------- 首屏卡片一次性级联入场 ----------
    * 首批数据渲染后立即翻转 cardsAnimated；已挂载的卡片在挂载时捕获过自己的
@@ -311,6 +363,10 @@ export function QuotaPage() {
         attentionCount={attentionCount}
         refreshing={loading || batchLoading}
         disableControls={disableControls}
+        canRefreshPage={canUseActions && pageItems.length > 0}
+        onRefreshPage={() => {
+          if (canUseActions && !batchLoading) void loadQuota(pageItems);
+        }}
         onRefreshAll={handleRefreshAll}
       />
 
@@ -372,12 +428,12 @@ export function QuotaPage() {
           <div className={styles.grid}>
             {pageItems.map((entry, index) => (
               <QuotaCard
-                key={`${entry.type}:${entry.file.name}`}
+                key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
                 entry={entry}
                 quota={getQuota(entry)}
                 resolvedTheme={resolvedTheme}
                 canRefresh={canUseActions && !entry.file.disabled}
-                resetting={resettingQuotaName === entry.file.name}
+                resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
                 entranceDelayMs={cardEntranceDelay(index)}
                 onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
                 onReset={() => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
