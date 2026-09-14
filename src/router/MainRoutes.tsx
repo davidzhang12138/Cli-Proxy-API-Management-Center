@@ -2,6 +2,7 @@ import { Navigate, useRoutes, type Location } from 'react-router-dom';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { ProvidersWorkbenchPage } from '@/features/providers/ProvidersWorkbenchPage';
 import { RoutingWorkbenchPage } from '@/features/routing/RoutingWorkbenchPage';
+import { BenchmarkPage } from '@/features/benchmark/BenchmarkPage';
 import { AuthFilesPage } from '@/features/authFiles/AuthFilesPage';
 import { AuthFilesOAuthExcludedEditPage } from '@/pages/AuthFilesOAuthExcludedEditPage';
 import { AuthFilesOAuthModelAliasEditPage } from '@/pages/AuthFilesOAuthModelAliasEditPage';
@@ -24,6 +25,7 @@ const createMainRoutes = (supportsPlugin: boolean) => [
   { path: '/api-keys', element: <Navigate to="/config" replace /> },
   { path: '/ai-providers', element: <ProvidersWorkbenchPage /> },
   { path: '/routing', element: <RoutingWorkbenchPage /> },
+  { path: '/benchmark', element: <BenchmarkPage /> },
   { path: '/ai-providers/*', element: <Navigate to="/ai-providers" replace /> },
   { path: '/auth-files', element: <AuthFilesPage /> },
   { path: '/auth-files/oauth-excluded', element: <AuthFilesOAuthExcludedEditPage /> },

@@ -31,6 +31,7 @@ import {
   IconSidebarSystem,
   IconSidebarUsage,
   IconChevronDown,
+  IconModelCluster,
   IconSlidersHorizontal,
 } from '@/components/ui/icons';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
@@ -68,6 +69,7 @@ const sidebarIcons: Record<string, ReactNode> = {
   system: <IconSidebarSystem size={18} />,
   monitor: <IconChartLine size={18} />,
   routing: <IconSlidersHorizontal size={18} />,
+  benchmark: <IconModelCluster size={18} />,
 };
 
 interface SidebarNavLinkItem {
@@ -649,6 +651,12 @@ export function MainLayout() {
           labelKey: 'nav.routing_workbench',
           metaKey: 'nav_meta.routing_workbench',
           icon: sidebarIcons.routing,
+        },
+        {
+          path: '/benchmark',
+          labelKey: 'nav.benchmark',
+          metaKey: 'nav_meta.benchmark',
+          icon: sidebarIcons.benchmark,
         },
         {
           path: '/auth-files',
