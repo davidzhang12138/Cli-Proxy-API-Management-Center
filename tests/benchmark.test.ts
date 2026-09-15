@@ -3,9 +3,12 @@ import {
   buildBenchmarkRequest,
   extractBenchmarkText,
   extractBenchmarkUsage,
+  runBenchmarkRequest,
 } from '../src/services/api/benchmark';
+import { apiClient } from '../src/services/api/client';
 import {
   buildBenchmarkTargets,
+  mergeBenchmarkOAuthModels,
   resolveTargetModel,
   targetServesModel,
 } from '../src/features/benchmark/benchmark';
@@ -70,6 +73,42 @@ describe('benchmark wire requests', () => {
     expect(request.header?.Authorization).toBe('Bearer $TOKEN$');
     expect(body.reasoning_effort).toBe('high');
     expect(body.temperature).toBe(0);
+  });
+
+  test('uses the pinned backend executor for OpenAI-compatible auth indexes', async () => {
+    const originalPost = apiClient.post;
+    let request: { url: string; data?: unknown } | undefined;
+    apiClient.post = (async (url: string, data?: unknown) => {
+      request = { url, data };
+      return {
+        available: true,
+        status_code: 200,
+        latency_ms: 12,
+        body: { choices: [{ message: { content: 'ok' } }] },
+      };
+    }) as typeof apiClient.post;
+
+    try {
+      const response = await runBenchmarkRequest({
+        target: target({ authIndex: 'compat-auth-1' }),
+        model: 'openai/gpt-4o',
+        prompt: 'question',
+        systemPrompt: 'system',
+        thinkingLevel: 'high',
+        maxOutputTokens: 400,
+      });
+      expect(response.answer).toBe('ok');
+      expect(request).toEqual({
+        url: '/auth-files/benchmark',
+        data: expect.objectContaining({
+          auth_index: 'compat-auth-1',
+          model: 'openai/gpt-4o',
+          thinking_level: 'high',
+        }),
+      });
+    } finally {
+      apiClient.post = originalPost;
+    }
   });
 
   test('maps Claude thinking to native adaptive effort', () => {
@@ -155,6 +194,21 @@ describe('benchmark target discovery', () => {
     );
     expect(target.providerKey).toBe('openai-compatible-ollama');
     expect(target.supported).toBe(true);
+  });
+
+  test('keeps runtime OAuth model IDs when static definitions are stale', () => {
+    const catalog = mergeBenchmarkOAuthModels(
+      [{ id: 'deepseek-v4.1-flash' }],
+      ['deepseek-v4-flash']
+    );
+    const [target] = buildBenchmarkTargets(
+      {},
+      [{ name: 'freebuff.json', type: 'freebuff', authIndex: 'freebuff-auth' }],
+      { freebuff: catalog }
+    );
+
+    expect(catalog).toEqual(['deepseek-v4-flash', 'deepseek-v4.1-flash']);
+    expect(targetServesModel(target, 'deepseek-v4.1-flash')).toBe(true);
   });
 });
 

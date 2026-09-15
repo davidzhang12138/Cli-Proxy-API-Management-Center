@@ -6,7 +6,6 @@ import { Select } from '@/components/ui/Select';
 import {
   IconAlertTriangle,
   IconCheckCircle2,
-  IconChevronDown,
   IconTimer,
   IconCode,
   IconInfo,
@@ -14,6 +13,7 @@ import {
   IconRefreshCw,
   IconDiamond,
   IconSearch,
+  IconX,
 } from '@/components/ui/icons';
 import { runBenchmarkRequest } from '@/services/api/benchmark';
 import { useNotificationStore } from '@/stores';
@@ -66,6 +66,21 @@ interface BenchmarkAttempt {
   usage?: BenchmarkResponse['usage'];
 }
 
+interface BenchmarkTaskInfo {
+  id: string;
+  targetLabel: string;
+  caseLabel: string;
+  run: number;
+}
+
+interface BenchmarkRunProgress {
+  total: number;
+  completed: number;
+  success: number;
+  failed: number;
+  active: BenchmarkTaskInfo[];
+}
+
 interface TargetSummary {
   target: BenchmarkTarget;
   attempts: BenchmarkAttempt[];
@@ -94,14 +109,24 @@ const CUSTOM_CASE: BenchmarkCase = {
 const normalizeError = (cause: unknown, fallback = 'Request failed'): string =>
   cause instanceof Error ? cause.message : typeof cause === 'string' ? cause : fallback;
 
-const runTasks = async <T,>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]> => {
+const runTasks = async <T,>(
+  tasks: Array<() => Promise<T>>,
+  concurrency: number,
+  callbacks: {
+    onStart?: (index: number) => void;
+    onSettled?: (result: T, index: number) => void;
+  } = {}
+): Promise<T[]> => {
   const results: T[] = [];
   let cursor = 0;
   const worker = async () => {
     while (cursor < tasks.length) {
       const index = cursor;
       cursor += 1;
-      results[index] = await tasks[index]();
+      callbacks.onStart?.(index);
+      const result = await tasks[index]();
+      results[index] = result;
+      callbacks.onSettled?.(result, index);
     }
   };
   await Promise.all(
@@ -150,6 +175,8 @@ export function BenchmarkPage() {
   const [credentialQueries, setCredentialQueries] = useState<Record<string, string>>({});
   const [credentialPages, setCredentialPages] = useState<Record<string, number>>({});
   const [attempts, setAttempts] = useState<BenchmarkAttempt[]>([]);
+  const [runProgress, setRunProgress] = useState<BenchmarkRunProgress | null>(null);
+  const [detailTargetId, setDetailTargetId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState('');
 
@@ -344,6 +371,27 @@ export function BenchmarkPage() {
       });
   }, [attempts, discovery?.targets]);
 
+  const detailSummary = useMemo(
+    () => summaries.find((summary) => summary.target.id === detailTargetId) ?? null,
+    [detailTargetId, summaries]
+  );
+
+  useEffect(() => {
+    if (!detailTargetId) return undefined;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setDetailTargetId(null);
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [detailTargetId]);
+
   const toggleGroupExpanded = (groupId: string) => {
     setExpandedGroups((current) => {
       const next = new Set(current);
@@ -385,11 +433,15 @@ export function BenchmarkPage() {
     setRunning(true);
     setRunError('');
     setAttempts([]);
+    setRunProgress(null);
+    setDetailTargetId(null);
 
     const tasks: Array<() => Promise<BenchmarkAttempt>> = [];
+    const taskInfos: BenchmarkTaskInfo[] = [];
     for (let runIndex = 1; runIndex <= repeatCount; runIndex += 1) {
       casesToRun.forEach((benchmarkCase) => {
         randomize(eligibleTargets).forEach((target) => {
+          const caseLabel = localizedCaseLabel(benchmarkCase.id, benchmarkCase.label);
           tasks.push(async () => {
             const actualModel = resolveTargetModel(target, modelInput);
             const attemptId = `${runIndex}:${benchmarkCase.id}:${target.id}`;
@@ -413,7 +465,7 @@ export function BenchmarkPage() {
                 identity: target.identity,
                 model: actualModel,
                 caseId: benchmarkCase.id,
-                caseLabel: localizedCaseLabel(benchmarkCase.id, benchmarkCase.label),
+                caseLabel,
                 run: runIndex,
                 state: 'success',
                 score: evaluation.score,
@@ -431,7 +483,7 @@ export function BenchmarkPage() {
                 identity: target.identity,
                 model: actualModel,
                 caseId: benchmarkCase.id,
-                caseLabel: localizedCaseLabel(benchmarkCase.id, benchmarkCase.label),
+                caseLabel,
                 run: runIndex,
                 state: 'error',
                 score: null,
@@ -442,12 +494,53 @@ export function BenchmarkPage() {
               } satisfies BenchmarkAttempt;
             }
           });
+          taskInfos.push({
+            id: `${runIndex}:${benchmarkCase.id}:${target.id}`,
+            targetLabel: target.label,
+            caseLabel,
+            run: runIndex,
+          });
         });
       });
     }
 
+    setRunProgress({
+      total: tasks.length,
+      completed: 0,
+      success: 0,
+      failed: 0,
+      active: [],
+    });
+
     try {
-      const result = await runTasks(tasks, 3);
+      const result = await runTasks(tasks, 3, {
+        onStart: (index) => {
+          const task = taskInfos[index];
+          if (!task) return;
+          setRunProgress((current) =>
+            current
+              ? {
+                  ...current,
+                  active: [...current.active.filter((item) => item.id !== task.id), task],
+                }
+              : current
+          );
+        },
+        onSettled: (attempt) => {
+          setAttempts((current) => [...current, attempt]);
+          setRunProgress((current) =>
+            current
+              ? {
+                  ...current,
+                  completed: current.completed + 1,
+                  success: current.success + (attempt.state === 'success' ? 1 : 0),
+                  failed: current.failed + (attempt.state === 'error' ? 1 : 0),
+                  active: current.active.filter((item) => item.id !== attempt.id),
+                }
+              : current
+          );
+        },
+      });
       setAttempts(result);
       const successCount = result.filter((attempt) => attempt.state === 'success').length;
       showNotification(
@@ -469,6 +562,9 @@ export function BenchmarkPage() {
   const activeCandidates =
     routingWorkbench.snapshot?.candidates.filter((candidate) => candidate.enabled).length ??
     runnableTargets;
+  const progressPercent = runProgress?.total
+    ? Math.round((runProgress.completed / runProgress.total) * 100)
+    : 0;
 
   return (
     <div className={styles.page}>
@@ -861,12 +957,94 @@ export function BenchmarkPage() {
         </div>
       ) : null}
 
+      {runProgress ? (
+        <section
+          className={`${styles.progressCard} ${running ? styles.progressCardRunning : ''}`}
+          aria-live="polite"
+          aria-label={t('benchmark.progress_label')}
+        >
+          <div className={styles.progressHeader}>
+            <div>
+              <span className={styles.kicker}>RUN TELEMETRY</span>
+              <h2>
+                {running
+                  ? t('benchmark.progress_title')
+                  : t('benchmark.progress_complete_title')}
+              </h2>
+            </div>
+            <div className={styles.progressCounter}>
+              <strong>
+                {runProgress.completed}/{runProgress.total}
+              </strong>
+              <span>{progressPercent}%</span>
+            </div>
+          </div>
+          <div
+            className={styles.progressTrack}
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={runProgress.total}
+            aria-valuenow={runProgress.completed}
+            aria-label={t('benchmark.progress_count', {
+              completed: runProgress.completed,
+              total: runProgress.total,
+            })}
+          >
+            <span style={{ width: `${progressPercent}%` }} />
+          </div>
+          <div className={styles.progressSummary}>
+            <span>
+              <b className={styles.progressSuccess}>{runProgress.success}</b>{' '}
+              {t('benchmark.progress_success')}
+            </span>
+            <span>
+              <b className={styles.progressFailure}>{runProgress.failed}</b>{' '}
+              {t('benchmark.progress_failed')}
+            </span>
+            <span>
+              <b>{runProgress.active.length}</b> {t('benchmark.progress_active_count')}
+            </span>
+            <span className={styles.progressHint}>
+              {running
+                ? t('benchmark.progress_running_hint')
+                : t('benchmark.progress_complete_hint')}
+            </span>
+          </div>
+          <div className={styles.progressDetails}>
+            <div className={styles.progressDetailsLabel}>{t('benchmark.progress_active')}</div>
+            {runProgress.active.length ? (
+              <div className={styles.activeTaskGrid}>
+                {runProgress.active.map((task) => (
+                  <div className={styles.activeTask} key={task.id}>
+                    <IconRefreshCw className={styles.spin} size={14} />
+                    <span>
+                      <strong>{task.targetLabel}</strong>
+                      <small>
+                        {task.caseLabel} · #{task.run}
+                      </small>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className={styles.progressIdle}>
+                {running
+                  ? t('benchmark.progress_waiting')
+                  : t('benchmark.progress_all_settled')}
+              </span>
+            )}
+          </div>
+        </section>
+      ) : null}
+
       {attempts.length > 0 ? (
         <section className={styles.resultsSection}>
           <div className={styles.sectionHeading}>
             <div>
               <span className={styles.kicker}>RESULTS / BLIND ORDER</span>
-              <h2>{t('benchmark.results_title')}</h2>
+              <h2>
+                {running ? t('benchmark.live_results_title') : t('benchmark.results_title')}
+              </h2>
             </div>
             <span className={styles.resultMeta}>
               {t('benchmark.result_meta', {
@@ -930,34 +1108,25 @@ export function BenchmarkPage() {
                         {summary.attempts.length}
                       </td>
                       <td>
-                        <details className={styles.detailDisclosure}>
-                          <summary aria-label={t('benchmark.open_details')}>
-                            <IconChevronDown size={15} />
-                          </summary>
-                          <div className={styles.detailPopover}>
-                            {summary.attempts.map((attempt) => (
-                              <div className={styles.attemptRow} key={attempt.id}>
-                                <div className={styles.attemptMeta}>
-                                  <span>
-                                    {attempt.caseLabel} · #{attempt.run}
-                                  </span>
-                                  <span>
-                                    {attempt.latencyMs === null ? '—' : `${attempt.latencyMs} ms`}
-                                    {attempt.state === 'success'
-                                      ? ` · ${attempt.note}`
-                                      : ` · ${attempt.error}`}
-                                  </span>
-                                </div>
-                                {attempt.state === 'success' ? (
-                                  <ScorePill score={attempt.score} />
-                                ) : (
-                                  <span className={styles.errorScore}>失败</span>
-                                )}
-                                {attempt.answer ? <pre>{attempt.answer}</pre> : null}
-                              </div>
-                            ))}
-                          </div>
-                        </details>
+                        <button
+                          type="button"
+                          className={styles.detailOpenButton}
+                          aria-label={t(
+                            summary.attempts.some((attempt) => attempt.state === 'error')
+                              ? 'benchmark.view_error'
+                              : 'benchmark.open_details'
+                          )}
+                          onClick={() => setDetailTargetId(summary.target.id)}
+                        >
+                          <IconInfo size={14} />
+                          <span>
+                            {t(
+                              summary.attempts.some((attempt) => attempt.state === 'error')
+                                ? 'benchmark.view_error'
+                                : 'benchmark.open_details'
+                            )}
+                          </span>
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -981,6 +1150,102 @@ export function BenchmarkPage() {
           </div>
         </section>
       )}
+
+      {detailSummary ? (
+        <div
+          className={styles.detailModalBackdrop}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setDetailTargetId(null);
+          }}
+        >
+          <section
+            className={styles.detailModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="benchmark-detail-title"
+          >
+            <header className={styles.detailModalHeader}>
+              <div>
+                <span className={styles.kicker}>REQUEST INSPECTOR</span>
+                <h2 id="benchmark-detail-title">{t('benchmark.detail_title')}</h2>
+                <p>
+                  {detailSummary.target.label} · {detailSummary.target.identity || detailSummary.target.source}
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.detailModalClose}
+                aria-label={t('common.close')}
+                onClick={() => setDetailTargetId(null)}
+              >
+                <IconX size={18} />
+              </button>
+            </header>
+            <div className={styles.detailModalMeta}>
+              <span>
+                <strong>{t('benchmark.error_model')}</strong>
+                {detailSummary.target.models.find((model) => model.id === modelInput)?.name ??
+                  modelInput}
+              </span>
+              <span>
+                <strong>{t('benchmark.thinking_label')}</strong>
+                {thinkingLevel}
+              </span>
+              <span>
+                <strong>{t('benchmark.answer_count')}</strong>
+                {detailSummary.attempts.filter((attempt) => attempt.state === 'success').length}/
+                {detailSummary.attempts.length}
+              </span>
+            </div>
+            <div className={styles.detailModalBody}>
+              {detailSummary.attempts.map((attempt) => (
+                <article
+                  className={`${styles.modalAttempt} ${
+                    attempt.state === 'error' ? styles.modalAttemptError : ''
+                  }`}
+                  key={attempt.id}
+                >
+                  <div className={styles.modalAttemptHeader}>
+                    <div>
+                      <strong>
+                        {attempt.caseLabel} · #{attempt.run}
+                      </strong>
+                      <small>
+                        {attempt.targetLabel} · {attempt.identity || detailSummary.target.source} ·{' '}
+                        {attempt.latencyMs === null ? '—' : `${attempt.latencyMs} ms`}
+                      </small>
+                    </div>
+                    {attempt.state === 'success' ? (
+                      <ScorePill score={attempt.score} />
+                    ) : (
+                      <span className={styles.errorScore}>{t('benchmark.error_failed')}</span>
+                    )}
+                  </div>
+                  {attempt.state === 'error' ? (
+                    <div className={styles.modalErrorDetail}>
+                      <span>{t('benchmark.error_message')}</span>
+                      <pre>{attempt.error || t('benchmark.request_failed')}</pre>
+                    </div>
+                  ) : null}
+                  {attempt.answer ? (
+                    <div className={styles.modalAnswer}>
+                      <span>{t('benchmark.answer_count')}</span>
+                      <pre>{attempt.answer}</pre>
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+            <footer className={styles.detailModalFooter}>
+              <span>{t('benchmark.results_note')}</span>
+              <Button variant="secondary" size="sm" onClick={() => setDetailTargetId(null)}>
+                {t('common.close')}
+              </Button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

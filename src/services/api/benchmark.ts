@@ -367,7 +367,10 @@ export const extractBenchmarkUsage = (body: unknown): BenchmarkUsage | undefined
 export async function runBenchmarkRequest(
   options: BenchmarkRequestOptions
 ): Promise<BenchmarkResponse> {
-  if (options.target.source === 'oauth') {
+  // Config-backed OpenAI-compatible credentials have a synthesized auth file
+  // and a stable auth index. Use CPA's pinned executor for them so provider
+  // payload rules and native reasoning adaptation run before the upstream call.
+  if (options.target.source === 'oauth' || (options.target.source === 'openai-compat' && options.target.authIndex)) {
     return runAuthFileBenchmark(options);
   }
 

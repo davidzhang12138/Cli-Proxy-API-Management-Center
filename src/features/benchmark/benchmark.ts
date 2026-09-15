@@ -1,13 +1,26 @@
-import { authFilesApi, configApi } from '@/services/api';
+import { authFilesApi, configApi, providersApi } from '@/services/api';
 import {
   CLAUDE_REQUEST_HEADERS,
   CODEX_REQUEST_HEADERS,
   XAI_API_REQUEST_HEADERS,
 } from '@/utils/quota';
 import { resolveCodexChatgptAccountId } from '@/utils/quota/resolvers';
-import { normalizeProviderKey } from '@/features/authFiles/constants';
+import { normalizeProviderKey, type AuthFileModelItem } from '@/features/authFiles/constants';
+import {
+  aliasesForProvider,
+  applyOAuthModelAliases,
+  mergeAuthFileModels,
+} from '@/features/authFiles/modelCatalog';
 import { maskApiKey } from '@/utils/format';
-import type { AuthFileItem, Config, GeminiKeyConfig, ModelAlias, ProviderKeyConfig } from '@/types';
+import type {
+  AuthFileItem,
+  Config,
+  GeminiKeyConfig,
+  ModelAlias,
+  OpenAIProviderConfig,
+  OAuthModelAliasEntry,
+  ProviderKeyConfig,
+} from '@/types';
 import type { BenchmarkModel, BenchmarkProtocol, BenchmarkTarget } from '@/types';
 
 export interface BenchmarkDiscovery {
@@ -87,6 +100,22 @@ const modelsFromCatalog = (models: string[] | undefined): BenchmarkModel[] => {
     result.push({ id: name, name });
     return result;
   }, []);
+};
+
+/**
+ * Static provider definitions can lag behind the model IDs returned by a live
+ * auth file. Keep both sources so Benchmark uses the same model coverage as
+ * the routing workbench.
+ */
+export const mergeBenchmarkOAuthModels = (
+  runtimeModels: readonly AuthFileModelItem[],
+  staticModelIds: readonly string[],
+  aliases: readonly OAuthModelAliasEntry[] = []
+): string[] => {
+  const staticModels = staticModelIds.map((id) => ({ id }));
+  return applyOAuthModelAliases(mergeAuthFileModels(runtimeModels, staticModels), aliases).map(
+    (model) => model.id
+  );
 };
 
 const providerProtocol = (provider: string): BenchmarkProtocol | null => {
@@ -263,8 +292,47 @@ export const buildBenchmarkTargets = (
   });
 };
 
+/**
+ * The raw /config response intentionally contains no runtime auth indexes.
+ * The management OpenAI-compatible list does, so copy those indexes onto the
+ * config snapshot before building targets. This lets Benchmark use the
+ * backend's pinned provider executor instead of bypassing it with api-call.
+ */
+const mergeOpenAIAuthIndexes = (
+  config: Config,
+  indexedProviders: OpenAIProviderConfig[]
+): Config => {
+  if (!config.openaiCompatibility?.length || !indexedProviders.length) return config;
+
+  return {
+    ...config,
+    openaiCompatibility: config.openaiCompatibility.map((provider, providerIndex) => {
+      const indexed =
+        indexedProviders.find((candidate) => candidate.sourceIndex === providerIndex) ??
+        indexedProviders.find(
+          (candidate) => candidate.name.trim().toLowerCase() === provider.name.trim().toLowerCase()
+        );
+      if (!indexed) return provider;
+
+      return {
+        ...provider,
+        authIndex: provider.authIndex || indexed.authIndex,
+        apiKeyEntries: (provider.apiKeyEntries ?? []).map((entry, entryIndex) => ({
+          ...entry,
+          authIndex: entry.authIndex || indexed.apiKeyEntries?.[entryIndex]?.authIndex,
+        })),
+      };
+    }),
+  };
+};
+
 export async function loadBenchmarkTargets(): Promise<BenchmarkDiscovery> {
-  const [config, authFiles] = await Promise.all([configApi.getConfig(), authFilesApi.list()]);
+  const [config, authFiles, aliases, indexedProviders] = await Promise.all([
+    configApi.getConfig(),
+    authFilesApi.list(),
+    authFilesApi.getOauthModelAlias().catch(() => ({})),
+    providersApi.getOpenAIProviders().catch(() => []),
+  ]);
   const providers = [
     ...new Set(
       (authFiles.files ?? [])
@@ -275,12 +343,36 @@ export async function loadBenchmarkTargets(): Promise<BenchmarkDiscovery> {
 
   const catalogEntries = await Promise.all(
     providers.map(async (provider) => {
-      const models = await authFilesApi.getModelDefinitions(provider).catch(() => []);
-      return [provider, models.map((model) => normalizeText(model.id)).filter(Boolean)] as const;
+      const staticModels = await authFilesApi.getModelDefinitions(provider).catch(() => []);
+      const representative = (authFiles.files ?? []).find(
+        (file) =>
+          normalizeProviderKey(normalizeText(file.type ?? file.provider)) === provider &&
+          file.disabled !== true &&
+          file.unavailable !== true &&
+          normalizeText(file.name) !== ''
+      );
+      const runtimeModels = representative
+        ? await authFilesApi.getModelsForAuthFile(representative.name).catch(() => [])
+        : [];
+      const staticModelIds = staticModels
+        .map((model) => normalizeText(model.id))
+        .filter(Boolean);
+      return [
+        provider,
+        mergeBenchmarkOAuthModels(
+          runtimeModels,
+          staticModelIds,
+          aliasesForProvider(aliases, provider)
+        ),
+      ] as const;
     })
   );
   const oauthCatalog = Object.fromEntries(catalogEntries);
-  const targets = buildBenchmarkTargets(config, authFiles.files ?? [], oauthCatalog);
+  const targets = buildBenchmarkTargets(
+    mergeOpenAIAuthIndexes(config, indexedProviders),
+    authFiles.files ?? [],
+    oauthCatalog
+  );
   const models = [
     ...new Set(targets.flatMap((target) => target.models.map((model) => model.id)).filter(Boolean)),
   ].sort((left, right) => left.localeCompare(right));
