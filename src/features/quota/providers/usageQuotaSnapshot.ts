@@ -18,6 +18,16 @@ import {
   resolveCodexSubscriptionActiveUntil,
   resolveResetMs,
 } from '@/utils/quota';
+import type { QuotaProviderData } from './types';
+
+export const buildQuotaSnapshotState = <TState>(
+  adapter: Pick<QuotaProviderData<TState, unknown>, 'buildSnapshotState' | 'buildErrorState'>,
+  file: AuthFileItem
+): TState | null => {
+  const snapshot = parseUsageQuotaSnapshot(file.usage_quota ?? file.usageQuota);
+  if (snapshot?.error) return adapter.buildErrorState(snapshot.error);
+  return adapter.buildSnapshotState?.(file) ?? null;
+};
 
 type SnapshotState<T> = Omit<T, 'status' | 'error' | 'errorStatus'>;
 

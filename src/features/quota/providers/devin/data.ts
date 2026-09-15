@@ -7,7 +7,7 @@ import type { QuotaProviderData } from '../types';
 import { createDevinQuotaFetcher, DevinQuotaError } from './requests';
 
 const fetchSnapshot = createDevinQuotaFetcher({
-  request: (payload) => apiCallApi.request(payload),
+  request: (payload) => apiCallApi.request({ ...payload, quota: true }),
   generation: (name) => {
     const state = useQuotaStore.getState();
     return { session: state.cacheGeneration, file: state.fileGenerations[name] ?? 0 };

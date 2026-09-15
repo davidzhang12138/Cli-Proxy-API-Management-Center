@@ -1,5 +1,5 @@
 /**
- * Kiro 额度数据层。React-free / SCSS-free。
+ * Kiro quota data. React-free and SCSS-free.
  */
 
 import type { TFunction } from 'i18next';
@@ -101,6 +101,7 @@ const fetchKiroQuota = async (file: AuthFileItem, t: TFunction): Promise<KiroQuo
     authIndex,
     method: 'GET',
     url: KIRO_QUOTA_URL,
+    quota: true,
     header: { ...KIRO_REQUEST_HEADERS },
   });
 

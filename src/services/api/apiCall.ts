@@ -8,6 +8,7 @@ import { isRecord } from '@/utils/helpers';
 
 export interface ApiCallRequest {
   authIndex?: string;
+  quota?: boolean;
   method: string;
   url: string;
   header?: Record<string, string>;

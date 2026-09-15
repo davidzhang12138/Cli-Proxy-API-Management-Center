@@ -1,6 +1,6 @@
 /**
- * 额度页纯逻辑：文件归类、tab 过滤、计数、分页。
- * React-free —— 由 tests/quotaPageLogic.test.ts 直接消费。
+ * Pure quota page logic: classification, tab filtering, counts, and pagination.
+ * React-free for tests/quotaPageLogic.test.ts.
  */
 
 import type { AuthFileItem } from '@/types';
@@ -37,8 +37,8 @@ export interface QuotaFileEntry {
 }
 
 /**
- * 配额卡片与时间线沿用认证文件页的身份规则：优先显示邮箱 / 项目 ID，
- * 没有结构化身份时才回落到去掉 .json 后缀的文件名。
+ * Cards and timelines share auth-file identity rules: prefer email or project ID,
+ * falling back to the filename without its .json suffix.
  */
 export const resolveQuotaDisplayName = (file: AuthFileItem): string =>
   isDevinFile(file) ? getQuotaDisplayName(file) : deriveAuthFileIdentity(file).primary;
@@ -59,8 +59,7 @@ export const resolveQuotaProviderType = (file: AuthFileItem): QuotaProviderType 
   QUOTA_TAB_ORDER.find((type) => QUOTA_FILTER_MAP[type](file)) ?? null;
 
 /**
- * 把文件列表归类为额度条目：不支持额度或已停用的文件被过滤，
- * 结果按 QUOTA_TAB_ORDER 分组排列（'全部' tab 的卡片顺序即由此决定）。
+ * Classify quota-capable, enabled credentials in QUOTA_TAB_ORDER.
  */
 export function classifyQuotaFiles(files: AuthFileItem[]): QuotaFileEntry[] {
   const groups = new Map<QuotaProviderType, QuotaFileEntry[]>(
@@ -83,11 +82,8 @@ export function filterEntriesByTab(entries: QuotaFileEntry[], tab: QuotaTabId): 
  * Whether a freshly fetched backend snapshot should replace the cached card
  * state for one credential.
  *
- * The backend re-probes credentials on its own schedule, so its snapshot can be
- * strictly newer than whatever the card last rendered — a hand-triggered
- * success from a moment ago, or a persisted entry from days back. Timestamps
- * decide that; status alone cannot, which is what let a persisted `success`
- * pin the card until the 7-day cache fallback expired.
+ * In-flight refreshes and failures remain authoritative until a manual retry.
+ * For successful cached entries, a newer backend snapshot may replace the data.
  *
  * A snapshot carrying no `checked_at` cannot be ordered against the cache, so
  * it only fills gaps rather than displacing a timestamped success.
@@ -97,6 +93,7 @@ export function shouldApplySnapshot(
   snapshotCheckedAtMs: number | null,
   nowMs: number = Date.now()
 ): boolean {
+  if (current?.status === 'loading' || current?.status === 'error') return false;
   if (!current || current.status !== 'success') return true;
   if (snapshotCheckedAtMs === null) return false;
   const cachedAt = current._cachedAt;
@@ -153,7 +150,7 @@ export function buildTabCounts(entries: QuotaFileEntry[]): Record<string, number
   return counts;
 }
 
-/** 额度页只展示实际有可用凭证的提供商 tab，避免空 tab 占据横向空间。 */
+/** Only show provider tabs with available credentials. */
 export function buildVisibleTabIds(counts: Record<string, number>): QuotaTabId[] {
   return ['all', ...QUOTA_TAB_ORDER.filter((type) => (counts[type] ?? 0) > 0)];
 }
@@ -170,7 +167,7 @@ export interface QuotaPagination<T> {
   totalPages: number;
 }
 
-/** 页码越界时收敛到有效区间（列表缩短后停留在最后一页而不是空页）。 */
+/** Clamp the page to the valid range when the list shrinks. */
 export function paginate<T>(items: T[], page: number, pageSize: number): QuotaPagination<T> {
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const currentPage = Math.min(Math.max(1, page), totalPages);

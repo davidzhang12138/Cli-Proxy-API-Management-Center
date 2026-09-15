@@ -1,6 +1,6 @@
 /**
- * Claude 额度数据层：用量窗口 + 套餐 + 额外用量。
- * React-free / SCSS-free —— 由 tests/claudeFableQuota.test.ts 直接消费。
+ * Claude quota data: usage windows, plans, and extra usage.
+ * React-free and SCSS-free for tests/claudeFableQuota.test.ts.
  */
 
 import type { TFunction } from 'i18next';
@@ -166,6 +166,7 @@ const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<Claud
       authIndex,
       method: 'GET',
       url: CLAUDE_USAGE_URL,
+      quota: true,
       header: { ...CLAUDE_REQUEST_HEADERS },
     }),
     apiCallApi.request({

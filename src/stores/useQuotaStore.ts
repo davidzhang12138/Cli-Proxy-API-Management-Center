@@ -81,6 +81,7 @@ const resolveQuotaCacheExpiryAt = (cachedAt: number) => cachedAt + QUOTA_CACHE_F
 
 const isFreshQuotaState = (value: TimedQuotaState | undefined, now: number) => {
   if (!value || value.status === 'loading') return false;
+  if (value.status === 'error') return true;
   if (typeof value._cacheExpiresAt === 'number' && Number.isFinite(value._cacheExpiresAt)) {
     return value._cacheExpiresAt > now;
   }

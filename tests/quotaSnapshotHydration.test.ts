@@ -4,6 +4,7 @@ import { CLAUDE_CONFIG } from '@/features/quota/providers/claude/data';
 import { CODEX_CONFIG } from '@/features/quota/providers/codex/data';
 import { KIMI_CONFIG } from '@/features/quota/providers/kimi/data';
 import { shouldApplySnapshot } from '@/features/quota/logic';
+import { buildQuotaSnapshotState } from '@/features/quota/providers/usageQuotaSnapshot';
 import { usageQuotaCheckedAtMs } from '@/utils/quota';
 import { useQuotaStore } from '@/stores';
 import type { AntigravityQuotaState } from '@/types';
@@ -11,6 +12,19 @@ import type { AntigravityQuotaState } from '@/types';
 const HOUR_MS = 60 * 60 * 1000;
 
 describe('management quota snapshot hydration', () => {
+  test('a backend quota failure replaces old numeric data with an error state', () => {
+    const state = buildQuotaSnapshotState(CODEX_CONFIG, {
+      name: 'codex.json',
+      type: 'codex',
+      usage_quota: {
+        known: false,
+        error: 'quota request failed',
+        checked_at: '2026-09-15T00:00:00Z',
+      },
+    });
+    expect(state).toMatchObject({ status: 'error', error: 'quota request failed', windows: [] });
+  });
+
   test('hydrates Codex windows from a persisted management snapshot', () => {
     const state = CODEX_CONFIG.buildSnapshotState?.({
       name: 'codex.json',
@@ -144,25 +158,33 @@ describe('stale snapshot replacement', () => {
 
   test('a backend snapshot newer than the cached success replaces it', () => {
     const cachedAt = now - 3 * HOUR_MS;
-    const checked = usageQuotaCheckedAtMs(
-      snapshotAt(new Date(now - HOUR_MS).toISOString())
+    const checked = usageQuotaCheckedAtMs(snapshotAt(new Date(now - HOUR_MS).toISOString()));
+    expect(shouldApplySnapshot({ status: 'success', _cachedAt: cachedAt }, checked, now)).toBe(
+      true
     );
-    expect(shouldApplySnapshot({ status: 'success', _cachedAt: cachedAt }, checked, now)).toBe(true);
   });
 
   test('an older backend snapshot leaves the cached success alone', () => {
     const cachedAt = now - HOUR_MS;
-    const checked = usageQuotaCheckedAtMs(
-      snapshotAt(new Date(now - 3 * HOUR_MS).toISOString())
+    const checked = usageQuotaCheckedAtMs(snapshotAt(new Date(now - 3 * HOUR_MS).toISOString()));
+    expect(shouldApplySnapshot({ status: 'success', _cachedAt: cachedAt }, checked, now)).toBe(
+      false
     );
-    expect(shouldApplySnapshot({ status: 'success', _cachedAt: cachedAt }, checked, now)).toBe(false);
   });
 
-  test('a snapshot predating the fix still fills idle, error and missing entries', () => {
+  test('a snapshot fills only idle and missing entries', () => {
     const checked = usageQuotaCheckedAtMs(snapshotAt(new Date(now - 5 * HOUR_MS).toISOString()));
     expect(shouldApplySnapshot(undefined, checked, now)).toBe(true);
     expect(shouldApplySnapshot({ status: 'idle' }, checked, now)).toBe(true);
-    expect(shouldApplySnapshot({ status: 'error' }, checked, now)).toBe(true);
+    expect(shouldApplySnapshot({ status: 'error' }, checked, now)).toBe(false);
+    expect(shouldApplySnapshot({ status: 'loading' }, checked, now)).toBe(false);
+  });
+
+  test('a failed refresh cannot be revived by any backend snapshot until manually retried', () => {
+    for (const checked of [null, now - HOUR_MS, now + HOUR_MS]) {
+      expect(shouldApplySnapshot({ status: 'error', _cachedAt: now }, checked, now)).toBe(false);
+      expect(shouldApplySnapshot({ status: 'loading' }, checked, now)).toBe(false);
+    }
   });
 
   test('an unstamped snapshot cannot displace a success but still fills a gap', () => {
@@ -235,5 +257,19 @@ describe('quota cache purge', () => {
       },
     });
     expect(Object.keys(after)).toEqual(['fresh.json']);
+  });
+
+  test('retains an error marker until manual refresh instead of reviving a stale snapshot', () => {
+    const after = write({
+      'failed.json': {
+        status: 'error',
+        error: 'Quota refresh failed',
+        groups: [],
+        _cachedAt: 1,
+        _cacheExpiresAt: 2,
+      },
+    });
+    expect(after['failed.json']?.status).toBe('error');
+    expect(after['failed.json']?.groups).toEqual([]);
   });
 });

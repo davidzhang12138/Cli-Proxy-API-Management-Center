@@ -28,7 +28,8 @@ export function useDevinQuotaAutoLoad(
       if (attempted.current.has(key)) return false;
       attempted.current.add(key);
       // An explicit refresh already started in this effect cycle counts too.
-      return useQuotaStore.getState().devinQuota[getQuotaCacheKey(file)]?.status !== 'loading';
+      const status = useQuotaStore.getState().devinQuota[getQuotaCacheKey(file)]?.status;
+      return status !== 'loading' && status !== 'error';
     });
     if (targets.length > 0) void loadQuota(targets);
   }, [disabled, entries, fileGenerations, loadQuota, session]);

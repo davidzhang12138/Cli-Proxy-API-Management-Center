@@ -1,5 +1,5 @@
 /**
- * Kimi 额度数据层。React-free / SCSS-free。
+ * Kimi quota data. React-free and SCSS-free.
  */
 
 import type { TFunction } from 'i18next';
@@ -27,6 +27,7 @@ const fetchKimiQuota = async (file: AuthFileItem, t: TFunction): Promise<KimiQuo
 
   const result = await apiCallApi.request({
     authIndex,
+    quota: true,
     method: 'GET',
     url: KIMI_USAGE_URL,
     header: { ...KIMI_REQUEST_HEADERS },

@@ -1,5 +1,5 @@
 /**
- * Antigravity 额度数据层：分组配额 + 订阅信息 + 服务器时钟偏移。
+ * Antigravity quota data: grouped quotas, subscriptions, and server clock offset.
  * React-free / SCSS-free。
  */
 
@@ -146,6 +146,7 @@ const fetchAntigravityQuota = async (
     try {
       const result = await apiCallApi.request({
         authIndex,
+        quota: true,
         method: 'POST',
         url,
         header: { ...ANTIGRAVITY_REQUEST_HEADERS },

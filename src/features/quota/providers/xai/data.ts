@@ -1,15 +1,10 @@
 /**
- * xAI 额度数据层：免费档账单 + 付费档健康探测回退。
- * React-free / SCSS-free —— 由 tests/xaiPaidQuotaFallback.test.ts 直接消费。
+ * xAI quota data: free-tier billing and paid-tier health fallback.
+ * React-free and SCSS-free for tests/xaiPaidQuotaFallback.test.ts.
  */
 
 import type { TFunction } from 'i18next';
-import type {
-  AuthFileItem,
-  XaiBillingSummary,
-  XaiQuotaState,
-  XaiRateLimitQuota,
-} from '@/types';
+import type { AuthFileItem, XaiBillingSummary, XaiQuotaState, XaiRateLimitQuota } from '@/types';
 import { apiCallApi, getApiCallErrorMessage } from '@/services/api';
 import {
   XAI_API_CHAT_URL,
@@ -90,6 +85,7 @@ const requestXaiBilling = async (
 ): Promise<XaiBillingSummary | null> => {
   const result = await apiCallApi.request({
     authIndex,
+    quota: true,
     method: 'GET',
     url,
     header,
@@ -119,6 +115,7 @@ const requestXaiPaidHealth = async (authIndex: string): Promise<XaiBillingSummar
         authIndex,
         method: 'POST',
         url: XAI_API_CHAT_URL,
+        quota: true,
         header: {
           ...XAI_API_REQUEST_HEADERS,
           'Content-Type': 'application/json',

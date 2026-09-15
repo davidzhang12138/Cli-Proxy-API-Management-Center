@@ -15,9 +15,10 @@ import { IconRefreshCw } from '@/components/ui/icons';
 import { bindQuotaClasses } from '@/features/quota/types';
 import { shouldApplySnapshot } from '@/features/quota/logic';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '@/features/quota/providers';
+import { buildQuotaSnapshotState } from '@/features/quota/providers/usageQuotaSnapshot';
 import styles from './AuthFileQuota.module.scss';
 
-/** 认证文件卡片外衣：紧凑额度样式绑定成类型化契约（缺键在模块初始化即抛）。 */
+/** Bind compact quota styles and validate required classes at module initialization. */
 const compactQuotaClasses = bindQuotaClasses(styles, 'AuthFileQuota.module.scss');
 
 const assertNever = (value: never): never => {
@@ -62,12 +63,10 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
   const updateQuotaState = useQuotaStore(
     (state) => state[adapter.storeSetter] as unknown as QuotaMapUpdater
   );
-  const snapshotQuota = adapter.buildSnapshotState?.(file);
+  const snapshotQuota = buildQuotaSnapshotState(adapter, file);
   const snapshotCheckedAtMs = usageQuotaCheckedAtMs(file.usage_quota);
 
-  // Refresh the cached state whenever the backend's snapshot is newer than what
-  // the card is showing — see shouldApplySnapshot for why status alone can't
-  // decide this.
+  // Hydrate newer backend snapshots without overwriting a pending or failed refresh.
   useEffect(() => {
     if (!snapshotQuota) return;
     if (!shouldApplySnapshot(quota, snapshotCheckedAtMs)) return;
