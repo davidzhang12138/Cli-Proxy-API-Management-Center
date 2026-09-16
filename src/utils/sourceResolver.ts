@@ -136,6 +136,7 @@ export function resolveSourceDisplay(
         displayName: authInfo.name || authIndexKey,
         type: authInfo.type,
         identityKey: `auth:${authIndexKey}`,
+        rawName: authInfo.rawName,
       };
     }
   }

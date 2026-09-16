@@ -40,11 +40,19 @@ export const credentialInfoFromAuthFile = (file: unknown): UsageAuthLookupEntry 
   const authIndex = normalizeAuthIndex(entry.auth_index ?? entry.authIndex);
   if (!authIndex) return null;
 
+  const rawName = String(entry.name || entry.filename || entry.fileName || '').trim();
+  const provider = String(entry.type || entry.provider || '')
+    .trim()
+    .toLowerCase();
+  const email = String(entry.email || entry.account_email || entry.account || '').trim();
+  const displayName = provider && email ? `${provider}-${email}` : email || rawName || authIndex;
+
   return [
     authIndex,
     {
-      name: String(entry.name || entry.email || entry.account || authIndex),
-      type: String(entry.type || entry.provider || ''),
+      name: displayName,
+      type: provider,
+      rawName: rawName || undefined,
     },
   ];
 };
@@ -124,7 +132,9 @@ const fetchUsageAuthLookupTerm = (term: string): Promise<UsageAuthLookupEntry[]>
   return request;
 };
 
-export const loadUsageAuthFileMap = async (usage: unknown): Promise<Map<string, CredentialInfo>> => {
+export const loadUsageAuthFileMap = async (
+  usage: unknown
+): Promise<Map<string, CredentialInfo>> => {
   const terms = collectUsageAuthLookupTerms(usage);
   const authFileMap = new Map<string, CredentialInfo>();
 
