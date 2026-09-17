@@ -59,9 +59,14 @@ describe('credentialInfoFromAuthFile email', () => {
         auth_index: AUTH_INDEX,
         name: 'codex-a.json',
         email: '  user@example.com  ',
-        type: 'cline',
+        type: 'Cline',
       })?.[1]
-    ).toEqual({ name: 'codex-a.json', type: 'cline', email: 'user@example.com' });
+    ).toEqual({
+      name: 'cline-user@example.com',
+      type: 'cline',
+      rawName: 'codex-a.json',
+      email: 'user@example.com',
+    });
   });
 
   /**
@@ -73,5 +78,17 @@ describe('credentialInfoFromAuthFile email', () => {
       credentialInfoFromAuthFile({ auth_index: AUTH_INDEX, name: 'codex-a.json', type: 'codex' })?.[1]
         .email
     ).toBeUndefined();
+  });
+
+  /** account 在 api-key 类凭证里就是 API key，绝不能当邮箱。 */
+  test('ignores account when email is absent', () => {
+    expect(
+      credentialInfoFromAuthFile({
+        auth_index: AUTH_INDEX,
+        name: 'kimi.json',
+        account: 'sk-secret-key-value',
+        type: 'kimi',
+      })?.[1]
+    ).toEqual({ name: 'kimi.json', type: 'kimi', rawName: 'kimi.json' });
   });
 });

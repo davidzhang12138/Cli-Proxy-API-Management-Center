@@ -32,6 +32,7 @@ type RequestEventRow = {
   sourceKey: string;
   sourceRaw: string;
   source: string;
+  sourceRawName: string;
   sourceType: string;
   authIndex: string;
   failed: boolean;
@@ -165,6 +166,7 @@ export function RequestEventsDetailsCard({
       const source = sourceInfo.displayName;
       const sourceKey = sourceInfo.identityKey ?? `source:${sourceRaw || source}`;
       const sourceType = sourceInfo.type;
+      const sourceRawName = sourceInfo.rawName || '';
       const model = String(detail.__modelName ?? '').trim() || '-';
       const inputTokens = Math.max(toNumber(detail.tokens?.input_tokens), 0);
       const outputTokens = Math.max(toNumber(detail.tokens?.output_tokens), 0);
@@ -190,6 +192,7 @@ export function RequestEventsDetailsCard({
         sourceKey,
         sourceRaw: sourceRaw || '-',
         source,
+        sourceRawName,
         sourceType,
         authIndex,
         failed: detail.failed === true,
@@ -334,6 +337,7 @@ export function RequestEventsDetailsCard({
       'timestamp',
       'model',
       'source',
+      'source_file',
       'source_raw',
       'auth_index',
       'result',
@@ -354,6 +358,7 @@ export function RequestEventsDetailsCard({
         row.timestamp,
         row.model,
         row.source,
+        row.sourceRawName,
         row.sourceRaw,
         row.authIndex,
         row.failed ? 'failed' : 'success',
@@ -387,6 +392,7 @@ export function RequestEventsDetailsCard({
       timestamp: row.timestamp,
       model: row.model,
       source: row.source,
+      ...(row.sourceRawName ? { source_file: row.sourceRawName } : {}),
       source_raw: row.sourceRaw,
       auth_index: row.authIndex,
       failed: row.failed,
@@ -535,7 +541,10 @@ export function RequestEventsDetailsCard({
                       {row.timestampLabel}
                     </td>
                     <td className={styles.modelCell}>{row.model}</td>
-                    <td className={styles.requestEventsSourceCell} title={row.source}>
+                    <td
+                      className={styles.requestEventsSourceCell}
+                      title={row.sourceRawName ? `${row.source}\n${row.sourceRawName}` : row.source}
+                    >
                       <span>{row.source}</span>
                       {row.sourceType && (
                         <span className={styles.credentialType}>{row.sourceType}</span>

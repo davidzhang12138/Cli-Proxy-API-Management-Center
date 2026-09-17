@@ -40,14 +40,21 @@ export const credentialInfoFromAuthFile = (file: unknown): UsageAuthLookupEntry 
   const authIndex = normalizeAuthIndex(entry.auth_index ?? entry.authIndex);
   if (!authIndex) return null;
 
-  // 只认 email 字段：entry.name 可能是文件名，拿它当邮箱配渠道会读出假身份。
-  const email = normalizeUsageSourceForAuthLookup(entry.email);
+  const rawName = String(entry.name || entry.filename || entry.fileName || '').trim();
+  const provider = String(entry.type || entry.provider || '')
+    .trim()
+    .toLowerCase();
+  // 邮箱只认 email 字段。account 在 api-key 类凭证里就是 API key 本身，
+  // 拿它当邮箱会把密钥拼进渠道列（sdk/cliproxy/auth/types.go AccountInfo）。
+  const email = normalizeUsageSourceForAuthLookup(entry.email || entry.account_email);
+  const displayName = provider && email ? `${provider}-${email}` : email || rawName || authIndex;
 
   return [
     authIndex,
     {
-      name: String(entry.name || entry.email || entry.account || authIndex),
-      type: String(entry.type || entry.provider || ''),
+      name: displayName,
+      type: provider,
+      rawName: rawName || undefined,
       ...(email ? { email } : {}),
     },
   ];
@@ -128,7 +135,9 @@ const fetchUsageAuthLookupTerm = (term: string): Promise<UsageAuthLookupEntry[]>
   return request;
 };
 
-export const loadUsageAuthFileMap = async (usage: unknown): Promise<Map<string, CredentialInfo>> => {
+export const loadUsageAuthFileMap = async (
+  usage: unknown
+): Promise<Map<string, CredentialInfo>> => {
   const terms = collectUsageAuthLookupTerms(usage);
   const authFileMap = new Map<string, CredentialInfo>();
 
