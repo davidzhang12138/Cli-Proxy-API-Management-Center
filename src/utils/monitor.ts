@@ -4,6 +4,8 @@
 
 import type { UsageData } from '@/pages/MonitorPage';
 import type { UsageQueryParams } from '@/services/api/usage';
+import type { CredentialInfo } from '@/types/sourceInfo';
+import { normalizeAuthIndex } from '@/utils/usage';
 
 /**
  * 日期范围接口
@@ -65,25 +67,6 @@ export function resolveProvider(
 }
 
 /**
- * 格式化渠道显示名称：渠道名 (脱敏后的api-key)
- * @param source 来源标识
- * @param providerMap 渠道映射表
- * @returns 格式化后的显示名称
- */
-export function formatProviderDisplay(
-  source: string,
-  providerMap: Record<string, string>
-): string {
-  if (!source || source === '-' || source === 'unknown') {
-    return source || '-';
-  }
-  const provider = resolveProvider(source, providerMap);
-  const masked = maskSecret(source);
-  if (!provider) return masked;
-  return `${provider} (${masked})`;
-}
-
-/**
  * 获取渠道显示信息（分离渠道名和秘钥）
  * @param source 来源标识
  * @param providerMap 渠道映射表
@@ -99,6 +82,31 @@ export function getProviderDisplayParts(
   const provider = resolveProvider(source, providerMap);
   const masked = maskSecret(source);
   return { provider, masked };
+}
+
+/**
+ * 渠道列展示。有凭证邮箱时用「渠道-邮箱」（如 cline-xxx@gmail.com），
+ * 否则回退到原来的「渠道 (脱敏key)」；两者都没有就是脱敏 key。
+ *
+ * 邮箱按 auth_index 查 authFileMap；渠道名缺失时不拼邮箱——否则会得到
+ * 「sk-2***4Ylx-xxx@gmail.com」这种既无渠道也非原样脱敏的假身份。
+ */
+export function buildChannelDisplay(
+  source: string,
+  authIndex: string,
+  providerName: string | null,
+  authFileMap?: Map<string, CredentialInfo>
+): { name: string | null; email: string | null; display: string } {
+  const masked = maskSecret(source);
+  const fallback = providerName ? `${providerName} (${masked})` : masked;
+
+  const key = normalizeAuthIndex(authIndex);
+  const email = (key ? authFileMap?.get(key)?.email : '') || '';
+  if (!email || !providerName) {
+    return { name: providerName, email: null, display: fallback };
+  }
+
+  return { name: providerName, email, display: `${providerName}-${email}` };
 }
 
 /**

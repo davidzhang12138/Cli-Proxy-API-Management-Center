@@ -17,10 +17,11 @@ import type { CredentialInfo } from '@/types/sourceInfo';
 import { TimeRangeSelector, formatTimeRangeCaption, type TimeRange } from './TimeRangeSelector';
 import { DisableModelModal } from './DisableModelModal';
 import {
-  formatProviderDisplay,
+  buildChannelDisplay,
   formatTimestamp,
   getRateClassName,
   getProviderDisplayParts,
+  resolveProvider,
   buildUsageDateQueryParams,
   filterDataByTimeRange,
   type DateRange,
@@ -50,6 +51,12 @@ interface LogEntry {
   providerName: string | null;
   providerType: string;
   maskedKey: string;
+  /** 渠道名（providerMap 优先，回退 sourceResolver），渠道列与筛选下拉共用。 */
+  channelName: string | null;
+  /** 凭证账号邮箱；api-key 类凭证为 null。有它时渠道列渲染成「渠道-邮箱」。 */
+  email: string | null;
+  /** 渠道列展示文本，与筛选下拉选项一致。 */
+  channelDisplay: string;
   failed: boolean;
   inputTokens: number;
   cachedTokens: number;
@@ -334,6 +341,16 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
           const resolvedName = sourceInfo.displayName && sourceInfo.displayName !== normalizedSource
             ? sourceInfo.displayName
             : null;
+          // 渠道名：providerMap 优先；没有渠道配置时用凭证类型（cline / codex），
+          // 与右侧「请求类型」列同源。仅剩 auth_index/source 哈希的条目不带前缀。
+          const channelProviderName =
+            resolveProvider(source, providerMap) || sourceInfo.type || null;
+          const channel = buildChannelDisplay(
+            source,
+            detail.auth_index,
+            channelProviderName,
+            authFileMap
+          );
           const displayName = resolvedName ? `${resolvedName} (${masked})` : masked;
           entries.push({
             id: `${idCounter++}`,
@@ -347,6 +364,9 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
             providerName: resolvedName,
             providerType,
             maskedKey: masked,
+            channelName: channel.name,
+            email: channel.email,
+            channelDisplay: channel.display,
             failed: detail.failed,
             inputTokens: detail.tokens.input_tokens || 0,
             cachedTokens: parseCachedTokens(detail.tokens.cached_tokens, detail.tokens.cache_tokens),
@@ -431,13 +451,15 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
   const { apis, models, sources, providerTypes } = useMemo(() => {
     const apiSet = new Set<string>();
     const modelSet = new Set<string>();
-    const sourceSet = new Set<string>();
+    const sourceLabels = new Map<string, string>();
     const providerTypeSet = new Set<string>();
 
     logEntries.forEach((entry) => {
       apiSet.add(entry.apiKey);
       modelSet.add(entry.model);
-      sourceSet.add(entry.source);
+      if (!sourceLabels.has(entry.source)) {
+        sourceLabels.set(entry.source, entry.channelDisplay);
+      }
       if (entry.providerType && entry.providerType !== '--') {
         providerTypeSet.add(entry.providerType);
       }
@@ -446,7 +468,9 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
     return {
       apis: Array.from(apiSet).sort(),
       models: Array.from(modelSet).sort(),
-      sources: Array.from(sourceSet).sort(),
+      sources: Array.from(sourceLabels, ([value, label]) => ({ value, label })).sort((a, b) =>
+        a.label.localeCompare(b.label)
+      ),
       providerTypes: Array.from(providerTypeSet).sort(),
     };
   }, [logEntries]);
@@ -613,7 +637,12 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
           {entry.model}
         </td>
         <td title={entry.source}>
-          {entry.providerName ? (
+          {entry.email && entry.channelName ? (
+            <>
+              <span className={styles.channelName}>{entry.channelName}</span>
+              <span className={styles.channelSecret}>-{entry.email}</span>
+            </>
+          ) : entry.providerName ? (
             <>
               <span className={styles.channelName}>{entry.providerName}</span>
               <span className={styles.channelSecret}> ({entry.maskedKey})</span>
@@ -731,8 +760,8 @@ export function RequestLogs({ data, loading: parentLoading, providerMap, provide
           >
             <option value="">{t('monitor.logs.all_sources')}</option>
             {sources.map((source) => (
-              <option key={source} value={source}>
-                {formatProviderDisplay(source, providerMap)}
+              <option key={source.value} value={source.value}>
+                {source.label}
               </option>
             ))}
           </select>

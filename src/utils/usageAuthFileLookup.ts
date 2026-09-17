@@ -40,11 +40,15 @@ export const credentialInfoFromAuthFile = (file: unknown): UsageAuthLookupEntry 
   const authIndex = normalizeAuthIndex(entry.auth_index ?? entry.authIndex);
   if (!authIndex) return null;
 
+  // 只认 email 字段：entry.name 可能是文件名，拿它当邮箱配渠道会读出假身份。
+  const email = normalizeUsageSourceForAuthLookup(entry.email);
+
   return [
     authIndex,
     {
       name: String(entry.name || entry.email || entry.account || authIndex),
       type: String(entry.type || entry.provider || ''),
+      ...(email ? { email } : {}),
     },
   ];
 };
