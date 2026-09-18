@@ -29,7 +29,7 @@ describe('Devin OAuth login UI', () => {
           createElement(MemoryRouter, null, createElement(OAuthPage))
         )
       );
-      for (const provider of ['devin', 'hyper', 'context_code', 'cline', 'freebuff', 'kiro']) {
+      for (const provider of ['devin', 'hyper', 'cline', 'freebuff', 'kiro']) {
         const title = (en.auth_login as Record<string, string>)[`${provider}_oauth_title`];
         expect(markup).toContain(`title="${title}"`);
       }

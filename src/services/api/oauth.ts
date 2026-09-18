@@ -16,7 +16,6 @@ export type BuiltInOAuthProvider =
   | 'kimi'
   | 'xai'
   | 'hyper'
-  | 'context-code'
   | 'cline';
 
 export type OAuthProvider = BuiltInOAuthProvider | 'freebuff';

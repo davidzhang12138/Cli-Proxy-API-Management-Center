@@ -58,10 +58,6 @@ export const TYPE_COLORS: Record<string, TypeColorSet> = {
     light: { bg: '#e6f3ff', text: '#075fae', border: '1px solid #b9dcfb' },
     dark: { bg: '#0a355d', text: '#8dccff', border: '1px solid #17649f' },
   },
-  'context-code': {
-    light: { bg: '#e0f2fe', text: '#075985', border: '1px solid #7dd3fc' },
-    dark: { bg: '#0c4a6e', text: '#bae6fd', border: '1px solid #0369a1' },
-  },
   cline: {
     light: { bg: '#dff8f4', text: '#087f77', border: '1px solid #9de5dc' },
     dark: { bg: '#0d3f3c', text: '#8ce8df', border: '1px solid #1d7770' },

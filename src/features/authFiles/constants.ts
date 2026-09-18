@@ -11,7 +11,6 @@ import iconIflow from '@/assets/icons/iflow.svg';
 import iconKiro from '@/assets/icons/kiro.svg';
 import iconKimiDark from '@/assets/icons/kimi-dark.svg';
 import iconKimiLight from '@/assets/icons/kimi-light.svg';
-import iconContextCode from '@/assets/icons/context-code.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
 import iconCrush from '@/assets/icons/crush.png';
 import iconCline from '@/assets/icons/cline.svg';
@@ -60,7 +59,6 @@ export const OAUTH_PROVIDER_PRESETS = [
   'codex',
   'devin',
   'kimi',
-  'context-code',
   'cline',
   'cline-pass',
 ];
@@ -97,7 +95,6 @@ export const AUTH_FILE_ICONS: Record<string, AuthFileIconAsset> = {
   iflow: iconIflow,
   kiro: iconKiro,
   kimi: { light: iconKimiLight, dark: iconKimiDark },
-  'context-code': iconContextCode,
   cline: iconCline,
   'cline-pass': iconCline,
   freebuff: iconFreebuff,
