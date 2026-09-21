@@ -16,7 +16,8 @@ export type BuiltInOAuthProvider =
   | 'kimi'
   | 'xai'
   | 'hyper'
-  | 'cline';
+  | 'cline'
+  | 'meta';
 
 export type OAuthProvider = BuiltInOAuthProvider | 'freebuff';
 
@@ -24,7 +25,7 @@ export interface OAuthStartResponse {
   url: string;
   state?: string;
   method?: 'device_code';
-  flow?: 'device';
+  flow?: 'device' | string;
   user_code?: string;
   verification_uri?: string;
   verification_uri_complete?: string;
@@ -90,7 +91,11 @@ const normalizeProviderForManagementPath = (provider: string): string => {
 };
 
 export const oauthApi = {
-  startAuth: (provider: string, options?: OAuthStartOptions) => {
+  startAuth: (provider: string, options?: OAuthStartOptions | AbortSignal) => {
+    // Both call shapes are in use: an options bag (proxy URL + signal) and a
+    // bare AbortSignal.
+    const resolved: OAuthStartOptions =
+      options instanceof AbortSignal ? { signal: options } : (options ?? {});
     const providerKey = normalizeProviderForManagementPath(provider);
     const params: Record<string, string | boolean> = {};
     if (WEBUI_SUPPORTED.has(providerKey)) {
@@ -99,13 +104,13 @@ export const oauthApi = {
     if (providerKey === 'xai') {
       params.device = true;
     }
-    const proxyUrl = options?.proxyUrl?.trim();
+    const proxyUrl = resolved.proxyUrl?.trim();
     if (proxyUrl) {
       params['proxy-url'] = proxyUrl;
     }
     return apiClient.get<OAuthStartResponse>(`/${providerKey}-auth-url`, {
       params: Object.keys(params).length ? params : undefined,
-      ...(options?.signal ? { signal: options.signal } : {}),
+      ...(resolved.signal ? { signal: resolved.signal } : {}),
     });
   },
 

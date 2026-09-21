@@ -11,6 +11,7 @@ export const QUOTA_TAB_ORDER: readonly QuotaProviderType[] = [
   'freebuff',
   'hyper',
   'devin',
+  'meta',
 ];
 
 export type QuotaTabId = 'all' | QuotaProviderType;

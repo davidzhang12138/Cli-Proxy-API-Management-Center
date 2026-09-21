@@ -18,6 +18,7 @@ import type { PluginListEntry } from '@/types';
 import { createOAuthAttempts, type OAuthAttempt } from './oauthAttempts';
 import { validateDevinCallback } from './devinOAuth';
 import styles from './OAuthPage.module.scss';
+import iconMeta from '@/assets/icons/meta.svg';
 import iconCodex from '@/assets/icons/codex.svg';
 import iconClaude from '@/assets/icons/claude.svg';
 import iconAntigravity from '@/assets/icons/antigravity.svg';
@@ -35,8 +36,8 @@ import iconDevinDark from '@/assets/icons/devin-dark.svg';
 
 interface ProviderState {
   url?: string;
-  state?: string;
   userCode?: string;
+  state?: string;
   deviceName?: string;
   deviceHostname?: string;
   expiresIn?: number;
@@ -135,6 +136,12 @@ function getErrorStatus(error: unknown): number | undefined {
 const PROVIDERS: BuiltInOAuthProviderCard[] = [
   {
     kind: 'builtin',
+    id: 'meta',
+    titleKey: 'auth_login.meta_oauth_title',
+    icon: iconMeta,
+  },
+  {
+    kind: 'builtin',
     id: 'codex',
     titleKey: 'auth_login.codex_oauth_title',
     icon: iconCodex,
@@ -193,7 +200,8 @@ const BUILTIN_PROVIDER_TAB_TITLES: Record<BuiltInOAuthProvider, string> = {
   kimi: 'Kimi',
   xai: 'xAI',
   hyper: 'Charm Hyper',
-    cline: 'Cline',
+  cline: 'Cline',
+  meta: 'Meta',
 };
 
 const FREEBUFF_PROVIDER: FreebuffOAuthProviderCard = {
@@ -571,8 +579,8 @@ export function OAuthPage() {
     const proxyUrl = states[provider]?.oauthProxyUrl?.trim() || undefined;
     updateProviderState(provider, {
       url: undefined,
-      state: undefined,
       userCode: undefined,
+      state: undefined,
       deviceName: undefined,
       deviceHostname: undefined,
       expiresIn: undefined,
@@ -932,6 +940,15 @@ export function OAuthPage() {
                 {getProviderText(provider, 'oauth_url_label')}
               </div>
               <div className={styles.authUrlValue}>{state.url}</div>
+              {state.userCode && (
+                <div>
+                  <div className={styles.authUrlLabel}>{t('auth_login.device_code_label')}</div>
+                  <div className={styles.authUrlValue}>{state.userCode}</div>
+                  <Button variant="secondary" size="sm" onClick={() => copyLink(state.userCode)}>
+                    {t('auth_login.device_code_copy')}
+                  </Button>
+                </div>
+              )}
               <div className={styles.authUrlActions}>
                 <Button variant="secondary" size="sm" onClick={() => copyLink(state.url!)}>
                   {getProviderText(provider, 'copy_link')}
