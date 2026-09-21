@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/Button';
 import { IconRefreshCw } from '@/components/ui/icons';
 import { useCountUp } from '@/hooks/motion';
 import styles from './QuotaHeader.module.scss';
@@ -8,16 +7,24 @@ export type QuotaHeaderProps = {
   totalCount: number;
   loadedCount: number;
   attentionCount: number;
-  refreshing: boolean;
-  disableControls: boolean;
+  /** 作用域按钮是否正在拉取（本 tab 的凭证有 loading 即可）。 */
+  scopeRefreshing: boolean;
+  /** 当前页按钮是否正在拉取。 */
+  pageRefreshing: boolean;
+  canRefreshScope: boolean;
   canRefreshPage: boolean;
+  /** 当前 tab 的刷新作用域：'all' = 全部凭证，provider = 该 provider 的凭证。 */
+  refreshScopeLabel: string;
+  onRefreshScope: () => void;
   onRefreshPage: () => void;
-  onRefreshAll: () => void;
 };
 
 /**
- * 额度页头部：标题领衔 + ▍mono 遥测 meta 行 + 墨色药丸「刷新全部」。
+ * 额度页头部：标题领衔 + ▍mono 遥测 meta 行 + 两枚刷新药丸。
  * 与凭证库头部同语汇（无 eyebrow —— ▍游标挂在 meta 行开头）。
+ *
+ * 刷新层级：主按钮跟随当前 tab —— '全部' 刷全部、provider tab 刷该 provider
+ * 的所有页；次按钮只刷当前这一页（不重载文件列表，也不点一下刷全部）。
  *
  * 入场：三处 `data-reveal` 交给页面壳的 useRevealGroup 统一编排
  * （标题 0ms → meta 70ms → 动作 140ms → tabs 210ms）。
@@ -27,11 +34,13 @@ export function QuotaHeader(props: QuotaHeaderProps) {
     totalCount,
     loadedCount,
     attentionCount,
-    refreshing,
-    disableControls,
+    scopeRefreshing,
+    pageRefreshing,
+    canRefreshScope,
     canRefreshPage,
+    refreshScopeLabel,
+    onRefreshScope,
     onRefreshPage,
-    onRefreshAll,
   } = props;
   const { t } = useTranslation();
   // 批量结果陆续落地时，「已加载」是页面上唯一滚动的数字
@@ -66,24 +75,25 @@ export function QuotaHeader(props: QuotaHeaderProps) {
         </p>
       </div>
       <div className={styles.actions} data-reveal>
-        <Button
-          variant="secondary"
-          size="sm"
-          className={styles.pageAction}
+        <button
+          type="button"
+          className={styles.secondaryAction}
           onClick={onRefreshPage}
-          disabled={disableControls || refreshing || !canRefreshPage}
+          disabled={!canRefreshPage}
         >
-          <IconRefreshCw size={14} aria-hidden="true" />
+          <IconRefreshCw size={14} className={pageRefreshing ? styles.spinning : undefined} />
           {t('quota_management.refresh_page_credentials')}
-        </Button>
+        </button>
         <button
           type="button"
           className={styles.primaryAction}
-          onClick={onRefreshAll}
-          disabled={disableControls || refreshing}
+          onClick={onRefreshScope}
+          disabled={!canRefreshScope}
         >
-          <IconRefreshCw size={14} className={refreshing ? styles.spinning : undefined} />
-          {t('quota_management.refresh_all_credentials')}
+          <IconRefreshCw size={14} className={scopeRefreshing ? styles.spinning : undefined} />
+          <span className={styles.actionLabel}>
+            {t('quota_management.refresh_credentials', { scope: refreshScopeLabel })}
+          </span>
         </button>
       </div>
     </header>

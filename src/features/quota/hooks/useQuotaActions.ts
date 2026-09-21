@@ -27,7 +27,9 @@ export function useQuotaActions(disableControls: boolean) {
 
   const refreshQuota = useCallback(
     async (file: AuthFileItem, adapter: QuotaAdapter) => {
-      if (disableControls || file.disabled) return;
+      // Disabled credentials still fetch: they stay listed until their quota is
+      // known, and the refresh button is the only way they ever get one.
+      if (disableControls) return;
       const cacheKey = getQuotaCacheKey(file);
       if (resettingQuotaName === cacheKey) return;
       if (getQuotaState(adapter, file)?.status === 'loading') return;
@@ -70,7 +72,7 @@ export function useQuotaActions(disableControls: boolean) {
     (file: AuthFileItem, adapter: QuotaAdapter) => {
       const resetQuotaFn = adapter.resetQuota;
       if (!resetQuotaFn) return;
-      if (disableControls || file.disabled) return;
+      if (disableControls) return;
       const cacheKey = getQuotaCacheKey(file);
       if (getQuotaState(adapter, file)?.status === 'loading') return;
       if (resettingQuotaName === cacheKey) return;

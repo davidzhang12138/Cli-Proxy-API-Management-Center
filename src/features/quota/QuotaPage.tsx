@@ -23,6 +23,7 @@ import type { AuthFileItem, ResolvedTheme } from '@/types';
 import { usageQuotaCheckedAtMs } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
+import { getTypeLabel } from '@/features/authFiles/constants';
 import { QuotaHeader } from './components/QuotaHeader';
 import { QuotaCard } from './components/QuotaCard';
 import { QuotaTimeline } from './components/QuotaTimeline';
@@ -286,41 +287,75 @@ export function QuotaPage() {
   const { batchLoading, loadQuota } = useQuotaBatchLoader();
   const { resettingQuotaName, refreshQuota, resetQuota } = useQuotaActions(disableControls);
 
-  const pendingRefreshRef = useRef<number | null>(null);
-  const prevLoadingRef = useRef(loading);
+  // The header action refreshes the credentials of the tab in view — the whole
+  // scope, not just the visible page. Disabled files have no quota to read, so
+  // a batch leaves them to the cards that already show loaded data.
+  const refreshTargets = filterEntriesByTab(entries, tab).filter((entry) => !entry.file.disabled);
 
-  // Refresh every quota-capable credential after the file list has settled.
+  const pendingRefreshRef = useRef<{ tab: QuotaTabId; session: number } | null>(null);
+  const prevLoadingRef = useRef(loading);
+  // Which button started the batch in flight, so only that one spins.
+  const [refreshAction, setRefreshAction] = useState<'scope' | 'page' | null>(null);
+
+  useEffect(() => {
+    if (!batchLoading) setRefreshAction(null);
+  }, [batchLoading]);
+
+  // Reload the file list, then refresh the clicked tab's credentials.
   const handleRefreshAll = useCallback(() => {
     if (disableControls) return;
-    pendingRefreshRef.current = sessionGeneration;
+    pendingRefreshRef.current = { tab, session: sessionGeneration };
     void loadFiles();
-  }, [disableControls, loadFiles, sessionGeneration]);
+  }, [disableControls, loadFiles, sessionGeneration, tab]);
+
+  // Current page only: the cards are on screen and their list is settled, so
+  // this refetches exactly what is visible without a list round-trip.
+  const handleRefreshPage = useCallback(() => {
+    if (disableControls || loading || batchLoading) return;
+    setRefreshAction('page');
+    void loadQuota(pageItems.filter((entry) => !entry.file.disabled));
+  }, [batchLoading, disableControls, loadQuota, loading, pageItems]);
 
   useEffect(() => {
     const wasLoading = prevLoadingRef.current;
     prevLoadingRef.current = loading;
 
-    const requestedSession = pendingRefreshRef.current;
-    if (requestedSession === null) return;
-    if (requestedSession !== sessionGeneration) {
+    const requested = pendingRefreshRef.current;
+    if (requested === null) return;
+    if (requested.session !== sessionGeneration) {
       pendingRefreshRef.current = null;
       return;
     }
     if (loading || !wasLoading) return;
+    // Tab switched mid-flight: keep the intent pending and honor the tab the
+    // user is now looking at.
+    if (requested.tab !== tab) return;
 
     pendingRefreshRef.current = null;
     if (
       canRefreshQuotaAfterList(
-        requestedSession,
+        requested.session,
         sessionGeneration,
         filesGeneration,
         Boolean(error),
         disableControls
       )
     ) {
-      void loadQuota(entries);
+      // Targets come from the settled list, so credentials added while the
+      // refresh was in flight are included.
+      setRefreshAction('scope');
+      void loadQuota(refreshTargets);
     }
-  }, [disableControls, entries, error, filesGeneration, loading, loadQuota, sessionGeneration]);
+  }, [
+    disableControls,
+    error,
+    filesGeneration,
+    loading,
+    loadQuota,
+    refreshTargets,
+    sessionGeneration,
+    tab,
+  ]);
 
   useDevinQuotaAutoLoad(
     pageItems,
@@ -333,6 +368,11 @@ export function QuotaPage() {
   );
 
   const canUseActions = !disableControls && !loading && filesGeneration === sessionGeneration;
+
+  /* Each button spins for its own action only. Deriving it from card statuses
+   * would light both up whenever a scope refresh reaches the visible page. */
+  const pageRefreshing = batchLoading && refreshAction === 'page';
+  const scopeRefreshing = loading || (batchLoading && refreshAction === 'scope');
 
   /* ---------- Initial card animation ----------
    * Cards capture their delay on mount. Later tab, page, and refresh changes
@@ -361,13 +401,13 @@ export function QuotaPage() {
         totalCount={entries.length}
         loadedCount={loadedCount}
         attentionCount={attentionCount}
-        refreshing={loading || batchLoading}
-        disableControls={disableControls}
-        canRefreshPage={canUseActions && pageItems.length > 0}
-        onRefreshPage={() => {
-          if (canUseActions && !batchLoading) void loadQuota(pageItems);
-        }}
-        onRefreshAll={handleRefreshAll}
+        scopeRefreshing={scopeRefreshing}
+        pageRefreshing={pageRefreshing}
+        canRefreshScope={canUseActions && !batchLoading && refreshTargets.length > 0}
+        canRefreshPage={canUseActions && !batchLoading && pageItems.length > 0}
+        refreshScopeLabel={tab === 'all' ? t('auth_files.filter_all') : getTypeLabel(t, tab)}
+        onRefreshScope={handleRefreshAll}
+        onRefreshPage={handleRefreshPage}
       />
 
       <section className={styles.workbench}>
@@ -431,7 +471,7 @@ export function QuotaPage() {
                 entry={entry}
                 quota={getQuota(entry)}
                 resolvedTheme={resolvedTheme}
-                canRefresh={canUseActions && !entry.file.disabled}
+                canRefresh={canUseActions}
                 resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
                 entranceDelayMs={cardEntranceDelay(index)}
                 onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}

@@ -1635,7 +1635,7 @@
   "quota_management": {
     "title": "配額管理",
     "description": "集中查看 OAuth 配額與剩餘情況",
-    "refresh_all_credentials": "重新整理全部憑證",
+    "refresh_credentials": "重新整理{{scope}}憑證",
     "refresh_page_credentials": "重新整理本頁憑證",
     "refresh_files": "重新整理驗證檔案",
     "refresh_files_and_quota": "重新整理驗證檔案&配額",

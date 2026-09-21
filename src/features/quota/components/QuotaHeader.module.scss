@@ -82,28 +82,26 @@
   flex-shrink: 0;
 }
 
-.pageAction {
-  border-radius: $radius-full;
-  white-space: normal;
-}
-
-/* 墨色药丸主按钮（深色主题自动反相） */
+/* 两枚刷新药丸共用一套几何：同高、同字号、同图标间距，只换表面材质。
+ * 次按钮复用同款绘制但降成浅色药丸（而非凭证库那种纯文字链接）：窄屏上两个
+ * 按钮换行堆叠，纯文字会让次按钮不像按钮。此前用通用 Button 会高出主按钮
+ * 几像素、字号大一号，并排很明显。 */
+.secondaryAction,
 .primaryAction {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  border: 0;
+  border: 1px solid transparent;
   cursor: pointer;
-  background: var(--text-primary);
-  color: var(--bg-secondary);
   border-radius: $radius-full;
-  padding: 10px 18px;
+  padding: 9px 17px;
   font-size: 13.5px;
   font-weight: 600;
   line-height: 1;
   transition:
     transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out),
     background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
+    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
     box-shadow var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
 
   &:disabled {
@@ -121,12 +119,25 @@
   }
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .primaryAction:hover:not(:disabled) {
-    transform: translateY(-1px);
-    background: color-mix(in srgb, var(--text-primary) 86%, var(--bg-secondary));
-    box-shadow: 0 12px 26px color-mix(in srgb, var(--text-primary) 22%, transparent);
-  }
+/* 次按钮：同款药丸、浅一档的材质 */
+.secondaryAction {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+/* 作用域名可能很长（Charm Hyper），窄屏下让标签自己省略 */
+.actionLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 墨色药丸主按钮（深色主题自动反相） */
+.primaryAction {
+  background: var(--text-primary);
+  color: var(--bg-secondary);
 }
 
 .spinning {
@@ -139,6 +150,36 @@
   }
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .primaryAction:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: color-mix(in srgb, var(--text-primary) 86%, var(--bg-secondary));
+    box-shadow: 0 12px 26px color-mix(in srgb, var(--text-primary) 22%, transparent);
+  }
+
+  .secondaryAction:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: var(--border-hover);
+    background: var(--bg-hover, var(--bg-tertiary));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .secondaryAction,
+  .primaryAction {
+    transition: none;
+  }
+
+  .secondaryAction:active:not(:disabled),
+  .primaryAction:active:not(:disabled) {
+    transform: none;
+  }
+
+  .spinning {
+    animation: none;
+  }
+}
+
 @include mobile {
   .header {
     align-items: stretch;
@@ -148,18 +189,15 @@
   .actions {
     justify-content: flex-start;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
+  /* 触控目标下限 44px；桌面维持 34px 的紧凑药丸。两个按钮等宽并排，
+   * 窄到放不下时再换行堆叠。 */
+  .secondaryAction,
   .primaryAction {
-    transition: none;
-  }
-
-  .primaryAction:active:not(:disabled) {
-    transform: none;
-  }
-
-  .spinning {
-    animation: none;
+    min-height: 44px;
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 10px 16px;
+    font-size: 14px;
   }
 }

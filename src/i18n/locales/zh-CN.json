@@ -1628,7 +1628,7 @@
   "quota_management": {
     "title": "配额管理",
     "description": "集中查看 OAuth 额度与剩余情况",
-    "refresh_all_credentials": "刷新全部凭证",
+    "refresh_credentials": "刷新{{scope}}凭证",
     "refresh_files": "刷新认证文件",
     "refresh_files_and_quota": "刷新认证文件&额度",
     "refresh_page_credentials": "刷新当前页凭证",

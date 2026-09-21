@@ -811,19 +811,7 @@
     }
   }
 
-  @media (max-width: $breakpoint-mobile) {
-    position: fixed;
-    z-index: $z-dropdown;
-    left: 0;
-    top: var(--header-height);
-    bottom: 0;
-    transform: translateX(-100%);
-    box-shadow: $shadow-lg;
-
-    &.open {
-      transform: translateX(0);
-    }
-  }
+  /* 移动端的抽屉定位在文件末尾的 @media 块里（单处真相），此处不再重复。 */
 }
 
 .nav-tooltip {
@@ -1041,8 +1029,10 @@
   }
 
   .sidebar {
+    /* 从 header 下沿起：此处 top 一旦是 0，抽屉顶端就落进固定 header 之下，
+     * 首屏那几个导航项会被 header 盖住而滚不出来。 */
     position: fixed;
-    top: 0;
+    top: var(--header-height);
     bottom: 0;
     left: 0;
     z-index: $z-dropdown;
