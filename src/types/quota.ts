@@ -97,7 +97,15 @@ export interface UsageQuotaSharedPoolPayload {
   exhausted?: boolean | string | number | null;
 }
 
+export interface UsageQuotaGroupPayload {
+  label?: string | null;
+  models?: string[] | null;
+  /** Upstream bucket identifier; stable across label changes. */
+  key?: string | null;
+}
+
 export interface UsageQuotaResourcePayload {
+  group?: UsageQuotaGroupPayload | null;
   resource_type?: string | null;
   resourceType?: string | null;
   models?: string[] | null;
@@ -156,8 +164,20 @@ export interface UsageQuotaSharedPool {
   exhausted: boolean;
 }
 
+export interface UsageQuotaGroup {
+  label: string;
+  models: string[];
+  /** Upstream bucket identifier; stable across label changes. */
+  key?: string;
+}
+
 export interface UsageQuotaResource {
   resourceType?: string;
+  /**
+   * Present when the backend aggregated several models into one pool, carrying
+   * the provider's own grouping. Absent on per-model resources.
+   */
+  group?: UsageQuotaGroup;
   models?: string[];
   shared?: boolean;
   totalLimit: number | null;
@@ -348,6 +368,12 @@ export interface AntigravityQuotaGroup {
   id: string;
   label: string;
   description?: string;
+  /**
+   * Whether the label is the provider's own group name. When set with
+   * `description`, the row is rendered as the group's header line rather than
+   * as another quota bucket.
+   */
+  header?: boolean;
   models: string[];
   remainingFraction: number;
   remainingAmount?: number;
@@ -371,6 +397,12 @@ export interface AntigravityQuotaBucket {
   minimumAmount?: number;
   resetTime?: string;
   description?: string;
+  /**
+   * Longer label for the group's own models line. Rendered as the row's
+   * description when the bucket stands for the provider's group instead of a
+   * single model, so the card can show which models the row covers.
+   */
+  fullDescription?: string;
   /**
    * Reset instant in epoch ms, parsed from `resetTime`. Kept alongside the raw
    * string so the timeline can position a bar without re-parsing.

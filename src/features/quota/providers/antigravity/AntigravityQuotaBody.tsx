@@ -173,7 +173,15 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
             ANTIGRAVITY_GROUP_LABEL_KEYS,
             t
           );
-          const groupDescription = translateAntigravityQuotaDescription(group.description, t);
+          // A group the provider itself named already carries its own label, so
+          // the header row would repeat the model row verbatim. Its models line
+          // is what the reader needs instead.
+          const groupDescription = group.header
+            ? undefined
+            : translateAntigravityQuotaDescription(group.description, t);
+          const groupModelsLine = group.header
+            ? translateAntigravityQuotaDescription(group.buckets[0]?.fullDescription, t)
+            : undefined;
 
           return (
             <div key={group.id} className={classes.antigravityQuotaGroup}>
@@ -182,6 +190,11 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
                 {groupDescription && (
                   <span className={classes.antigravityQuotaGroupDescription}>
                     {groupDescription}
+                  </span>
+                )}
+                {groupModelsLine && (
+                  <span className={classes.antigravityQuotaGroupDescription}>
+                    {groupModelsLine}
                   </span>
                 )}
               </div>
@@ -195,15 +208,13 @@ export function AntigravityQuotaBody({ quota, classes }: QuotaBodyProps<Antigrav
                         percent: Math.round(percent),
                       });
                 const resetLabel = formatAntigravityResetLabel(bucket.resetTime, t, nowMs);
-                const bucketLabel = translateAntigravityQuotaLabel(
-                  bucket.label,
-                  ANTIGRAVITY_BUCKET_LABEL_KEYS,
-                  t
-                );
                 const bucketDescription = translateAntigravityQuotaDescription(
-                  bucket.description,
+                  bucket.fullDescription ?? bucket.description,
                   t
                 );
+                const bucketLabel = group.header
+                  ? t('antigravity_quota.weekly_limit')
+                  : translateAntigravityQuotaLabel(bucket.label, ANTIGRAVITY_BUCKET_LABEL_KEYS, t);
 
                 const soon = bucket.id === soonestRowId;
 

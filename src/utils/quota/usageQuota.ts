@@ -1,9 +1,11 @@
 import type {
+  AntigravityQuotaBucket,
   AntigravityQuotaGroup,
   AntigravityModelsPayload,
   KiroQuotaState,
   UsageQuotaEntitlementBreakdown,
   UsageQuotaEntitlementBreakdownPayload,
+  UsageQuotaGroup,
   UsageQuotaResource,
   UsageQuotaResourcePayload,
   UsageQuotaSharedPool,
@@ -11,6 +13,7 @@ import type {
   UsageQuotaSnapshot,
   UsageQuotaSnapshotPayload,
 } from '@/types';
+import i18n from '@/i18n';
 import { ANTIGRAVITY_QUOTA_GROUPS } from './constants';
 import { buildAntigravityQuotaGroups } from './builders';
 import { normalizeNumberValue, normalizeStringValue } from './parsers';
@@ -26,6 +29,20 @@ const normalizeBooleanValue = (value: unknown): boolean | null => {
     if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false;
   }
   return null;
+};
+
+/** Parse the optional `group` the backend attaches to aggregated resources. */
+const parseUsageQuotaResourceGroup = (
+  value: UsageQuotaResourcePayload['group']
+): UsageQuotaGroup | undefined => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const label = normalizeStringValue(value.label);
+  if (!label) return undefined;
+  return {
+    label,
+    models: normalizeStringList(value.models),
+    key: normalizeStringValue(value.key) ?? undefined,
+  };
 };
 
 const normalizeStringList = (value: unknown): string[] => {
@@ -149,6 +166,7 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
 
   return {
     resourceType,
+    group: parseUsageQuotaResourceGroup(payload.group),
     models,
     shared,
     totalLimit,
@@ -164,6 +182,46 @@ const parseUsageQuotaResource = (value: unknown): UsageQuotaResource | null => {
     modelScoped,
     usageUnknown,
     unlimited,
+  };
+};
+
+/**
+ * One row's worth of quota, derived from a resource's numbers.
+ *
+ * Returns null when the resource reports nothing usable, so callers can drop
+ * the row instead of rendering an empty meter.
+ */
+const usageQuotaResourceToAntigravityBucket = (
+  resource: UsageQuotaResource,
+  models: string[]
+): AntigravityQuotaBucket | null => {
+  const remaining = resource.remaining ?? (resource.exhausted ? 0 : null);
+  const inferredLimit =
+    resource.totalLimit ??
+    (remaining !== null && resource.currentUsage !== null
+      ? remaining + resource.currentUsage
+      : null);
+  if (remaining === null && inferredLimit === null) return null;
+
+  const remainingFraction =
+    inferredLimit !== null && inferredLimit > 0
+      ? Math.max(0, Math.min(1, (remaining ?? 0) / inferredLimit))
+      : remaining !== null && remaining > 0 && !resource.exhausted
+        ? 1
+        : 0;
+  const label = usageQuotaResourceLabel(resource.resourceType);
+
+  return {
+    id: `${usageQuotaResourceId(resource.resourceType)}-quota`,
+    label,
+    remainingFraction,
+    remainingAmount: remaining ?? undefined,
+    minimumAmount: resource.minimumCreditAmountForUsage ?? undefined,
+    resetTime: resource.resetAt,
+    fullDescription:
+      models.length > 0
+        ? i18n.t('antigravity_quota.group_models_description', { models: models.join(', ') })
+        : undefined,
   };
 };
 
@@ -226,6 +284,39 @@ const usageQuotaResourceToAntigravityModel = (
       remainingFraction: group.remainingFraction,
       resetTime,
     },
+  };
+};
+
+/**
+ * Render a resource that already carries the provider's grouping.
+ *
+ * The backend reports an aggregated pool as one resource whose `group` is the
+ * provider's own label and whose `models` are the names inside it. Without this
+ * the card would fall through to the per-resource path and label the row with
+ * the resource type, which duplicates the group it belongs to.
+ *
+ * Returns null when the resource has no grouping, so the caller keeps the
+ * model-name path for per-model snapshots.
+ */
+const usageQuotaResourceToReportedAntigravityGroup = (
+  resource: UsageQuotaResource
+): AntigravityQuotaGroup | null => {
+  const reported = resource.group;
+  const label = reported?.label?.trim();
+  if (!reported || !label) return null;
+
+  const models = reported.models ?? [];
+  const bucket = usageQuotaResourceToAntigravityBucket(resource, models);
+  if (!bucket) return null;
+
+  return {
+    id: usageQuotaResourceId(label),
+    label,
+    header: true,
+    models: models.length > 0 ? [...models] : [...(resource.models ?? [])],
+    remainingFraction: bucket.remainingFraction,
+    resetTime: resource.resetAt,
+    buckets: [bucket],
   };
 };
 
@@ -349,6 +440,17 @@ export const buildAntigravityQuotaGroupsFromUsageQuota = (
   if (!snapshot || !snapshot.known || snapshot.error) return [];
 
   if (snapshot.resources.length > 0) {
+    // The backend may already report the provider's own grouping on the
+    // resource. Those groups are authoritative: rendering them keeps the card
+    // identical to what the provider shows, and skips the model-name matching
+    // below that a group-scoped payload cannot satisfy.
+    const reportedGroups = snapshot.resources
+      .map((resource) => usageQuotaResourceToReportedAntigravityGroup(resource))
+      .filter((group): group is AntigravityQuotaGroup => group !== null);
+    if (reportedGroups.length === snapshot.resources.length) {
+      return reportedGroups;
+    }
+
     const groupedModels: AntigravityModelsPayload = {};
     const fallbackGroups: AntigravityQuotaGroup[] = [];
 
