@@ -107,6 +107,9 @@ const buildLegacyAntigravityGroupBucket = (
   label: group.label,
   remainingFraction: group.remainingFraction,
   resetTime: group.resetTime,
+  // Antigravity pools these models into one weekly limit, so the row carries a
+  // window: the reset countdown and the soonest-recovery ranking both need it.
+  periodHours: 24 * 7,
 });
 
 const buildAntigravityGroupsFromModels = (

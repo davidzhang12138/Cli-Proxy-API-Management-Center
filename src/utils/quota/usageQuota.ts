@@ -17,6 +17,7 @@ import i18n from '@/i18n';
 import { ANTIGRAVITY_QUOTA_GROUPS } from './constants';
 import { buildAntigravityQuotaGroups } from './builders';
 import { normalizeNumberValue, normalizeStringValue } from './parsers';
+import { periodHoursFromSeconds } from './resetInstants';
 
 type KiroQuotaData = Omit<KiroQuotaState, 'status' | 'error' | 'errorStatus'>;
 
@@ -218,6 +219,10 @@ const usageQuotaResourceToAntigravityBucket = (
     remainingAmount: remaining ?? undefined,
     minimumAmount: resource.minimumCreditAmountForUsage ?? undefined,
     resetTime: resource.resetAt,
+    // The reset countdown and the soonest-recovery ranking both need a window;
+    // it comes from the payload and falls back to the weekly default these
+    // aggregates always are.
+    periodHours: periodHoursFromSeconds(resource.windowSeconds) ?? 24 * 7,
     fullDescription:
       models.length > 0
         ? i18n.t('antigravity_quota.group_models_description', { models: models.join(', ') })

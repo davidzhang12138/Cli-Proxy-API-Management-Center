@@ -53,3 +53,12 @@ test('per-model snapshots still render one row per model', () => {
   });
   expect(groups.map((group) => group.label)).toEqual(['Claude/GPT', 'Gemini 3 Flash']);
 });
+
+// The reset countdown and the soonest-recovery ranking both need a window on
+// the row, and a grouped snapshot must supply one.
+test('grouped rows carry a weekly window', () => {
+  const groups = buildAntigravityQuotaGroupsFromUsageQuota(groupedSnapshot);
+  expect(groups[0].buckets[0].periodHours).toBe(24 * 7);
+  expect(typeof groups[0].buckets[0].fullDescription).toBe('string');
+  expect(groups[0].buckets[0].fullDescription).toContain('Gemini Flash');
+});
