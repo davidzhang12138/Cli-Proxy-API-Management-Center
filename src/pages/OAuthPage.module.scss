@@ -239,6 +239,14 @@
   gap: $spacing-sm;
 }
 
+/* 注册与登录两个动作并排；窄屏由 Card 头部改为纵向排列。 */
+.featuredActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
 .cardTitleIcon {
   width: 24px;
   height: 24px;

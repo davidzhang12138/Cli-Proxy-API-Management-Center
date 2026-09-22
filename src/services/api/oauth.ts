@@ -14,6 +14,7 @@ export type BuiltInOAuthProvider =
   | 'anthropic'
   | 'antigravity'
   | 'kimi'
+  | 'kimi-ai'
   | 'xai'
   | 'hyper'
   | 'cline'

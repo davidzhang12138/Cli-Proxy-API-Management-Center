@@ -14,6 +14,10 @@ import { normalizeApiBase } from '@/utils/connection';
 import { getErrorMessage, isRecord } from '@/utils/helpers';
 import { notifyAuthFilesChanged } from '@/features/authFiles/authFilesEvents';
 import { getPluginTitle, resolvePluginAssetURL } from '@/features/plugins/pluginResources';
+import {
+  KIMI_CHINESE_AFFILIATE_URL,
+  KIMI_INTERNATIONAL_AFFILIATE_URL,
+} from '@/features/providers/kimi';
 import type { PluginListEntry } from '@/types';
 import { createOAuthAttempts, type OAuthAttempt } from './oauthAttempts';
 import { validateDevinCallback } from './devinOAuth';
@@ -142,6 +146,18 @@ const PROVIDERS: BuiltInOAuthProviderCard[] = [
   },
   {
     kind: 'builtin',
+    id: 'kimi',
+    titleKey: 'auth_login.kimi_oauth_title',
+    icon: { light: iconKimiLight, dark: iconKimiDark },
+  },
+  {
+    kind: 'builtin',
+    id: 'kimi-ai',
+    titleKey: 'auth_login.kimi_ai_oauth_title',
+    icon: { light: iconKimiLight, dark: iconKimiDark },
+  },
+  {
+    kind: 'builtin',
     id: 'codex',
     titleKey: 'auth_login.codex_oauth_title',
     icon: iconCodex,
@@ -198,6 +214,7 @@ const BUILTIN_PROVIDER_TAB_TITLES: Record<BuiltInOAuthProvider, string> = {
   anthropic: 'Anthropic',
   antigravity: 'Antigravity',
   kimi: 'Kimi',
+  'kimi-ai': 'Kimi International',
   xai: 'xAI',
   hyper: 'Charm Hyper',
   cline: 'Cline',
@@ -885,6 +902,8 @@ export function OAuthPage() {
 
   const renderOAuthProvider = (provider: OAuthProviderCard) => {
     const state = states[provider.id] || {};
+    const showKimiSignUp =
+      provider.kind === 'builtin' && ['kimi', 'kimi-ai'].includes(provider.id);
     const canSubmitCallback =
       (provider.kind === 'plugin' || CALLBACK_SUPPORTED.has(provider.id)) && Boolean(state.url);
     const loginButtonLabel =
@@ -910,13 +929,34 @@ export function OAuthPage() {
         }
         subtitle={getProviderText(provider, 'oauth_hint')}
         extra={
-          <Button
-            onClick={() => startAuth(provider.id)}
-            loading={state.polling}
-            disabled={provider.id === 'devin' && Boolean(state.state)}
-          >
-            {loginButtonLabel}
-          </Button>
+          showKimiSignUp ? (
+            <div className={styles.featuredActions}>
+              <Button
+                onClick={() =>
+                  window.open(
+                    provider.id === 'kimi-ai'
+                      ? KIMI_INTERNATIONAL_AFFILIATE_URL
+                      : KIMI_CHINESE_AFFILIATE_URL,
+                    '_blank',
+                    'noopener,noreferrer'
+                  )
+                }
+              >
+                {t('auth_login.kimi_sign_up_button')}
+              </Button>
+              <Button onClick={() => startAuth(provider.id)} loading={state.polling}>
+                {loginButtonLabel}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={() => startAuth(provider.id)}
+              loading={state.polling}
+              disabled={provider.id === 'devin' && Boolean(state.state)}
+            >
+              {loginButtonLabel}
+            </Button>
+          )
         }
       >
         <div className={styles.cardContent}>
