@@ -9,8 +9,9 @@ const groupedSnapshot = {
   next_reset: '2026-09-29T03:28:49Z',
   resources: [
     {
-      group: { label: 'Gemini Models', models: ['Gemini Flash', 'Gemini Pro'] },
+      group: 'Gemini Models',
       resource_type: 'Gemini Models',
+      models: ['Gemini Flash', 'Gemini Pro'],
       shared: true,
       total_limit: 1,
       current_usage: 0,
@@ -19,8 +20,9 @@ const groupedSnapshot = {
       reset_at: '2026-09-29T03:28:49Z',
     },
     {
-      group: { label: 'Claude and GPT models', models: ['Claude Opus', 'Claude Sonnet', 'GPT-OSS'] },
+      group: 'Claude and GPT models',
       resource_type: 'Claude and GPT models',
+      models: ['Claude Opus', 'Claude Sonnet', 'GPT-OSS'],
       shared: true,
       total_limit: 1,
       current_usage: 0.49,

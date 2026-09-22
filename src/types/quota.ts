@@ -97,15 +97,13 @@ export interface UsageQuotaSharedPoolPayload {
   exhausted?: boolean | string | number | null;
 }
 
-export interface UsageQuotaGroupPayload {
-  label?: string | null;
-  models?: string[] | null;
-  /** Upstream bucket identifier; stable across label changes. */
-  key?: string | null;
-}
-
 export interface UsageQuotaResourcePayload {
-  group?: UsageQuotaGroupPayload | null;
+  /**
+   * The backend's grouping name when it aggregated several models into one
+   * pool. Distinct from the window key of the same name used by other
+   * providers' payloads, which is why it is only read as a string here.
+   */
+  group?: string | null;
   resource_type?: string | null;
   resourceType?: string | null;
   models?: string[] | null;
@@ -164,20 +162,14 @@ export interface UsageQuotaSharedPool {
   exhausted: boolean;
 }
 
-export interface UsageQuotaGroup {
-  label: string;
-  models: string[];
-  /** Upstream bucket identifier; stable across label changes. */
-  key?: string;
-}
-
 export interface UsageQuotaResource {
   resourceType?: string;
   /**
-   * Present when the backend aggregated several models into one pool, carrying
-   * the provider's own grouping. Absent on per-model resources.
+   * The backend's grouping name when it aggregated several models into one
+   * pool. Absent on per-model resources; distinct from the window key other
+   * providers send under the same name.
    */
-  group?: UsageQuotaGroup;
+  group?: string;
   models?: string[];
   shared?: boolean;
   totalLimit: number | null;

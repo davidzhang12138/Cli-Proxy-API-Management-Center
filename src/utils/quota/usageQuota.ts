@@ -5,7 +5,6 @@ import type {
   KiroQuotaState,
   UsageQuotaEntitlementBreakdown,
   UsageQuotaEntitlementBreakdownPayload,
-  UsageQuotaGroup,
   UsageQuotaResource,
   UsageQuotaResourcePayload,
   UsageQuotaSharedPool,
@@ -32,19 +31,10 @@ const normalizeBooleanValue = (value: unknown): boolean | null => {
   return null;
 };
 
-/** Parse the optional `group` the backend attaches to aggregated resources. */
+/** Read the optional grouping name the backend attaches to aggregated resources. */
 const parseUsageQuotaResourceGroup = (
   value: UsageQuotaResourcePayload['group']
-): UsageQuotaGroup | undefined => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-  const label = normalizeStringValue(value.label);
-  if (!label) return undefined;
-  return {
-    label,
-    models: normalizeStringList(value.models),
-    key: normalizeStringValue(value.key) ?? undefined,
-  };
-};
+): string | undefined => normalizeStringValue(value) ?? undefined;
 
 const normalizeStringList = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
@@ -307,10 +297,13 @@ const usageQuotaResourceToReportedAntigravityGroup = (
   resource: UsageQuotaResource
 ): AntigravityQuotaGroup | null => {
   const reported = resource.group;
-  const label = reported?.label?.trim();
-  if (!reported || !label) return null;
+  // `group` is the backend's own grouping name; snapshots from other providers
+  // (and non-Antigravity shapes) use the same key for the bucket's window, so
+  // only a string is a group here.
+  const label = typeof reported === 'string' ? reported.trim() : '';
+  if (!label) return null;
 
-  const models = reported.models ?? [];
+  const models = resource.models ?? [];
   const bucket = usageQuotaResourceToAntigravityBucket(resource, models);
   if (!bucket) return null;
 
