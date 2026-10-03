@@ -23,12 +23,26 @@ test('fork extensions keep their declared path and current connection authentica
   for (const origin of ['https://one.invalid/gateway', 'https://two.invalid/proxy']) {
     apiClient.setConfig({ apiBase: `${origin}/v8/management`, managementKey: 'fixture-only' });
     const adapter: AxiosAdapter = async (config) => {
-      expect(config.url).toBe(`${origin}/v0/management/auth-quotas`);
+      expect(config.baseURL).toBe(origin);
+      expect(config.url).toBe('/v0/management/auth-quotas');
       expect(config.headers.Authorization).toBe('Bearer fixture-only');
       return { data: {}, status: 200, statusText: 'OK', headers: {}, config };
     };
     await apiClient.get(apiClient.getExtensionUrl('/auth-quotas'), { adapter });
   }
+});
+
+test('an extension never sends a new connection key to the previous server', async () => {
+  apiClient.setConfig({ apiBase: 'https://old.invalid', managementKey: 'old-fixture' });
+  const adapter: AxiosAdapter = async (config) => {
+    expect(config.baseURL).toBe('https://new.invalid/gateway');
+    expect(config.url).toBe('/v0/management/auth-quotas');
+    expect(config.headers.Authorization).toBe('Bearer new-fixture');
+    return { data: {}, status: 200, statusText: 'OK', headers: {}, config };
+  };
+  const request = apiClient.get(apiClient.getExtensionUrl('/auth-quotas'), { adapter });
+  apiClient.setConfig({ apiBase: 'https://new.invalid/gateway', managementKey: 'new-fixture' });
+  await request;
 });
 
 test('routing strategy uses the v8 scalar config contract', async () => {

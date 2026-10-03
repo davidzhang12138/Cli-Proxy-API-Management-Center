@@ -58,7 +58,7 @@ class ApiClient {
 
   /** Fork-only HTTP extensions retain the paths declared by CLIProxyAPIPlus. */
   getExtensionUrl(path: string): string {
-    return `${this.apiBase.replace(/\/v8\/management$/, '')}/v0/management${path}`;
+    return `/v0/management${path}`;
   }
 
   private readHeader(headers: Record<string, unknown> | undefined, keys: string[]): string | null {
@@ -120,7 +120,9 @@ class ApiClient {
     this.instance.interceptors.request.use(
       (config) => {
         // 设置 baseURL
-        config.baseURL = this.apiBase;
+        config.baseURL = config.url?.startsWith('/v0/management/')
+          ? this.apiBase.replace(/\/v8\/management$/, '')
+          : this.apiBase;
 
         // 添加认证头
         if (this.managementKey) {
