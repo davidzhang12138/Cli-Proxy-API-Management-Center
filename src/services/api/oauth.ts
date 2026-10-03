@@ -81,14 +81,14 @@ export interface OAuthCancelResponse {
   cancelled: boolean;
 }
 
-const WEBUI_SUPPORTED = new Set<string>(['codex', 'anthropic', 'antigravity', 'xai', 'devin']);
+const WEBUI_SUPPORTED = new Set<string>(['codex', 'claude', 'antigravity', 'xai', 'devin']);
 
 const normalizeProviderForManagementPath = (provider: string): string => {
   const key = normalizeManagementOAuthProviderKey(provider);
   if (!isManagementOAuthProviderKey(key)) {
     throw new Error('Invalid OAuth provider');
   }
-  return key;
+  return key === 'anthropic' ? 'claude' : key;
 };
 
 export const oauthApi = {
@@ -98,7 +98,7 @@ export const oauthApi = {
     const resolved: OAuthStartOptions =
       options instanceof AbortSignal ? { signal: options } : (options ?? {});
     const providerKey = normalizeProviderForManagementPath(provider);
-    const params: Record<string, string | boolean> = {};
+    const params: Record<string, string | boolean> = { provider: providerKey };
     if (WEBUI_SUPPORTED.has(providerKey)) {
       params.is_webui = true;
     }
@@ -109,20 +109,20 @@ export const oauthApi = {
     if (proxyUrl) {
       params['proxy-url'] = proxyUrl;
     }
-    return apiClient.get<OAuthStartResponse>(`/${providerKey}-auth-url`, {
+    return apiClient.get<OAuthStartResponse>('/oauth/auth-url', {
       params: Object.keys(params).length ? params : undefined,
       ...(resolved.signal ? { signal: resolved.signal } : {}),
     });
   },
 
   getAuthStatus: (state: string, signal?: AbortSignal) =>
-    apiClient.get<{ status: 'ok' | 'wait' | 'error'; error?: string }>(`/get-auth-status`, {
+    apiClient.get<{ status: 'ok' | 'wait' | 'error'; error?: string }>(`/oauth/status`, {
       params: { state },
       ...(signal ? { signal } : {}),
     }),
 
   cancelSession: (state: string, signal?: AbortSignal) =>
-    apiClient.delete<OAuthCancelResponse>('/oauth-session', {
+    apiClient.delete<OAuthCancelResponse>('/oauth/session', {
       params: { state },
       ...(signal ? { signal } : {}),
     }),
@@ -130,7 +130,7 @@ export const oauthApi = {
   submitCallback: (provider: string, redirectUrl: string, signal?: AbortSignal) => {
     const providerKey = normalizeProviderForManagementPath(provider);
     return apiClient.post<OAuthCallbackResponse>(
-      '/oauth-callback',
+      '/oauth/callback',
       { provider: providerKey, redirect_url: redirectUrl },
       signal ? { signal } : undefined
     );
@@ -139,12 +139,12 @@ export const oauthApi = {
 
 export const freebuffAuthApi = {
   startAuth: (options?: FreebuffStartOptions) => {
-    const params: Record<string, string> = {};
+    const params: Record<string, string> = { provider: 'freebuff' };
     const proxyUrl = options?.proxyUrl?.trim();
     if (proxyUrl) {
       params['proxy-url'] = proxyUrl;
     }
-    return apiClient.get<FreebuffStartResponse>('/freebuff-auth-url', {
+    return apiClient.get<FreebuffStartResponse>('/oauth/auth-url', {
       params: Object.keys(params).length ? params : undefined,
       ...(options?.signal ? { signal: options.signal } : {}),
     });
@@ -160,10 +160,9 @@ export const freebuffAuthApi = {
     if (proxyUrl) {
       payload.proxy_url = proxyUrl;
     }
-    return apiClient.post<FreebuffStatusResponse>(
-      '/freebuff-auth-status',
-      payload,
-      signal ? { signal } : undefined
-    );
+    return apiClient.post<FreebuffStatusResponse>('/oauth/status', payload, {
+      params: { provider: 'freebuff' },
+      ...(signal ? { signal } : {}),
+    });
   },
 };

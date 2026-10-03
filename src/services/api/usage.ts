@@ -125,7 +125,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 export const normalizeModelPricesResponse = (response: unknown): Record<string, ModelPrice> => {
   const payload = isRecord(response)
-    ? response.model_prices ?? response.prices ?? response['model-prices'] ?? response
+    ? (response.model_prices ?? response.prices ?? response['model-prices'] ?? response)
     : null;
   if (!isRecord(payload)) {
     return {};
@@ -140,11 +140,7 @@ export const normalizeModelPricesResponse = (response: unknown): Record<string, 
     const prompt = Number(price.prompt);
     const completion = Number(price.completion);
     const cache = Number(price.cache);
-    if (
-      !Number.isFinite(prompt) &&
-      !Number.isFinite(completion) &&
-      !Number.isFinite(cache)
-    ) {
+    if (!Number.isFinite(prompt) && !Number.isFinite(completion) && !Number.isFinite(cache)) {
       return;
     }
 
@@ -186,7 +182,7 @@ export const usageApi = {
    * 获取使用统计原始数据
    */
   getUsage: (params?: UsageQueryParams) =>
-    apiClient.get<Record<string, unknown>>('/usage', {
+    apiClient.get<Record<string, unknown>>(apiClient.getExtensionUrl('/usage'), {
       timeout: USAGE_TIMEOUT_MS,
       params,
     }),
@@ -195,7 +191,7 @@ export const usageApi = {
    * 获取单个认证账号在当前配额窗口内的用量
    */
   getAuthUsage: (params: AuthUsageQueryParams) =>
-    apiClient.get<AuthUsageResponse>('/auth-usage', {
+    apiClient.get<AuthUsageResponse>(apiClient.getExtensionUrl('/auth-usage'), {
       timeout: USAGE_TIMEOUT_MS,
       params,
     }),
@@ -204,7 +200,7 @@ export const usageApi = {
    * 获取后端保存的模型价格配置
    */
   getModelPrices: () =>
-    apiClient.get<ModelPricesResponse>('/model-prices', {
+    apiClient.get<ModelPricesResponse>(apiClient.getExtensionUrl('/model-prices'), {
       timeout: USAGE_TIMEOUT_MS,
     }),
 
@@ -212,22 +208,31 @@ export const usageApi = {
    * 替换后端模型价格配置
    */
   replaceModelPrices: (prices: Record<string, ModelPrice>) =>
-    apiClient.put<ModelPricesResponse>('/model-prices', {
-      model_prices: prices,
-    }, {
-      timeout: USAGE_TIMEOUT_MS,
-    }),
+    apiClient.put<ModelPricesResponse>(
+      apiClient.getExtensionUrl('/model-prices'),
+      {
+        model_prices: prices,
+      },
+      {
+        timeout: USAGE_TIMEOUT_MS,
+      }
+    ),
 
   /**
    * 导出使用统计快照
    */
-  exportUsage: () => apiClient.get<UsageExportPayload>('/usage/export', { timeout: USAGE_TIMEOUT_MS }),
+  exportUsage: () =>
+    apiClient.get<UsageExportPayload>(apiClient.getExtensionUrl('/usage/export'), {
+      timeout: USAGE_TIMEOUT_MS,
+    }),
 
   /**
    * 导入使用统计快照
    */
   importUsage: (payload: unknown) =>
-    apiClient.post<UsageImportResponse>('/usage/import', payload, { timeout: USAGE_TIMEOUT_MS }),
+    apiClient.post<UsageImportResponse>(apiClient.getExtensionUrl('/usage/import'), payload, {
+      timeout: USAGE_TIMEOUT_MS,
+    }),
 
   /**
    * 计算密钥成功/失败统计，必要时会先获取 usage 数据
@@ -235,12 +240,15 @@ export const usageApi = {
   async getKeyStats(usageData?: unknown): Promise<KeyStats> {
     let payload = usageData;
     if (!payload) {
-      const response = await apiClient.get<Record<string, unknown>>('/usage', {
-        timeout: USAGE_TIMEOUT_MS,
-        params: { all: true } satisfies UsageQueryParams,
-      });
+      const response = await apiClient.get<Record<string, unknown>>(
+        apiClient.getExtensionUrl('/usage'),
+        {
+          timeout: USAGE_TIMEOUT_MS,
+          params: { all: true } satisfies UsageQueryParams,
+        }
+      );
       payload = response?.usage ?? response;
     }
     return computeKeyStats(payload);
-  }
+  },
 };

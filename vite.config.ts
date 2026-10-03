@@ -14,7 +14,10 @@ function getVersion(): string {
 
   // 2. Try git tag
   try {
-    const gitTag = execSync('git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo ""', { encoding: 'utf8' }).trim();
+    const gitTag = execSync(
+      'git describe --tags --exact-match 2>/dev/null || git describe --tags 2>/dev/null || echo ""',
+      { encoding: 'utf8' }
+    ).trim();
     if (gitTag) {
       return gitTag;
     }
@@ -40,8 +43,8 @@ export default defineConfig({
   plugins: [
     react(),
     viteSingleFile({
-      removeViteModuleLoader: true
-    })
+      removeViteModuleLoader: true,
+    }),
   ],
   // Dev-only: forward proxy calls to a local backend so the dev server is
   // same-origin and needs no connection settings. `bun run dev:mock` points
@@ -49,31 +52,31 @@ export default defineConfig({
   server: process.env.MOCK_API_TARGET
     ? {
         proxy: Object.fromEntries(
-          ['/v0', '/v1'].map((prefix) => [
+          ['/v0', '/v8', '/v1'].map((prefix) => [
             prefix,
-            { target: process.env.MOCK_API_TARGET, changeOrigin: true }
+            { target: process.env.MOCK_API_TARGET, changeOrigin: true },
           ])
-        )
+        ),
       }
     : undefined,
   define: {
-    __APP_VERSION__: JSON.stringify(getVersion())
+    __APP_VERSION__: JSON.stringify(getVersion()),
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src')
-    }
+      '@': path.resolve(__dirname, './src'),
+    },
   },
   css: {
     modules: {
       localsConvention: 'camelCase',
-      generateScopedName: '[name]__[local]___[hash:base64:5]'
+      generateScopedName: '[name]__[local]___[hash:base64:5]',
     },
     preprocessorOptions: {
       scss: {
-        additionalData: `@use "@/styles/variables.scss" as *;`
-      }
-    }
+        additionalData: `@use "@/styles/variables.scss" as *;`,
+      },
+    },
   },
   build: {
     target: 'es2020',
@@ -83,8 +86,8 @@ export default defineConfig({
     cssCodeSplit: false,
     rolldownOptions: {
       output: {
-        codeSplitting: false
-      }
-    }
-  }
+        codeSplitting: false,
+      },
+    },
+  },
 });

@@ -19,7 +19,9 @@ const openAIFormInput = (
   models: [],
   headers: [],
   excludedModelsText: '',
-  apiKeyEntries: [{ apiKey: '', existingApiKey: 'existing-key', disabled: false, proxyUrl: '' }],
+  apiKeyEntries: [
+    { sourceIndex: 0, apiKey: '', existingApiKey: 'existing-key', disabled: false, proxyUrl: '' },
+  ],
   ...overrides,
 });
 
@@ -57,16 +59,18 @@ describe('OpenAI compatibility quota backoff', () => {
   test('writes duration fields and removes deprecated seconds fields', async () => {
     let putData: unknown;
     apiClient.get = (async () => ({
-      'openai-compatibility': [
-        {
-          name: 'morphllm',
-          'base-url': 'https://morph.example.com/v1',
-          'api-key-entries': [{ 'api-key': 'existing-key', 'future-key-field': 'preserved' }],
-          'quota-backoff-min-seconds': 60,
-          'quota-backoff-max-seconds': 300,
-          'future-provider-field': 'preserved',
-        },
-      ],
+      'api-keys': {
+        'openai-compatibility': [
+          {
+            name: 'morphllm',
+            'base-url': 'https://morph.example.com/v1',
+            keys: [{ 'api-key': 'existing-key', 'future-key-field': 'preserved' }],
+            'quota-backoff-min-seconds': 60,
+            'quota-backoff-max-seconds': 300,
+            'future-provider-field': 'preserved',
+          },
+        ],
+      },
     })) as typeof apiClient.get;
     apiClient.put = (async (_url: string, data?: unknown) => {
       putData = data;
@@ -74,7 +78,8 @@ describe('OpenAI compatibility quota backoff', () => {
     }) as typeof apiClient.put;
 
     const config = buildOpenAIConfig(
-      openAIFormInput({ quotaBackoffMin: ' 1h ', quotaBackoffMax: ' 5h ' })
+      openAIFormInput({ quotaBackoffMin: ' 1h ', quotaBackoffMax: ' 5h ' }),
+      (await providersApi.getOpenAIProviders())[0]
     );
     await providersApi.updateOpenAIProvider('morphllm', 0, config);
 
@@ -82,7 +87,7 @@ describe('OpenAI compatibility quota backoff', () => {
       {
         name: 'morphllm',
         'base-url': 'https://morph.example.com/v1',
-        'api-key-entries': [{ 'api-key': 'existing-key', 'future-key-field': 'preserved' }],
+        keys: [{ 'api-key': 'existing-key', 'future-key-field': 'preserved' }],
         disabled: false,
         'quota-backoff-min': '1h',
         'quota-backoff-max': '5h',
@@ -94,18 +99,20 @@ describe('OpenAI compatibility quota backoff', () => {
   test('clears saved duration and deprecated seconds fields when inputs are blank', async () => {
     let putData: unknown;
     apiClient.get = (async () => ({
-      'openai-compatibility': [
-        {
-          name: 'morphllm',
-          'base-url': 'https://morph.example.com/v1',
-          'api-key-entries': [{ 'api-key': 'existing-key' }],
-          'quota-backoff-min': '1h',
-          'quota-backoff-max': '5h',
-          'quota-backoff-min-seconds': 60,
-          'quota-backoff-max-seconds': 300,
-          'future-provider-field': 'preserved',
-        },
-      ],
+      'api-keys': {
+        'openai-compatibility': [
+          {
+            name: 'morphllm',
+            'base-url': 'https://morph.example.com/v1',
+            keys: [{ 'api-key': 'existing-key' }],
+            'quota-backoff-min': '1h',
+            'quota-backoff-max': '5h',
+            'quota-backoff-min-seconds': 60,
+            'quota-backoff-max-seconds': 300,
+            'future-provider-field': 'preserved',
+          },
+        ],
+      },
     })) as typeof apiClient.get;
     apiClient.put = (async (_url: string, data?: unknown) => {
       putData = data;
@@ -114,13 +121,7 @@ describe('OpenAI compatibility quota backoff', () => {
 
     const config = buildOpenAIConfig(
       openAIFormInput({ quotaBackoffMin: '   ', quotaBackoffMax: '' }),
-      {
-        name: 'morphllm',
-        baseUrl: 'https://morph.example.com/v1',
-        apiKeyEntries: [{ apiKey: 'existing-key' }],
-        quotaBackoffMin: '1h',
-        quotaBackoffMax: '5h',
-      }
+      (await providersApi.getOpenAIProviders())[0]
     );
     await providersApi.updateOpenAIProvider('morphllm', 0, config);
 
@@ -128,7 +129,7 @@ describe('OpenAI compatibility quota backoff', () => {
       {
         name: 'morphllm',
         'base-url': 'https://morph.example.com/v1',
-        'api-key-entries': [{ 'api-key': 'existing-key' }],
+        keys: [{ 'api-key': 'existing-key' }],
         disabled: false,
         'future-provider-field': 'preserved',
       },

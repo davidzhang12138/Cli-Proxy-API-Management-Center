@@ -99,7 +99,7 @@ describe('benchmark wire requests', () => {
       });
       expect(response.answer).toBe('ok');
       expect(request).toEqual({
-        url: '/auth-files/benchmark',
+        url: apiClient.getExtensionUrl('/auth-files/benchmark'),
         data: expect.objectContaining({
           auth_index: 'compat-auth-1',
           model: 'openai/gpt-4o',

@@ -5,6 +5,7 @@
 import { apiClient } from './client';
 import type { Config } from '@/types';
 import { normalizeConfigResponse } from './transformers';
+import { getConfigValue } from './configValue';
 
 export const configApi = {
   /**
@@ -16,17 +17,15 @@ export const configApi = {
   },
 
   async getRoutingStrategy(): Promise<string> {
-    const raw = await apiClient.get<{ strategy?: unknown }>('/routing/strategy');
-    return typeof raw?.strategy === 'string' && raw.strategy.trim()
-      ? raw.strategy.trim()
-      : 'round-robin';
+    const raw = await getConfigValue<unknown>('/config/routing/strategy', 'round-robin');
+    return typeof raw === 'string' && raw.trim() ? raw.trim() : 'round-robin';
   },
 
-  updateRoutingStrategy: (strategy: string) =>
-    apiClient.put('/routing/strategy', { value: strategy }),
+  updateRoutingStrategy: (strategy: string) => apiClient.put('/config/routing/strategy', strategy),
 
   /**
    * 请求日志开关
    */
-  updateRequestLog: (enabled: boolean) => apiClient.put('/request-log', { value: enabled }),
+  updateRequestLog: (enabled: boolean) =>
+    apiClient.put('/config/observability/logs/request-log', enabled),
 };

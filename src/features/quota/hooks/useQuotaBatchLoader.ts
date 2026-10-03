@@ -15,7 +15,8 @@ import { getStatusFromError } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import type { QuotaFileEntry } from '../logic';
 import { QUOTA_BATCH_CONCURRENCY } from '../constants';
-import { QUOTA_ADAPTERS, getQuotaSetter } from '../providers';
+import { QUOTA_ADAPTERS, getQuotaMap, getQuotaSetter } from '../providers';
+import { enrichQuotaInBackground } from '../quotaEnrichment';
 import type { QuotaProviderType } from '../providers/types';
 
 interface BatchFetchResult {
@@ -130,6 +131,7 @@ export function useQuotaBatchLoader() {
         resultsByType.forEach((typeResults, type) => {
           const adapter = QUOTA_ADAPTERS[type];
           const setQuota = getQuotaSetter(adapter);
+          const committedKeys = new Set<string>();
           setQuota((prev) => {
             const nextState = { ...prev };
             typeResults.forEach((result) => {
@@ -143,11 +145,21 @@ export function useQuotaBatchLoader() {
                           result.error || t('common.unknown_error'),
                           result.errorStatus
                         );
+                  committedKeys.add(result.cacheKey);
                 },
                 result.name
               );
             });
             return nextState;
+          });
+          const resultsByKey = new Map(typeResults.map((result) => [result.cacheKey, result]));
+          (entriesByType.get(type) ?? []).forEach(({ file }) => {
+            const cacheKey = getQuotaCacheKey(file);
+            const result = resultsByKey.get(cacheKey);
+            const state = committedKeys.has(cacheKey) ? getQuotaMap(adapter)[cacheKey] : undefined;
+            if (result?.status === 'success' && state) {
+              void enrichQuotaInBackground(adapter, file, result.data, state, t);
+            }
           });
         });
       } finally {

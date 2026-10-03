@@ -131,7 +131,10 @@ export const getRoutingCandidatePriority = (
   const override = candidate.modelPriorities[model];
   if (hasModelPriority(candidate.modelPriorities, model)) return Math.trunc(override);
   const inherited = candidate.inheritedModelPriorities?.[model];
-  if (typeof inherited === 'number' && hasModelPriority(candidate.inheritedModelPriorities, model)) {
+  if (
+    typeof inherited === 'number' &&
+    hasModelPriority(candidate.inheritedModelPriorities, model)
+  ) {
     return Math.trunc(inherited);
   }
   return candidate.priority;
@@ -223,7 +226,8 @@ const candidateServesModel = (
   candidate: RoutingCandidate,
   model: string,
   coverage: string[]
-): boolean => (candidate.models.length === 0 ? coverage.includes(model) : candidate.models.includes(model));
+): boolean =>
+  candidate.models.length === 0 ? coverage.includes(model) : candidate.models.includes(model);
 
 const isRuntimeOnly = (file: AuthFileItem): boolean =>
   file.runtimeOnly === true || file.runtimeOnly === 'true';
@@ -329,15 +333,13 @@ const buildOAuthCandidate = (file: AuthFileItem): RoutingCandidate => {
       await authFilesApi.patchFields(file.name, {
         ...(next.priority === undefined ? {} : { priority: next.priority }),
         ...(next.weight === undefined ? {} : { weight: next.weight }),
-        ...(next.modelPriorities === undefined
-          ? {}
-          : { model_priorities: next.modelPriorities }),
+        ...(next.modelPriorities === undefined ? {} : { model_priorities: next.modelPriorities }),
       });
     },
   };
 };
 
-const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCandidate[] => {
+export const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCandidate[] => {
   const sourceIndex = provider.sourceIndex ?? 0;
   const entries = provider.apiKeyEntries ?? [];
   const providerModels = modelNames(provider.models);
@@ -347,7 +349,9 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
     const identity = apiKey ? maskApiKey(apiKey) : provider.name;
     const enabled = provider.disabled !== true && entry?.disabled !== true;
     const models = entry?.models?.length ? modelNames(entry.models) : providerModels;
-    const modelPriorities = entry ? entry.modelPriorities ?? {} : provider.modelPriorities ?? {};
+    const modelPriorities = entry
+      ? (entry.modelPriorities ?? {})
+      : (provider.modelPriorities ?? {});
     const inheritedModelPriorities = entry ? provider.modelPriorities : undefined;
 
     return {
@@ -360,15 +364,13 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
       models,
       priority: effectivePriority(provider.priority),
       modelPriorities,
-      ...(inheritedModelPriorities
-        ? { inheritedModelPriorities }
-        : {}),
+      ...(inheritedModelPriorities ? { inheritedModelPriorities } : {}),
       weight: effectiveWeight(entry?.weight),
       enabled,
       status: enabled ? 'ready' : 'disabled',
       editable: true,
       update: async (next) => {
-        const nextEntries = entries.map((current, currentIndex) =>
+        const nextEntries = provider.apiKeyEntries.map((current, currentIndex) =>
           currentIndex === entryIndex
             ? {
                 ...current,
@@ -381,7 +383,7 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
               }
             : current
         );
-        await providersApi.updateOpenAIProvider(provider.name, sourceIndex, {
+        const saved = await providersApi.updateOpenAIProvider(provider.name, sourceIndex, {
           ...provider,
           ...(next.priority === undefined
             ? {}
@@ -391,6 +393,7 @@ const buildOpenAICompatCandidates = (provider: OpenAIProviderConfig): RoutingCan
             : { modelPriorities: next.modelPriorities }),
           apiKeyEntries: nextEntries,
         });
+        Object.assign(provider, saved);
       },
     };
   };
@@ -420,8 +423,7 @@ const groupRecords = (candidates: RoutingCandidate[], catalog?: string[]): Group
         candidates: groupCandidates,
         models: coverage,
         priority: Math.max(...groupCandidates.map((candidate) => candidate.priority), 0),
-        uniformPriority:
-          new Set(groupCandidates.map((candidate) => candidate.priority)).size <= 1,
+        uniformPriority: new Set(groupCandidates.map((candidate) => candidate.priority)).size <= 1,
         editable: groupCandidates.some((candidate) => candidate.editable),
         updatePriority: async (priority: number) => {
           const tasks = groupCandidates
@@ -464,8 +466,7 @@ const groupRecords = (candidates: RoutingCandidate[], catalog?: string[]): Group
         updateModelPriority: async (model: string, priority: number | null) => {
           const tasks = groupCandidates
             .filter(
-              (candidate) =>
-                candidate.editable && candidateServesModel(candidate, model, coverage)
+              (candidate) => candidate.editable && candidateServesModel(candidate, model, coverage)
             )
             .map((candidate) => {
               const modelPriorities = nextModelPriorities(
@@ -677,8 +678,7 @@ export function useRoutingWorkbench(): UseRoutingWorkbenchResult {
         resolved.map(([provider, models]) => [
           provider,
           models.filter(
-            (model) =>
-              !isModelExcluded(model, provider, excluded) && (!served || served.has(model))
+            (model) => !isModelExcluded(model, provider, excluded) && (!served || served.has(model))
           ),
         ])
       );

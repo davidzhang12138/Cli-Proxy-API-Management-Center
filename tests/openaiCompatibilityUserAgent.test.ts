@@ -15,12 +15,12 @@ const formInput = (forwardUserAgent = false): ProviderEntryFormInput => ({
   proxyUrl: '',
   prefix: '',
   disabled: false,
-  disableCooling: false,
+  disableCooling: undefined,
   forwardUserAgent,
   models: [],
   headers: [],
   excludedModelsText: '',
-  apiKeyEntries: [{ apiKey: 'key', disabled: false, proxyUrl: '' }],
+  apiKeyEntries: [{ sourceIndex: 0, apiKey: 'key', disabled: false, proxyUrl: '' }],
 });
 
 afterEach(() => {
@@ -47,27 +47,33 @@ describe('OpenAI compatibility User-Agent forwarding', () => {
   test('writes and clears the backend field', async () => {
     let putData: unknown;
     apiClient.get = (async () => ({
-      'openai-compatibility': [
-        {
-          name: 'compat',
-          'base-url': 'https://compat.example.com/v1',
-          'api-key-entries': [{ 'api-key': 'key' }],
-          'forward-user-agent': true,
-        },
-      ],
+      'api-keys': {
+        'openai-compatibility': [
+          {
+            name: 'compat',
+            'base-url': 'https://compat.example.com/v1',
+            keys: [{ 'api-key': 'key' }],
+            'forward-user-agent': true,
+          },
+        ],
+      },
     })) as typeof apiClient.get;
     apiClient.put = (async (_url: string, data?: unknown) => {
       putData = data;
       return undefined;
     }) as typeof apiClient.put;
 
-    await providersApi.updateOpenAIProvider('compat', 0, buildOpenAIConfig(formInput(false)));
+    await providersApi.updateOpenAIProvider(
+      'compat',
+      0,
+      buildOpenAIConfig(formInput(false), (await providersApi.getOpenAIProviders())[0])
+    );
 
     expect(putData).toEqual([
       {
         name: 'compat',
         'base-url': 'https://compat.example.com/v1',
-        'api-key-entries': [{ 'api-key': 'key' }],
+        keys: [{ 'api-key': 'key' }],
         disabled: false,
       },
     ]);

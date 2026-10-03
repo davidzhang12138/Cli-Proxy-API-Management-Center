@@ -271,15 +271,18 @@ const runAuthFileBenchmark = async (
     throw new Error('Auth file target is missing its identity');
   }
 
-  const result = await apiClient.post<AuthFileBenchmarkPayload>('/auth-files/benchmark', {
-    ...(authFileName ? { name: authFileName } : {}),
-    ...(authIndex ? { auth_index: authIndex } : {}),
-    model: options.model,
-    prompt: options.prompt,
-    system_prompt: options.systemPrompt,
-    thinking_level: options.thinkingLevel,
-    max_tokens: options.maxOutputTokens,
-  });
+  const result = await apiClient.post<AuthFileBenchmarkPayload>(
+    apiClient.getExtensionUrl('/auth-files/benchmark'),
+    {
+      ...(authFileName ? { name: authFileName } : {}),
+      ...(authIndex ? { auth_index: authIndex } : {}),
+      model: options.model,
+      prompt: options.prompt,
+      system_prompt: options.systemPrompt,
+      thinking_level: options.thinkingLevel,
+      max_tokens: options.maxOutputTokens,
+    }
+  );
   const body = result.body ?? result.body_text;
   const statusCode = Number(result.status_code ?? 0);
   if (result.available !== true || (statusCode >= 300 && statusCode > 0)) {
@@ -370,7 +373,10 @@ export async function runBenchmarkRequest(
   // Config-backed OpenAI-compatible credentials have a synthesized auth file
   // and a stable auth index. Use CPA's pinned executor for them so provider
   // payload rules and native reasoning adaptation run before the upstream call.
-  if (options.target.source === 'oauth' || (options.target.source === 'openai-compat' && options.target.authIndex)) {
+  if (
+    options.target.source === 'oauth' ||
+    (options.target.source === 'openai-compat' && options.target.authIndex)
+  ) {
     return runAuthFileBenchmark(options);
   }
 

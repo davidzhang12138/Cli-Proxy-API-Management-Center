@@ -14,7 +14,9 @@ const assertEqual = (actual: unknown, expected: unknown, message: string) => {
 };
 
 const resolve = (provider: Record<string, unknown>) => {
-  const cfg = normalizeConfigResponse({ 'openai-compatibility': [provider] });
+  const cfg = normalizeConfigResponse({
+    'api-keys': { 'openai-compatibility': [{ keys: [], ...provider }] },
+  });
   const entry = cfg.openaiCompatibility?.[0];
   return { min: entry?.quotaBackoffMin, max: entry?.quotaBackoffMax };
 };

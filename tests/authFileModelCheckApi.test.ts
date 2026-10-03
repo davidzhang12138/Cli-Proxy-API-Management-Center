@@ -18,7 +18,7 @@ test('checks an OAuth model with the stable auth index', async () => {
   const result = await authFilesApi.checkModel('codex-user.json', 'gpt-5.6-sol', 'auth-123');
 
   expect(request).toEqual({
-    url: '/auth-files/model-check',
+    url: apiClient.getExtensionUrl('/auth-files/model-check'),
     data: {
       name: 'codex-user.json',
       model: 'gpt-5.6-sol',

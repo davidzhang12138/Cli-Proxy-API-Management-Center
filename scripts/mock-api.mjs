@@ -11,45 +11,70 @@ import { createServer } from 'node:http';
 const PORT = Number(process.env.MOCK_API_PORT ?? 8317);
 
 const CONFIG = {
-  'routing-strategy': 'round-robin',
-  // Exercises exclusion filtering: an exact id and a wildcard.
-  'oauth-excluded-models': {
-    claude: ['claude-sonnet-4-6'],
-    gemini: ['gemini-3-flash*'],
-  },
-  'codex-api-key': [
-    { 'api-key': 'sk-codex-aaaaaaaaAAAAAAAAAAAAAAAA', priority: 5, 'base-url': 'https://codex.example.com' },
-    { 'api-key': 'sk-codex-bbbbbbbbBBBBBBBBBBBBBBBB', priority: 5 },
-  ],
-  'claude-api-key': [
-    { 'api-key': 'sk-ant-ccccccccCCCCCCCCCCCCCCCC', priority: 7 },
-    { 'api-key': 'sk-ant-ddddddddDDDDDDDDDDDDDDDD', priority: 7 },
-    { 'api-key': 'sk-ant-eeeeeeeeEEEEEEEEEEEEEEEE', priority: 2 },
-  ],
-  'gemini-api-key': [
-    { 'api-key': 'AIzaSyGeminiKEY1111111111111111111', priority: 4, weight: 2 },
-  ],
-  // excluded models `*` is how a config-declared key is disabled, so a provider
-  // whose only key carries it must drop out of the pool entirely.
-  'xai-api-key': [
-    { 'api-key': 'xai-1111111111111111111111111111', priority: 1, 'excluded-models': ['*'] },
-  ],
-  'openai-compatibility': [
-    {
-      name: 'hypercharm',
-      'base-url': 'https://api.hypercharm.example.com',
-      'api-key-entries': [
-        { 'api-key': 'sk-hc-111111111111111111111111', weight: 3 },
-        { 'api-key': 'sk-hc-222222222222222222222222', weight: 1 },
-      ],
-      models: [{ name: 'deepseek-v4-pro', alias: 'deepseek-v4-pro' }],
+  access: { 'api-keys': ['fixture-client-key'] },
+  routing: { strategy: 'round-robin' },
+  oauth: {
+    // Exercises exact and wildcard exclusions.
+    'excluded-models': { claude: ['claude-sonnet-4-6'], gemini: ['gemini-3-flash*'] },
+    'model-alias': {
+      claude: [{ name: 'claude-opus-4-6', alias: 'claude-opus-4-6-thinking' }],
     },
-  ],
+  },
+  'api-keys': {
+    codex: [
+      {
+        name: 'codex-team',
+        'base-url': 'https://codex.example.com',
+        keys: [
+          { 'api-key': 'fixture-codex-a', priority: 5 },
+          { 'api-key': 'fixture-codex-b', priority: 5 },
+        ],
+      },
+    ],
+    claude: [
+      {
+        name: 'claude-team',
+        keys: [
+          { 'api-key': 'fixture-claude-a', priority: 7 },
+          { 'api-key': 'fixture-claude-b', priority: 7 },
+          { 'api-key': 'fixture-claude-c', priority: 2 },
+        ],
+      },
+    ],
+    gemini: [
+      {
+        name: 'gemini-team',
+        keys: [{ 'api-key': 'fixture-gemini', priority: 4, weight: 2 }],
+      },
+    ],
+    xai: [
+      {
+        name: 'xai-disabled',
+        keys: [{ 'api-key': 'fixture-xai', priority: 1, 'excluded-models': ['*'] }],
+      },
+    ],
+    'openai-compatibility': [
+      {
+        name: 'hypercharm',
+        'base-url': 'https://api.hypercharm.example.com',
+        keys: [
+          { 'api-key': 'fixture-compatible-a', weight: 3 },
+          { 'api-key': 'fixture-compatible-b', weight: 1 },
+        ],
+        models: [{ name: 'deepseek-v4-pro', alias: 'deepseek-v4-pro' }],
+      },
+    ],
+  },
 };
 
 const AUTH_FILES = {
   files: [
-    { name: 'antigravity-acct.json', type: 'gemini', email: 'antigravity@example.com', priority: 9 },
+    {
+      name: 'antigravity-acct.json',
+      type: 'gemini',
+      email: 'antigravity@example.com',
+      priority: 9,
+    },
     { name: 'codex-team.json', type: 'codex', email: 'codex@example.com', priority: 5 },
     { name: 'freebuff.json', type: 'claude', email: 'freebuff@example.com', priority: 0 },
     { name: 'hyper.json', type: 'gemini', email: 'hyper@example.com', disabled: true },
@@ -97,16 +122,12 @@ const PROVIDER_MODELS = {
   openai: ['deepseek-v4-pro'],
 };
 
-const OAUTH_ALIASES = {
-  claude: [{ name: 'claude-opus-4-6', alias: 'claude-opus-4-6-thinking' }],
-};
-
 const json = (res, payload, status = 200) => {
   const body = JSON.stringify(payload);
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(body),
-    'X-CPA-Version': '1.4.2-mock',
+    'X-CPA-Version': 'v8.0.0-mock',
     'X-CPA-Support-Plugin': 'true',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': '*',
@@ -140,11 +161,15 @@ const server = createServer(async (req, res) => {
       console.log(`GET model-definitions/${provider}`);
       return json(res, { models: (PROVIDER_MODELS[provider] ?? []).map((id) => ({ id })) });
     }
-    if (path.endsWith('/auth-files')) return json(res, AUTH_FILES);
+    if (path.endsWith('/credentials')) return json(res, AUTH_FILES);
     if (path.endsWith('/auth-quotas')) return json(res, { quotas: {} });
-    if (path.endsWith('/api-keys')) return json(res, { 'api-keys': ['sk-mgmt-mock'] });
-    if (path.endsWith('/oauth-model-alias')) return json(res, OAUTH_ALIASES);
-    if (path.endsWith('/routing/strategy')) return json(res, { strategy: CONFIG['routing-strategy'] });
+    if (path.startsWith('/v8/management/config/')) {
+      const fields = path.slice('/v8/management/config/'.length).split('/').map(decodeURIComponent);
+      const value = fields.reduce((current, field) => current?.[field], CONFIG);
+      return value === undefined
+        ? json(res, { error: { code: 'not_found', message: 'Config value not found' } }, 404)
+        : json(res, value);
+    }
     if (path === '/v1/models') return json(res, { data: SERVED.map((id) => ({ id })) });
     if (path.endsWith('/models')) return json(res, { data: CATALOG.map((id) => ({ id })) });
     return json(res, {});
@@ -152,30 +177,25 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'PUT') {
     const payload = await readBody(req);
-    const section = path.split('/').pop();
-    if (section === 'strategy') {
-      CONFIG['routing-strategy'] = payload.value ?? 'round-robin';
-      console.log(`PUT strategy -> ${CONFIG['routing-strategy']}`);
-    } else if (Array.isArray(payload) && section in CONFIG) {
-      CONFIG[section] = payload;
-      console.log(`PUT ${section} -> ${payload.length} entries`);
-      for (const item of payload) {
-        const shown = {};
-        for (const key of ['api-key', 'priority', 'weight']) {
-          if (key in item) shown[key] = item[key];
-        }
-        if (Object.keys(shown).length) console.log('   ', JSON.stringify(shown));
-      }
+    if (path.startsWith('/v8/management/config/')) {
+      const fields = path.slice('/v8/management/config/'.length).split('/').map(decodeURIComponent);
+      const field = fields.pop();
+      const parent = fields.reduce((current, key) => (current[key] ??= {}), CONFIG);
+      parent[field] = payload;
+      console.log(`PUT config/${[...fields, field].join('/')}`);
     }
     return json(res, {});
   }
 
   if (req.method === 'PATCH') {
     const payload = await readBody(req);
-    if (path.endsWith('/auth-files/fields')) {
+    if (path.endsWith('/credentials/fields')) {
       const file = AUTH_FILES.files.find((item) => item.name === payload.name);
       if (file) {
-        Object.assign(file, Object.fromEntries(Object.entries(payload).filter(([k]) => k !== 'name')));
+        Object.assign(
+          file,
+          Object.fromEntries(Object.entries(payload).filter(([k]) => k !== 'name'))
+        );
         console.log(`PATCH ${file.name} -> priority=${file.priority} weight=${file.weight}`);
       }
     }

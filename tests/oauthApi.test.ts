@@ -35,8 +35,8 @@ describe('OAuth management API', () => {
     });
 
     expect(request).toEqual({
-      url: '/hyper-auth-url',
-      config: { params: { 'proxy-url': 'socks5://127.0.0.1:1080' }, signal },
+      url: '/oauth/auth-url',
+      config: { params: { provider: 'hyper', 'proxy-url': 'socks5://127.0.0.1:1080' }, signal },
     });
     expect(response).toMatchObject({
       state: 'hyp-123',
@@ -58,7 +58,7 @@ describe('OAuth management API', () => {
     await oauthApi.getAuthStatus('hyp-123');
 
     expect(request).toEqual({
-      url: '/get-auth-status',
+      url: '/oauth/status',
       config: { params: { state: 'hyp-123' } },
     });
   });
@@ -84,8 +84,8 @@ describe('OAuth management API', () => {
     });
 
     expect(request).toEqual({
-      url: '/cline-auth-url',
-      config: { params: { 'proxy-url': 'socks5://127.0.0.1:1080' } },
+      url: '/oauth/auth-url',
+      config: { params: { provider: 'cline', 'proxy-url': 'socks5://127.0.0.1:1080' } },
     });
     expect(response).toMatchObject({
       state: 'cline-123',
@@ -96,7 +96,7 @@ describe('OAuth management API', () => {
     });
   });
 
-  test('keeps the existing Freebuff start and dedicated status contracts intact', async () => {
+  test('keeps the Freebuff fingerprint polling payload on the v8 endpoints', async () => {
     const signal = new AbortController().signal;
     const calls: Array<{ method: string; url: string; data?: unknown; config?: unknown }> = [];
     apiClient.get = (async (url: string, config?: unknown) => {
@@ -128,13 +128,13 @@ describe('OAuth management API', () => {
     expect(calls).toEqual([
       {
         method: 'GET',
-        url: '/freebuff-auth-url',
-        config: { params: { 'proxy-url': 'direct' }, signal },
+        url: '/oauth/auth-url',
+        config: { params: { provider: 'freebuff', 'proxy-url': 'direct' }, signal },
       },
       {
         method: 'POST',
-        url: '/freebuff-auth-status',
-        config: { signal },
+        url: '/oauth/status',
+        config: { params: { provider: 'freebuff' }, signal },
         data: {
           fingerprintId: 'fingerprint-id',
           fingerprintHash: 'fingerprint-hash',

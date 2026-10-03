@@ -144,6 +144,9 @@ const stampQuotaMap = <T extends TimedQuotaState>(
       }
 
       const prevValue = prevMap[key];
+      if (prevValue === value && isFreshQuotaState(value, now)) {
+        return [[key, value]];
+      }
       const cachedAt =
         prevValue === value && isFreshQuotaState(prevValue, now) ? prevValue._cachedAt : now;
       const normalizedCachedAt =
