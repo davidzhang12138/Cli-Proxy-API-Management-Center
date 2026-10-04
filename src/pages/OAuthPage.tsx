@@ -34,6 +34,7 @@ import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconFreebuff from '@/assets/icons/freebuff.svg';
 import iconCrush from '@/assets/icons/crush.png';
+import iconContextCode from '@/assets/icons/context-code.svg';
 import iconCline from '@/assets/icons/cline.svg';
 import iconDevin from '@/assets/icons/devin.svg';
 import iconDevinDark from '@/assets/icons/devin-dark.svg';
@@ -194,6 +195,12 @@ const PROVIDERS: BuiltInOAuthProviderCard[] = [
   },
   {
     kind: 'builtin',
+    id: 'context-code',
+    titleKey: 'auth_login.context_code_oauth_title',
+    icon: iconContextCode,
+  },
+  {
+    kind: 'builtin',
     id: 'cline',
     titleKey: 'auth_login.cline_oauth_title',
     icon: iconCline,
@@ -217,6 +224,7 @@ const BUILTIN_PROVIDER_TAB_TITLES: Record<BuiltInOAuthProvider, string> = {
   'kimi-ai': 'Kimi International',
   xai: 'xAI',
   hyper: 'Charm Hyper',
+  'context-code': 'Context Code',
   cline: 'Cline',
   meta: 'Meta',
 };
@@ -902,8 +910,7 @@ export function OAuthPage() {
 
   const renderOAuthProvider = (provider: OAuthProviderCard) => {
     const state = states[provider.id] || {};
-    const showKimiSignUp =
-      provider.kind === 'builtin' && ['kimi', 'kimi-ai'].includes(provider.id);
+    const showKimiSignUp = provider.kind === 'builtin' && ['kimi', 'kimi-ai'].includes(provider.id);
     const canSubmitCallback =
       (provider.kind === 'plugin' || CALLBACK_SUPPORTED.has(provider.id)) && Boolean(state.url);
     const loginButtonLabel =
