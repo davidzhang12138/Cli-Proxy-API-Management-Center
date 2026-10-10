@@ -768,7 +768,8 @@
     "plan_max": "Max",
     "plan_max5": "Max 5x",
     "plan_max20": "Max 20x",
-    "plan_team": "Team"
+    "plan_team": "Team",
+    "cloud_session_credits": "雲端工作階段額度"
   },
   "codex_quota": {
     "title": "Codex 配額",
@@ -813,7 +814,9 @@
     "plan_business_premium": "Business Premium",
     "monthly_window": "月度限額",
     "credit_balance_label": "Credit 餘額",
-    "credit_unlimited": "無限額"
+    "credit_unlimited": "無限額",
+    "reset_not_confirmed": "尚未確認額度重置成功，請重新整理額度後再決定是否重試。",
+    "reset_cooldown_failed": "額度已重置，但代理冷卻清除失敗。請在原連線的認證檔案頁面使用「清除冷卻」，不要再次消耗重置卡。"
   },
   "devin_quota": {
     "daily": "每日剩餘額度",
@@ -906,7 +909,8 @@
     "resource_tokens": "Token 數量",
     "resource_quota": "配額",
     "resets_label": "重置",
-    "prepaid": "預付"
+    "prepaid": "預付",
+    "usage_breakdown": "用量明細（共用配額）"
   },
   "freebuff_quota": {
     "title": "FreeBuff 配額",
@@ -970,7 +974,9 @@
     "result_project": "專案 ID",
     "result_email": "服務帳號",
     "result_location": "區域",
-    "result_file": "儲存檔案"
+    "result_file": "儲存檔案",
+    "drop_hint": "選擇或拖入 JSON 檔案",
+    "import_another": "再匯入一個"
   },
   "oauth_excluded": {
     "editor_description": "為供應商設定不對外顯示的模型，支援精確選取和萬用字元規則。",
@@ -1304,7 +1310,27 @@
     "oauth_proxy_url_label": "OAuth 登入代理 URL（選填）",
     "oauth_proxy_url_placeholder": "socks5://127.0.0.1:1080，或 direct",
     "oauth_proxy_url_hint": "僅用於本次 OAuth 登入，並會儲存到產生的驗證檔案。支援 http/https/socks5/socks5h，也可填 direct 或 none。",
-    "kiro_proxy_url_label": "Kiro OAuth 代理 URL（選填）"
+    "kiro_proxy_url_label": "Kiro OAuth 代理 URL（選填）",
+    "kimi_oauth_name": "Kimi 中國站",
+    "kimi_ai_oauth_name": "Kimi 國際站",
+    "method_device": "裝置碼",
+    "method_browser": "瀏覽器授權",
+    "method_plugin": "外掛",
+    "tile_waiting": "等待授權",
+    "tile_success": "已新增憑證",
+    "tile_error": "授權失敗",
+    "meta_providers": "{{count}} 個提供商",
+    "meta_waiting": "{{count}} 個等待授權",
+    "meta_added": "本次新增 {{count}} 個憑證",
+    "step_open_auth_page": "開啟授權頁並完成登入",
+    "step_enter_device_code": "在授權頁輸入裝置碼",
+    "optional_step": "選填",
+    "generating_link": "正在產生授權連結…",
+    "waiting_background_hint": "關閉視窗不會中斷授權",
+    "restart_login": "重新開始",
+    "success_saved_hint": "憑證已儲存，可在驗證檔案頁管理。",
+    "sign_up_prompt": "還沒有帳號？",
+    "copied": "已複製"
   },
   "stats": {
     "success": "成功",
@@ -1649,7 +1675,9 @@
         },
         "server": {
           "host": "主機位址",
-          "port": "連接埠"
+          "port": "連接埠",
+          "github_token": "全域 GitHub 權杖",
+          "github_token_hint": "用於面板更新、外掛下載等伺服器端 GitHub 請求。優先於 GITHUB_TOKEN；留空時使用環境變數憑證，未設定憑證則匿名請求。外掛商店符合的驗證規則優先。"
         },
         "tls": {
           "title": "TLS/SSL 設定",
@@ -2017,7 +2045,8 @@
     "weekday_wed": "三",
     "weekday_thu": "四",
     "weekday_fri": "五",
-    "weekday_sat": "六"
+    "weekday_sat": "六",
+    "refresh_all_credentials": "重新整理全部憑證"
   },
   "plugin_management": {
     "title": "插件管理",
@@ -2309,7 +2338,8 @@
     "chinese_tw": "繁體中文（台灣）",
     "english": "英文",
     "russian": "俄文",
-    "vietnamese": "Tiếng Việt"
+    "vietnamese": "Tiếng Việt",
+    "korean": "한국어"
   },
   "theme": {
     "switch": "主題",
@@ -2591,7 +2621,8 @@
       "fingerprintProfile": "請求指紋",
       "fingerprintProfileDefault": "預設（由呼叫端控制）",
       "fingerprintProfileClaudeCodeCli": "Claude Code CLI",
-      "fingerprintProfileHint": "預設保留呼叫端傳入的提示詞與請求標頭；也可選擇使用 Claude Code CLI 請求指紋。"
+      "fingerprintProfileHint": "預設保留呼叫端傳入的提示詞與請求標頭；也可選擇使用 Claude Code CLI 請求指紋。",
+      "testModelHint": "僅用於連通性測試,不會被儲存"
     },
     "delete": {
       "title": "刪除資源",
@@ -3218,6 +3249,20 @@
     "ineligible": "此帳戶不符合資格。",
     "unavailable": "重置暫不可用。",
     "rate_limited": "請求過於頻繁。",
-    "auth_error": "授權遭拒。"
+    "auth_error": "授權遭拒。",
+    "expiry_title": "主動重置過期時間（{{timezone}}）",
+    "grant_number": "第 {{index}} 批",
+    "expiry_unknown": "到期時間未知"
+  },
+  "plugin_quota": {
+    "empty_title": "暫無插件憑證",
+    "empty_desc": "連接插件帳戶後即可查看剩餘額度。",
+    "idle": "點擊此處重新整理配額",
+    "loading": "正在載入配額…",
+    "load_failed": "配額取得失敗：{{message}}",
+    "missing_auth_index": "驗證檔案缺少 auth_index",
+    "empty_data": "暫無可用配額資料",
+    "plan_label": "方案",
+    "remaining_percent": "剩餘 {{percent}}%"
   }
 }

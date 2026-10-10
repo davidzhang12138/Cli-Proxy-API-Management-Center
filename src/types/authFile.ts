@@ -62,6 +62,9 @@ export interface AuthFileItem {
   size?: number;
   auth_index?: string | number | null;
   authIndex?: string | number | null;
+  /** Generic plugin quota capability advertised by CPA's auth-files API. */
+  supportsQuota?: boolean;
+  quotaProvider?: string;
   runtimeOnly?: boolean | string;
   disabled?: boolean;
   unavailable?: boolean;

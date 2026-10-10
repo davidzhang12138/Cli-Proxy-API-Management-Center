@@ -770,7 +770,8 @@
     "plan_max": "Max",
     "plan_max5": "Max 5x",
     "plan_max20": "Max 20x",
-    "plan_team": "Team"
+    "plan_team": "Team",
+    "cloud_session_credits": "云端会话额度"
   },
   "codex_quota": {
     "title": "Codex 额度",
@@ -815,7 +816,9 @@
     "plan_business_premium": "Business Premium",
     "monthly_window": "月度限额",
     "credit_balance_label": "Credit 余额",
-    "credit_unlimited": "无限额"
+    "credit_unlimited": "无限额",
+    "reset_not_confirmed": "未确认额度重置成功，请刷新额度后再决定是否重试。",
+    "reset_cooldown_failed": "额度已重置，但代理冷却清除失败。请在原连接的认证文件页面使用“清除冷却”，不要再次消耗重置卡。"
   },
   "devin_quota": {
     "daily": "每日剩余额度",
@@ -908,7 +911,8 @@
     "resource_tokens": "Token 数量",
     "resource_quota": "额度",
     "resets_label": "重置",
-    "prepaid": "预付"
+    "prepaid": "预付",
+    "usage_breakdown": "用量明细（共享配额）"
   },
   "freebuff_quota": {
     "title": "FreeBuff 配额",
@@ -972,7 +976,9 @@
     "result_project": "项目 ID",
     "result_email": "服务账号",
     "result_location": "区域",
-    "result_file": "存储文件"
+    "result_file": "存储文件",
+    "drop_hint": "选择或拖入 JSON 文件",
+    "import_another": "再导入一个"
   },
   "oauth_excluded": {
     "editor_description": "为提供商设置不对外展示的模型，支持精确选择和通配符规则。",
@@ -1297,7 +1303,27 @@
     "kiro_token_import_button": "导入 Token",
     "kiro_token_required": "请先填写 refreshToken",
     "kiro_token_import_success": "Kiro Token 导入成功",
-    "kiro_token_import_error": "Kiro Token 导入失败："
+    "kiro_token_import_error": "Kiro Token 导入失败：",
+    "kimi_oauth_name": "Kimi 国内站",
+    "kimi_ai_oauth_name": "Kimi 国际站",
+    "method_device": "设备码",
+    "method_browser": "浏览器授权",
+    "method_plugin": "插件",
+    "tile_waiting": "等待授权",
+    "tile_success": "已添加凭证",
+    "tile_error": "授权失败",
+    "meta_providers": "{{count}} 个提供商",
+    "meta_waiting": "{{count}} 个等待授权",
+    "meta_added": "本次新增 {{count}} 个凭证",
+    "step_open_auth_page": "打开授权页并完成登录",
+    "step_enter_device_code": "在授权页输入设备码",
+    "optional_step": "可选",
+    "generating_link": "正在生成授权链接…",
+    "waiting_background_hint": "关闭窗口不会中断授权",
+    "restart_login": "重新开始",
+    "success_saved_hint": "凭证已保存，可在认证文件页管理。",
+    "sign_up_prompt": "还没有账号？",
+    "copied": "已复制"
   },
   "stats": {
     "success": "成功",
@@ -1642,7 +1668,9 @@
         },
         "server": {
           "host": "主机地址",
-          "port": "端口"
+          "port": "端口",
+          "github_token": "全局 GitHub 令牌",
+          "github_token_hint": "用于面板更新、插件下载等服务端 GitHub 请求。优先于 GITHUB_TOKEN；留空时使用环境变量凭据，未设置凭据则匿名请求。插件商店匹配的认证规则优先。"
         },
         "tls": {
           "title": "TLS/SSL 配置",
@@ -2036,7 +2064,8 @@
     "weekday_wed": "三",
     "weekday_thu": "四",
     "weekday_fri": "五",
-    "weekday_sat": "六"
+    "weekday_sat": "六",
+    "refresh_all_credentials": "刷新全部凭证"
   },
   "plugin_management": {
     "title": "插件管理",
@@ -2328,7 +2357,8 @@
     "chinese_tw": "繁體中文（台灣）",
     "english": "English",
     "russian": "Русский",
-    "vietnamese": "Tiếng Việt"
+    "vietnamese": "Tiếng Việt",
+    "korean": "한국어"
   },
   "theme": {
     "switch": "主题",
@@ -2616,7 +2646,8 @@
       "fingerprintProfile": "请求指纹",
       "fingerprintProfileDefault": "默认（由调用方控制）",
       "fingerprintProfileClaudeCodeCli": "Claude Code CLI",
-      "fingerprintProfileHint": "默认保留调用方传入的提示词和请求头；也可选择使用 Claude Code CLI 请求指纹。"
+      "fingerprintProfileHint": "默认保留调用方传入的提示词和请求头；也可选择使用 Claude Code CLI 请求指纹。",
+      "testModelHint": "仅用于连通性测试,不会被保存"
     },
     "delete": {
       "title": "删除资源",
@@ -3432,6 +3463,20 @@
     "ineligible": "此账户不符合资格。",
     "unavailable": "重置暂不可用。",
     "rate_limited": "请求过于频繁。",
-    "auth_error": "授权被拒绝。"
+    "auth_error": "授权被拒绝。",
+    "expiry_title": "主动重置过期时间（{{timezone}}）",
+    "grant_number": "第 {{index}} 批",
+    "expiry_unknown": "到期时间未知"
+  },
+  "plugin_quota": {
+    "empty_title": "暂无插件凭证",
+    "empty_desc": "连接插件账户后查看剩余额度。",
+    "idle": "点击此处刷新额度",
+    "loading": "正在加载额度…",
+    "load_failed": "额度加载失败：{{message}}",
+    "missing_auth_index": "认证文件缺少 auth_index",
+    "empty_data": "暂无可用额度数据",
+    "plan_label": "方案",
+    "remaining_percent": "剩余 {{percent}}%"
   }
 }

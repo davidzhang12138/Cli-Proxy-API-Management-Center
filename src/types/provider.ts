@@ -40,7 +40,6 @@ export interface ModelAlias {
   name: string;
   alias?: string;
   priority?: number;
-  testModel?: string;
   image?: boolean;
   displayName?: string;
   maxContextLength?: number;
@@ -130,7 +129,6 @@ export interface OpenAIProviderConfig extends ProviderRuntimePolicy, ProviderBeh
   models?: ModelAlias[];
   priority?: number;
   modelPriorities?: Record<string, number>;
-  testModel?: string;
   disableCooling?: boolean;
   /** 429 配额退避冷却下限,Go duration 字符串如 "30s"/"5m"/"1h"。yaml: quota-backoff-min */
   quotaBackoffMin?: string;

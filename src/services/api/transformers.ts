@@ -32,7 +32,6 @@ const normalizeModelAliases = (models: unknown): ModelAlias[] => {
       if (!name) return null;
       const alias = item.alias;
       const priority = item.priority;
-      const testModel = item['test-model'];
       const image = normalizeBoolean(item.image);
       const thinking = normalizeModelThinking(item.thinking);
       const entry: ModelAlias = { name: String(name), sourceIndex, ...normalizeModelOptions(item) };
@@ -44,9 +43,6 @@ const normalizeModelAliases = (models: unknown): ModelAlias[] => {
         if (Number.isFinite(parsed)) {
           entry.priority = parsed;
         }
-      }
-      if (testModel) {
-        entry.testModel = String(testModel);
       }
       if (image !== undefined) {
         entry.image = image;
@@ -304,7 +300,6 @@ const normalizeOpenAIProvider = (
   const models = normalizeModelAliases(provider.models);
   const priority = provider.priority;
   const modelPriorities = normalizeIntegerMap(provider['model-priorities']);
-  const testModel = provider['test-model'];
 
   const result: OpenAIProviderConfig = {
     name: String(name),
@@ -348,7 +343,6 @@ const normalizeOpenAIProvider = (
   if (models.length) result.models = models;
   if (priority !== undefined) result.priority = Number(priority);
   if (modelPriorities) result.modelPriorities = modelPriorities;
-  if (testModel) result.testModel = String(testModel);
   const authIndex = normalizeAuthIndex(provider['auth-index']);
   if (authIndex) result.authIndex = authIndex;
   if (sourceIndex !== undefined) result.sourceIndex = sourceIndex;

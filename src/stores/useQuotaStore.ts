@@ -15,6 +15,7 @@ import type {
   KimiQuotaState,
   KiroQuotaState,
   MetaQuotaState,
+  PluginQuotaState,
   XaiQuotaState,
 } from '@/types';
 import { STORAGE_KEY_QUOTA } from '@/utils/constants';
@@ -34,6 +35,7 @@ interface QuotaStoreState {
   kiroQuota: Record<string, KiroQuotaState>;
   kimiQuota: Record<string, KimiQuotaState>;
   metaQuota: Record<string, MetaQuotaState>;
+  pluginQuota: Record<string, PluginQuotaState>;
   xaiQuota: Record<string, XaiQuotaState>;
   freebuffQuota: Record<string, FreebuffQuotaState>;
   hyperQuota: Record<string, HyperQuotaState>;
@@ -44,6 +46,7 @@ interface QuotaStoreState {
   setKiroQuota: (updater: QuotaUpdater<Record<string, KiroQuotaState>>) => void;
   setKimiQuota: (updater: QuotaUpdater<Record<string, KimiQuotaState>>) => void;
   setMetaQuota: (updater: QuotaUpdater<Record<string, MetaQuotaState>>) => void;
+  setPluginQuota: (updater: QuotaUpdater<Record<string, PluginQuotaState>>) => void;
   setXaiQuota: (updater: QuotaUpdater<Record<string, XaiQuotaState>>) => void;
   setFreebuffQuota: (updater: QuotaUpdater<Record<string, FreebuffQuotaState>>) => void;
   setHyperQuota: (updater: QuotaUpdater<Record<string, HyperQuotaState>>) => void;
@@ -59,6 +62,7 @@ type PersistedQuotaStoreState = Pick<
   | 'kiroQuota'
   | 'kimiQuota'
   | 'metaQuota'
+  | 'pluginQuota'
   | 'xaiQuota'
   | 'freebuffQuota'
   | 'hyperQuota'
@@ -167,6 +171,7 @@ const sanitizePersistedQuotaState = (
   kiroQuota: sanitizeQuotaMap(state.kiroQuota ?? {}),
   kimiQuota: sanitizeQuotaMap(state.kimiQuota ?? {}),
   metaQuota: sanitizeQuotaMap(state.metaQuota ?? {}),
+  pluginQuota: sanitizeQuotaMap(state.pluginQuota ?? {}),
   xaiQuota: sanitizeQuotaMap(state.xaiQuota ?? {}),
   freebuffQuota: sanitizeQuotaMap(state.freebuffQuota ?? {}),
   hyperQuota: sanitizeQuotaMap(state.hyperQuota ?? {}),
@@ -201,6 +206,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
       kiroQuota: {},
       kimiQuota: {},
       metaQuota: {},
+      pluginQuota: {},
       xaiQuota: {},
       freebuffQuota: {},
       hyperQuota: {},
@@ -234,6 +240,13 @@ export const useQuotaStore = create<QuotaStoreState>()(
       setMetaQuota: (updater) =>
         set((state) => ({
           metaQuota: stampQuotaMap(resolveUpdater(updater, state.metaQuota), state.metaQuota),
+        })),
+      setPluginQuota: (updater) =>
+        set((state) => ({
+          pluginQuota: stampQuotaMap(
+            resolveUpdater(updater, state.pluginQuota),
+            state.pluginQuota
+          ),
         })),
       setXaiQuota: (updater) =>
         set((state) => ({
@@ -280,6 +293,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
               hyperQuota: omitNames(state.hyperQuota),
               kimiQuota: omitNames(state.kimiQuota),
               metaQuota: omitNames(state.metaQuota),
+              pluginQuota: omitNames(state.pluginQuota),
               xaiQuota: omitNames(state.xaiQuota),
             };
           }
@@ -295,6 +309,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
             hyperQuota: {},
             kimiQuota: {},
             metaQuota: {},
+            pluginQuota: {},
             xaiQuota: {},
           };
         }),
@@ -306,6 +321,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
           kiroQuota: purgeStaleQuotaMap(state.kiroQuota),
           kimiQuota: purgeStaleQuotaMap(state.kimiQuota),
           metaQuota: purgeStaleQuotaMap(state.metaQuota),
+          pluginQuota: purgeStaleQuotaMap(state.pluginQuota),
           xaiQuota: purgeStaleQuotaMap(state.xaiQuota),
           freebuffQuota: purgeStaleQuotaMap(state.freebuffQuota),
           hyperQuota: purgeStaleQuotaMap(state.hyperQuota),
@@ -321,6 +337,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
           kiroQuota: state.kiroQuota,
           kimiQuota: state.kimiQuota,
           metaQuota: state.metaQuota,
+          pluginQuota: state.pluginQuota,
           xaiQuota: state.xaiQuota,
           freebuffQuota: state.freebuffQuota,
           hyperQuota: state.hyperQuota,

@@ -12,8 +12,9 @@ import { ModelAdvancedFields } from '@/features/providers/sheets/forms/ModelAdva
 import type { ModelEntryInput, ProviderBrand } from '@/features/providers/types';
 import type { ModelAlias } from '@/types';
 
-const i18n = createInstance();
-await i18n.init({ lng: 'cimode', resources: {} });
+// Keep key-based assertions independent of other suites initializing the app's i18n.
+const translations = createInstance();
+await translations.init({ lng: 'cimode', resources: {}, react: { useSuspense: false } });
 
 const draft = (model: ModelAlias): ModelEntryInput => ({
   name: model.name,
@@ -181,7 +182,7 @@ describe('provider model options', () => {
     renderToStaticMarkup(
       createElement(
         I18nextProvider,
-        { i18n },
+        { i18n: translations },
         createElement(ModelAdvancedFields, {
           entry: { name: 'model', thinkingEnabled: enabled },
           providerBrand: brand,

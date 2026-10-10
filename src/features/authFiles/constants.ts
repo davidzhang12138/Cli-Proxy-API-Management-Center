@@ -42,11 +42,12 @@ export type QuotaProviderType =
   | 'kiro'
   | 'kimi'
   | 'meta'
+  | 'plugin'
   | 'xai'
   | 'freebuff'
   | 'hyper';
 
-export type AuthFileQuotaFilter = QuotaProviderType | 'all' | null;
+export type AuthFileQuotaFilter = string | null;
 
 export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'meta',
@@ -56,6 +57,7 @@ export const QUOTA_PROVIDER_TYPES = new Set<QuotaProviderType>([
   'kiro',
   'devin',
   'kimi',
+  'plugin',
   'xai',
   'freebuff',
   'hyper',

@@ -772,7 +772,8 @@
     "plan_max": "Max",
     "plan_max5": "Max 5x",
     "plan_max20": "Max 20x",
-    "plan_team": "Team"
+    "plan_team": "Team",
+    "cloud_session_credits": "Cloud session credits"
   },
   "codex_quota": {
     "title": "Codex Quota",
@@ -817,7 +818,9 @@
     "plan_business_premium": "Business Premium",
     "monthly_window": "Monthly limit",
     "credit_balance_label": "Credit balance",
-    "credit_unlimited": "Unlimited"
+    "credit_unlimited": "Unlimited",
+    "reset_not_confirmed": "Quota reset was not confirmed. Refresh the quota before trying again.",
+    "reset_cooldown_failed": "Quota was reset, but the gateway cooldown could not be cleared. On the original connection, use Clear cooldown on the credential page; do not redeem another reset."
   },
   "devin_quota": {
     "daily": "Daily remaining",
@@ -910,7 +913,8 @@
     "resource_tokens": "Tokens",
     "resource_quota": "Quota",
     "resets_label": "Resets",
-    "prepaid": "Prepaid"
+    "prepaid": "Prepaid",
+    "usage_breakdown": "Usage breakdown (shared quota)"
   },
   "freebuff_quota": {
     "title": "FreeBuff quota",
@@ -974,7 +978,9 @@
     "result_project": "Project ID",
     "result_email": "Service account",
     "result_location": "Region",
-    "result_file": "Persisted file"
+    "result_file": "Persisted file",
+    "drop_hint": "Choose or drop a JSON file",
+    "import_another": "Import another"
   },
   "oauth_excluded": {
     "editor_description": "Choose which models a provider exposes using individual selections or wildcard rules.",
@@ -1299,7 +1305,27 @@
     "kiro_token_import_button": "Import Token",
     "kiro_token_required": "Please enter refreshToken first",
     "kiro_token_import_success": "Kiro token imported successfully",
-    "kiro_token_import_error": "Failed to import Kiro token:"
+    "kiro_token_import_error": "Failed to import Kiro token:",
+    "kimi_oauth_name": "Kimi China",
+    "kimi_ai_oauth_name": "Kimi International",
+    "method_device": "Device code",
+    "method_browser": "Browser sign-in",
+    "method_plugin": "Plugin",
+    "tile_waiting": "Awaiting authorization",
+    "tile_success": "Credential added",
+    "tile_error": "Authorization failed",
+    "meta_providers": "{{count}} providers",
+    "meta_waiting": "{{count}} awaiting authorization",
+    "meta_added": "{{count}} added this session",
+    "step_open_auth_page": "Open the sign-in page and authorize",
+    "step_enter_device_code": "Enter this code on the sign-in page",
+    "optional_step": "Optional",
+    "generating_link": "Generating sign-in link…",
+    "waiting_background_hint": "Closing this window won't stop sign-in",
+    "restart_login": "Start over",
+    "success_saved_hint": "The credential is saved — manage it in Auth Files.",
+    "sign_up_prompt": "No account yet?",
+    "copied": "Copied"
   },
   "stats": {
     "success": "Success",
@@ -1644,7 +1670,9 @@
         },
         "server": {
           "host": "Host Address",
-          "port": "Port"
+          "port": "Port",
+          "github_token": "Global GitHub Token",
+          "github_token_hint": "Used for server-side GitHub requests, such as panel updates and plugin downloads. Takes precedence over GITHUB_TOKEN; leave empty to use environment credentials, or unauthenticated requests if none are set. Matching plugin store authentication rules take precedence."
         },
         "tls": {
           "title": "TLS/SSL Configuration",
@@ -2038,7 +2066,8 @@
     "weekday_wed": "Wed",
     "weekday_thu": "Thu",
     "weekday_fri": "Fri",
-    "weekday_sat": "Sat"
+    "weekday_sat": "Sat",
+    "refresh_all_credentials": "Refresh all credentials"
   },
   "plugin_management": {
     "title": "Plugin Management",
@@ -2330,7 +2359,8 @@
     "chinese_tw": "Traditional Chinese (Taiwan)",
     "english": "English",
     "russian": "Русский",
-    "vietnamese": "Tiếng Việt"
+    "vietnamese": "Tiếng Việt",
+    "korean": "한국어"
   },
   "theme": {
     "switch": "Theme",
@@ -2618,7 +2648,8 @@
       "fingerprintProfile": "Request fingerprint",
       "fingerprintProfileDefault": "Default (caller-owned)",
       "fingerprintProfileClaudeCodeCli": "Claude Code CLI",
-      "fingerprintProfileHint": "Keep the caller's prompt and headers by default, or opt in to the Claude Code CLI request fingerprint."
+      "fingerprintProfileHint": "Keep the caller's prompt and headers by default, or opt in to the Claude Code CLI request fingerprint.",
+      "testModelHint": "Used for connectivity testing only; not saved"
     },
     "delete": {
       "title": "Delete resource",
@@ -3434,6 +3465,20 @@
     "ineligible": "This account is not eligible.",
     "unavailable": "Resets are currently unavailable.",
     "rate_limited": "Request rate limited.",
-    "auth_error": "Authorization was refused."
+    "auth_error": "Authorization was refused.",
+    "expiry_title": "Manual reset expiry ({{timezone}})",
+    "grant_number": "Grant {{index}}",
+    "expiry_unknown": "Expiry unknown"
+  },
+  "plugin_quota": {
+    "empty_title": "No Plugin Auth Files",
+    "empty_desc": "Connect a plugin account to view its remaining quota.",
+    "idle": "Click here to refresh quota",
+    "loading": "Loading quota...",
+    "load_failed": "Failed to load quota: {{message}}",
+    "missing_auth_index": "Auth file missing auth_index",
+    "empty_data": "No quota data available",
+    "plan_label": "Plan",
+    "remaining_percent": "{{percent}}% remaining"
   }
 }

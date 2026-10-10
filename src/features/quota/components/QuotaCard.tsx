@@ -23,6 +23,7 @@ import { bindQuotaClasses } from '../types';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import { isQuotaRefreshDisabled, resolveQuotaDisplayName, type QuotaFileEntry } from '../logic';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
+import { ClaudeResetGrantDetails } from '../providers/claude/ClaudeResetGrantDetails';
 import bodyStyles from './QuotaBody.module.scss';
 import styles from './QuotaCard.module.scss';
 
@@ -72,9 +73,13 @@ export function QuotaCard(props: QuotaCardProps) {
     quota,
     onRefresh
   );
-  const iconSrc = getAuthFileIcon(entry.type, resolvedTheme);
-  const typeLabel = getTypeLabel(t, entry.type);
-  const typeColor = getTypeColor(entry.type, resolvedTheme);
+  const providerType =
+    entry.type === 'plugin'
+      ? String(file.quotaProvider ?? file['quota_provider'] ?? file.provider ?? file.type ?? 'plugin')
+      : entry.type;
+  const iconSrc = getAuthFileIcon(providerType, resolvedTheme);
+  const typeLabel = getTypeLabel(t, providerType);
+  const typeColor = getTypeColor(providerType, resolvedTheme);
   const displayName = resolveQuotaDisplayName(file);
   const errorMessage = resolveQuotaErrorMessage(
     t,
@@ -97,7 +102,7 @@ export function QuotaCard(props: QuotaCardProps) {
           className={styles.iconWrap}
           title={typeLabel}
           style={
-            isThemeSurfaceIconProvider(entry.type)
+            isThemeSurfaceIconProvider(providerType)
               ? {
                   backgroundColor: getThemeSurfaceIconBackground(resolvedTheme),
                   color: typeColor.text,
@@ -141,6 +146,7 @@ export function QuotaCard(props: QuotaCardProps) {
                 <span className={quotaClasses.codexPlanValue}>{claudeReset.count ?? '--'}</span>
               </span>
             </div>
+            <ClaudeResetGrantDetails grants={claudeReset.grants} classes={quotaClasses} />
             {claudeReset.message && (
               <div role="status" className={quotaClasses.codexResetCreditsError}>
                 {t(`claude_reset.${claudeReset.message}`)}

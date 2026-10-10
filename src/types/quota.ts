@@ -279,6 +279,9 @@ export interface CodexUsagePayload {
 export interface ClaudeUsageWindow {
   utilization: number;
   resets_at: string | null;
+  limit_dollars?: number | null;
+  used_dollars?: number | null;
+  remaining_dollars?: number | null;
 }
 
 export interface ClaudeUsageLimit {
@@ -423,6 +426,20 @@ export interface AntigravityQuotaState extends QuotaCacheStamp {
   serverTimeOffsetMs?: number | null;
   error?: string;
   errorStatus?: number;
+}
+
+/** A provider-defined numeric/currency value rendered above generic quota windows. */
+export interface PluginQuotaMetric {
+  key: string;
+  label: string;
+  value: number;
+  unit?: string;
+  format?: 'number' | 'currency';
+  currency?: string;
+}
+
+export interface PluginQuotaState extends AntigravityQuotaState {
+  summary: PluginQuotaMetric[];
 }
 
 export interface CodexQuotaWindow {

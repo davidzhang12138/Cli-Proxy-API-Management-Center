@@ -151,7 +151,6 @@ const buildModelAliases = (
         name: m.name.trim(),
         alias: m.alias?.trim() || undefined,
         priority: m.priority,
-        testModel: m.testModel,
         ...buildModelOptions(m),
       };
       if (includeImage) {
@@ -268,7 +267,6 @@ export const buildOpenAIConfig = (
     models: models.length ? models : undefined,
     modelPriorities,
     priority: input.priority,
-    testModel: input.testModel?.trim() || undefined,
   };
 };
 

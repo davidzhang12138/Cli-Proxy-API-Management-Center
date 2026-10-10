@@ -14,6 +14,7 @@ import { KIRO_CONFIG } from './providers/kiro/data';
 import { DEVIN_CONFIG } from './providers/devin/data';
 import { KIMI_CONFIG } from './providers/kimi/data';
 import { META_CONFIG } from './providers/meta/data';
+import { PLUGIN_CONFIG } from './providers/plugin/data';
 import { XAI_CONFIG } from './providers/xai/data';
 import { FREEBUFF_CONFIG } from './providers/freebuff/data';
 import { HYPER_CONFIG } from './providers/hyper/data';
@@ -28,6 +29,7 @@ const QUOTA_FILTER_MAP: Record<QuotaProviderType, (file: AuthFileItem) => boolea
   devin: DEVIN_CONFIG.filterFn,
   kimi: KIMI_CONFIG.filterFn,
   meta: META_CONFIG.filterFn,
+  plugin: PLUGIN_CONFIG.filterFn,
   xai: XAI_CONFIG.filterFn,
   freebuff: FREEBUFF_CONFIG.filterFn,
   hyper: HYPER_CONFIG.filterFn,
@@ -58,7 +60,9 @@ export function canRefreshQuotaAfterList(
 }
 
 export const resolveQuotaProviderType = (file: AuthFileItem): QuotaProviderType | null =>
-  QUOTA_TAB_ORDER.find((type) => QUOTA_FILTER_MAP[type](file)) ?? null;
+  PLUGIN_CONFIG.filterFn(file)
+    ? 'plugin'
+    : (QUOTA_TAB_ORDER.find((type) => QUOTA_FILTER_MAP[type](file)) ?? null);
 
 /**
  * Classify quota-capable, enabled credentials in QUOTA_TAB_ORDER.

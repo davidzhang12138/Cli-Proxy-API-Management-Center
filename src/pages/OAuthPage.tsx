@@ -19,8 +19,8 @@ import {
   KIMI_INTERNATIONAL_AFFILIATE_URL,
 } from '@/features/providers/kimi';
 import type { PluginListEntry } from '@/types';
-import { createOAuthAttempts, type OAuthAttempt } from './oauthAttempts';
-import { validateDevinCallback } from './devinOAuth';
+import { createOAuthAttempts, type OAuthAttempt } from '@/features/oauth/oauthAttempts';
+import { validateDevinCallback } from '@/features/oauth/devinOAuth';
 import styles from './OAuthPage.module.scss';
 import iconMeta from '@/assets/icons/meta.svg';
 import iconCodex from '@/assets/icons/codex.svg';
