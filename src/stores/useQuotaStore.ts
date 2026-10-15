@@ -218,9 +218,35 @@ export const useQuotaStore = create<QuotaStoreState>()(
           ),
         })),
       setClaudeQuota: (updater) =>
-        set((state) => ({
-          claudeQuota: stampQuotaMap(resolveUpdater(updater, state.claudeQuota), state.claudeQuota),
-        })),
+        set((state) => {
+          const next = resolveUpdater(updater, state.claudeQuota);
+          let retained = next;
+          for (const [key, quota] of Object.entries(next)) {
+            const previous = state.claudeQuota[key];
+            if (
+              previous &&
+              quota !== previous &&
+              (quota.status === 'loading' || quota.status === 'error') &&
+              !quota.observedAt &&
+              (previous.observedAt ||
+                previous.windows.length ||
+                previous.extraUsage ||
+                previous.dollarWindows?.length)
+            ) {
+              if (retained === next) retained = { ...next };
+              retained[key] = {
+                ...quota,
+                windows: previous.windows,
+                extraUsage: previous.extraUsage,
+                dollarWindows: previous.dollarWindows,
+                observedAt: previous.observedAt,
+                planType: previous.planType,
+                stale: quota.status === 'error' || previous.stale,
+              };
+            }
+          }
+          return { claudeQuota: stampQuotaMap(retained, state.claudeQuota) };
+        }),
       setCodexQuota: (updater) =>
         set((state) => ({
           codexQuota: stampQuotaMap(resolveUpdater(updater, state.codexQuota), state.codexQuota),
@@ -243,10 +269,7 @@ export const useQuotaStore = create<QuotaStoreState>()(
         })),
       setPluginQuota: (updater) =>
         set((state) => ({
-          pluginQuota: stampQuotaMap(
-            resolveUpdater(updater, state.pluginQuota),
-            state.pluginQuota
-          ),
+          pluginQuota: stampQuotaMap(resolveUpdater(updater, state.pluginQuota), state.pluginQuota),
         })),
       setXaiQuota: (updater) =>
         set((state) => ({

@@ -652,6 +652,17 @@
     "iguana_necktie": "Iguana Necktie",
     "seven_day_fable": "7 天 Fable 5",
     "extra_usage_label": "額外用量",
+    "extra_usage_enabled": "已啟用",
+    "extra_usage_disabled": "已停用",
+    "usage_spent_limit": "已花費 {{spent}} / 限額 {{limit}}",
+    "usage_utilization": "已使用 {{percent}}%",
+    "extra_usage_user_disabled": "使用者已停用",
+    "extra_usage_spend_limit_reached": "已達消費限額",
+    "extra_usage_disabled_reason": "原因：{{reason}}",
+    "dollar_balance_remaining": "剩餘 {{amount}}",
+    "balance_reset": "重設時間",
+    "balance_reset_unknown": "未提供",
+    "stale_snapshot": "重新整理失敗。顯示上次成功檢查的結果：{{time}}",
     "plan_label": "方案",
     "plan_unknown": "未知",
     "plan_free": "Free",
@@ -748,6 +759,7 @@
     "inactive": "訂閱未啟用",
     "window": "週期額度",
     "window_duration": "{{minutes}} 分鐘週期",
+    "window_duration_hours": "{{hours}} 小時週期",
     "weekly": "每週額度",
     "unknown": "未知",
     "remaining": "剩餘 {{percent}}%"
@@ -1204,6 +1216,10 @@
     "kiro_proxy_url_label": "Kiro OAuth 代理 URL（選填）",
     "kimi_oauth_name": "Kimi 中國站",
     "kimi_ai_oauth_name": "Kimi 國際站",
+    "sponsor_site_china": "中國站",
+    "sponsor_site_international": "國際站",
+    "sponsor_kimi_caption": "裝置碼登入 · 兩站帳號互不相通",
+    "sponsor_sign_up": "註冊開放平台",
     "method_device": "裝置碼",
     "method_browser": "瀏覽器授權",
     "method_plugin": "外掛",
@@ -1557,6 +1573,7 @@
           "description": "除錯、日誌輸出與使用統計"
         },
         "advanced": {
+          "antigravity_credits": "使用Antigravity Credits",
           "title": "進階與實驗",
           "description": "請求標頭偽裝、簽章快取、外掛來源等不常修改的設定",
           "plugins_title": "外掛",
@@ -1694,25 +1711,16 @@
           "strategy_round_robin": "輪詢（Round Robin）",
           "strategy_weighted_round_robin": "加權輪詢（Weighted Round Robin）",
           "strategy_fill_first": "填充優先（Fill First）",
-          "session_affinity_ttl": "會話黏性 TTL",
+          "session_affinity_ttl": "工作階段親和性 TTL",
           "force_model_prefix": "強制模型前綴",
           "force_model_prefix_desc": "未帶前綴的模型請求只使用無前綴憑證",
           "passthrough_headers": "透傳上游回應 Header",
           "passthrough_headers_desc": "將過濾後的上游回應 Header 轉發給下游客戶端",
           "disable_cooling": "停用冷卻調度",
           "disable_cooling_desc": "全域停用驗證/模型失敗後的冷卻視窗",
-          "session_affinity": "會話黏性路由",
+          "session_affinity": "工作階段親和性路由",
           "ws_auth": "WebSocket 驗證",
           "ws_auth_desc": "啟用 AI Studio WebSocket 連線驗證（oauth.providers.aistudio.ws-auth）"
-        },
-        "quota": {
-          "title": "配額回退",
-          "description": "配額耗盡時的回退策略",
-          "switch_project": "切換專案",
-          "switch_project_desc": "配額耗盡時自動切換到其他專案",
-          "switch_preview_model": "切換預覽模型",
-          "switch_preview_model_desc": "配額耗盡時切換到預覽版本模型",
-          "antigravity_credits": "使用Antigravity Credits"
         },
         "streaming": {
           "title": "串流傳輸設定",
@@ -3154,6 +3162,8 @@
     "missing_auth_index": "驗證檔案缺少 auth_index",
     "empty_data": "暫無可用配額資料",
     "plan_label": "方案",
-    "remaining_percent": "剩餘 {{percent}}%"
+    "remaining_percent": "剩餘 {{percent}}%",
+    "probe_unsupported": "v8 管理介面暫不支援宣告式配額探測（quota_probe）",
+    "plugin_not_found": "找不到為 {{provider}} 提供配額查詢的已啟用插件"
   }
 }

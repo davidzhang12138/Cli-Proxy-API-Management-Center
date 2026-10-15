@@ -656,6 +656,17 @@
     "iguana_necktie": "Iguana Necktie",
     "seven_day_fable": "7-day Fable 5",
     "extra_usage_label": "Extra Usage",
+    "extra_usage_enabled": "Enabled",
+    "extra_usage_disabled": "Disabled",
+    "usage_spent_limit": "Spent {{spent}} / Limit {{limit}}",
+    "usage_utilization": "{{percent}}% used",
+    "extra_usage_user_disabled": "Disabled by user",
+    "extra_usage_spend_limit_reached": "Spending limit reached",
+    "extra_usage_disabled_reason": "Reason: {{reason}}",
+    "dollar_balance_remaining": "{{amount}} remaining",
+    "balance_reset": "Resets",
+    "balance_reset_unknown": "Not provided",
+    "stale_snapshot": "Refresh failed. Showing last successful check: {{time}}",
     "plan_label": "Plan",
     "plan_unknown": "Unknown",
     "plan_free": "Free",
@@ -752,6 +763,7 @@
     "inactive": "Subscription inactive",
     "window": "Usage window",
     "window_duration": "{{minutes}}-minute window",
+    "window_duration_hours": "{{hours}}-hour window",
     "weekly": "Weekly quota",
     "unknown": "Unknown",
     "remaining": "{{percent}}% remaining"
@@ -1199,6 +1211,10 @@
     "kiro_token_import_error": "Failed to import Kiro token:",
     "kimi_oauth_name": "Kimi China",
     "kimi_ai_oauth_name": "Kimi International",
+    "sponsor_site_china": "China",
+    "sponsor_site_international": "International",
+    "sponsor_kimi_caption": "Device code sign-in · accounts are separate per site",
+    "sponsor_sign_up": "Join Open Platform",
     "method_device": "Device code",
     "method_browser": "Browser sign-in",
     "method_plugin": "Plugin",
@@ -1552,6 +1568,7 @@
           "description": "Debug, log output, and usage statistics"
         },
         "advanced": {
+          "antigravity_credits": "Use Antigravity Credits",
           "title": "Advanced & Experimental",
           "description": "Header spoofing, signature cache, plugin sources, and other rarely changed settings",
           "plugins_title": "Plugins",
@@ -1699,15 +1716,6 @@
           "session_affinity": "Session Affinity Routing",
           "ws_auth": "WebSocket Authentication",
           "ws_auth_desc": "Require authentication for AI Studio WebSocket connections (oauth.providers.aistudio.ws-auth)"
-        },
-        "quota": {
-          "title": "Quota Fallback",
-          "description": "Fallback strategy when quota is exceeded",
-          "switch_project": "Switch Project",
-          "switch_project_desc": "Automatically switch to another project when quota is exceeded",
-          "switch_preview_model": "Switch to Preview Model",
-          "switch_preview_model_desc": "Switch to preview model version when quota is exceeded",
-          "antigravity_credits": "Use Antigravity Credits"
         },
         "streaming": {
           "title": "Streaming Configuration",
@@ -3370,6 +3378,8 @@
     "missing_auth_index": "Auth file missing auth_index",
     "empty_data": "No quota data available",
     "plan_label": "Plan",
-    "remaining_percent": "{{percent}}% remaining"
+    "remaining_percent": "{{percent}}% remaining",
+    "probe_unsupported": "Declarative quota probes are not available through the v8 management API",
+    "plugin_not_found": "No enabled plugin provides quota for {{provider}}"
   }
 }

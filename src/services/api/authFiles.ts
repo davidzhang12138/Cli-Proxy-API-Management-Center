@@ -383,7 +383,10 @@ const normalizeAuthFileEntry = (
   const modelPriorities = readIntegerMap(entry['model_priorities'] ?? entry['model-priorities']);
   const weight = readIntegerField(entry['weight']);
   const supportsQuota = readBooleanField(entry['supports_quota'] ?? entry.supportsQuota);
-  const quotaProvider = readTextField(entry, 'quota_provider') || readTextField(entry, 'quotaProvider');
+  const quotaProvider =
+    readTextField(entry, 'quota_provider') || readTextField(entry, 'quotaProvider');
+  const quotaPluginId =
+    readTextField(entry, 'quota_plugin_id') || readTextField(entry, 'quotaPluginId');
 
   return {
     ...entry,
@@ -393,6 +396,7 @@ const normalizeAuthFileEntry = (
     authIndex: normalizeRecentRequestAuthIndex(entry['auth_index'] ?? entry.authIndex),
     ...(supportsQuota !== undefined ? { supportsQuota } : {}),
     ...(quotaProvider ? { quotaProvider } : {}),
+    quotaPluginId: quotaPluginId || undefined,
     recentRequests: normalizeRecentRequestBuckets(entry.recent_requests ?? entry.recentRequests),
     successCount: normalizeUsageTotal(entry.success),
     failureCount: normalizeUsageTotal(entry.failed),

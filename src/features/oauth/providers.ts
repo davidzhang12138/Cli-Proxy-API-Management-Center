@@ -38,10 +38,18 @@ export interface BuiltInOAuthProviderCard {
   flow: OAuthFlowKind;
   /** 区分同品牌的不同站点，磁贴副行展示。 */
   domain?: string;
-  /** 赞助商：画廊首行大卡 + 品牌蓝强调，带注册推广链接（目前是 Kimi 两站）。 */
-  sponsor?: { signUpUrl: string };
+  /**
+   * 赞助商：同品牌的各站点合并进画廊首行的一张品牌卡，每站一个登录入口 + 开放平台注册链接
+   * （目前是 Kimi 国内站 / 国际站）。`siteKey` 是卡内站点短名（品牌名由卡片标题承载）。
+   */
+  sponsor?: SponsorSite;
   /** Kiro's Builder ID, IDC, and token import flow remains on the legacy form. */
   legacyPath?: string;
+}
+
+export interface SponsorSite {
+  signUpUrl: string;
+  siteKey: string;
 }
 
 export interface PluginOAuthProviderCard {
@@ -63,7 +71,7 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     icon: { light: iconKimiTileBlack, dark: iconKimiTileWhite },
     flow: 'device',
     domain: 'kimi.com',
-    sponsor: { signUpUrl: KIMI_CHINESE_AFFILIATE_URL },
+    sponsor: { signUpUrl: KIMI_CHINESE_AFFILIATE_URL, siteKey: 'auth_login.sponsor_site_china' },
   },
   {
     kind: 'builtin',
@@ -73,7 +81,10 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
     icon: { light: iconKimiTileBlack, dark: iconKimiTileWhite },
     flow: 'device',
     domain: 'kimi.ai',
-    sponsor: { signUpUrl: KIMI_INTERNATIONAL_AFFILIATE_URL },
+    sponsor: {
+      signUpUrl: KIMI_INTERNATIONAL_AFFILIATE_URL,
+      siteKey: 'auth_login.sponsor_site_international',
+    },
   },
   {
     kind: 'builtin',
@@ -182,7 +193,7 @@ export const supportsManualCallback = (provider: OAuthProviderCard): boolean =>
 
 export const isSponsor = (
   provider: OAuthProviderCard
-): provider is BuiltInOAuthProviderCard & { sponsor: { signUpUrl: string } } =>
+): provider is BuiltInOAuthProviderCard & { sponsor: SponsorSite } =>
   provider.kind === 'builtin' && Boolean(provider.sponsor);
 
 export const resolveThemedIcon = (icon: ThemedIcon, theme: 'light' | 'dark'): string =>

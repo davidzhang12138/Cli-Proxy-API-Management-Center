@@ -49,17 +49,17 @@ describe('resolveAuthFileQuotaType', () => {
   });
 
   test('exposes a plugin quota on its own provider tab', () => {
-    const kiro = authFile({ type: 'kiro', supportsQuota: true, quotaProvider: 'kiro' });
-    expect(resolveAuthFileQuotaType(kiro, 'all')).toBe('plugin');
-    expect(resolveAuthFileQuotaType(kiro, 'kiro')).toBe('plugin');
+    const custom = authFile({ type: 'custom', supportsQuota: true, quotaProvider: 'custom' });
+    expect(resolveAuthFileQuotaType(custom, 'all')).toBe('plugin');
+    expect(resolveAuthFileQuotaType(custom, 'custom')).toBe('plugin');
   });
 
   test('exposes a probe-only plugin quota without a provider identifier', () => {
-    expect(resolveAuthFileQuotaType(authFile({ type: 'kiro', supportsQuota: true }), 'all')).toBe(
+    expect(resolveAuthFileQuotaType(authFile({ type: 'custom', supportsQuota: true }), 'all')).toBe(
       'plugin'
     );
     expect(
-      resolveAuthFileQuotaType(authFile({ type: 'kiro', supportsQuota: true }), 'plugin')
+      resolveAuthFileQuotaType(authFile({ type: 'custom', supportsQuota: true }), 'plugin')
     ).toBe('plugin');
   });
 });

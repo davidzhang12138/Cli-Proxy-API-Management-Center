@@ -660,6 +660,17 @@
     "iguana_necktie": "Iguana Necktie",
     "seven_day_fable": "7 дней Fable 5",
     "extra_usage_label": "Дополнительное использование",
+    "extra_usage_enabled": "Включено",
+    "extra_usage_disabled": "Отключено",
+    "usage_spent_limit": "Потрачено {{spent}} / Лимит {{limit}}",
+    "usage_utilization": "Использовано {{percent}}%",
+    "extra_usage_user_disabled": "Отключено пользователем",
+    "extra_usage_spend_limit_reached": "Достигнут лимит расходов",
+    "extra_usage_disabled_reason": "Причина: {{reason}}",
+    "dollar_balance_remaining": "Осталось {{amount}}",
+    "balance_reset": "Сброс",
+    "balance_reset_unknown": "Не указан",
+    "stale_snapshot": "Не удалось обновить. Последняя успешная проверка: {{time}}",
     "plan_label": "План",
     "plan_unknown": "Неизвестно",
     "plan_free": "Free",
@@ -756,6 +767,7 @@
     "inactive": "Подписка неактивна",
     "window": "Квота за период",
     "window_duration": "Период: {{minutes}} мин.",
+    "window_duration_hours": "Период: {{hours}} ч.",
     "weekly": "Недельная квота",
     "unknown": "Неизвестно",
     "remaining": "Осталось {{percent}}%"
@@ -1203,6 +1215,10 @@
     "kiro_token_import_error": "Не удалось импортировать токен Kiro:",
     "kimi_oauth_name": "Kimi — Китай",
     "kimi_ai_oauth_name": "Kimi — международный",
+    "sponsor_site_china": "Китай",
+    "sponsor_site_international": "Международный",
+    "sponsor_kimi_caption": "Вход по коду устройства · аккаунты сайтов не связаны",
+    "sponsor_sign_up": "Регистрация",
     "method_device": "Код устройства",
     "method_browser": "Вход через браузер",
     "method_plugin": "Плагин",
@@ -1556,6 +1572,7 @@
           "description": "Отладка, вывод логов и статистика использования"
         },
         "advanced": {
+          "antigravity_credits": "Использовать Antigravity Credits",
           "title": "Дополнительно и эксперименты",
           "description": "Подмена заголовков, кэш подписей, источники плагинов и другие редко изменяемые настройки",
           "plugins_title": "Плагины",
@@ -1703,15 +1720,6 @@
           "session_affinity": "Маршрутизация с привязкой к сессии",
           "ws_auth": "Аутентификация WebSocket",
           "ws_auth_desc": "Аутентификация WebSocket AI Studio (oauth.providers.aistudio.ws-auth)"
-        },
-        "quota": {
-          "title": "Резерв по квоте",
-          "description": "Стратегия при превышении квоты",
-          "switch_project": "Переключить проект",
-          "switch_project_desc": "Автоматически переходить на другой проект при превышении квоты",
-          "switch_preview_model": "Переключить на preview-модель",
-          "switch_preview_model_desc": "Переключаться на preview-версию модели при превышении квоты",
-          "antigravity_credits": "Использовать Antigravity Credits"
         },
         "streaming": {
           "title": "Настройки стриминга",
@@ -3356,6 +3364,8 @@
     "missing_auth_index": "В файле авторизации отсутствует auth_index",
     "empty_data": "Нет доступных данных о квоте",
     "plan_label": "План",
-    "remaining_percent": "Осталось {{percent}}%"
+    "remaining_percent": "Осталось {{percent}}%",
+    "probe_unsupported": "Декларативные проверки квоты недоступны через API управления v8",
+    "plugin_not_found": "Не найден активный плагин, предоставляющий квоту для {{provider}}"
   }
 }

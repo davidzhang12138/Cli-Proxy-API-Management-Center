@@ -54,9 +54,9 @@ describe('resolveQuotaProviderType', () => {
       resolveQuotaProviderType(
         file('kiro-a.json', 'kiro', { supportsQuota: true, quotaProvider: 'kiro', authIndex: '1' })
       )
-    ).toBe('plugin');
+    ).toBe('kiro');
     expect(resolveQuotaProviderType(file('kiro-probe.json', 'kiro', { supportsQuota: true }))).toBe(
-      'plugin'
+      'kiro'
     );
   });
 });
