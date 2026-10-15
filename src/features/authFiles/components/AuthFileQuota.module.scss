@@ -61,8 +61,39 @@ button.quotaMessageAction {
 
 .quotaCardActions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 6px;
+}
+
+// Match the quota typography; outrank the shared .btn.btn-sm sizing.
+.quotaRefreshButton:global(.btn) {
+  min-height: 26px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: $quota-font-size;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  transition:
+    color var(--dur-hover) var(--ease-out-strong),
+    background-color var(--dur-hover) var(--ease-out-strong);
+
+  > span:last-child {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
 .quotaResetCreditButton {

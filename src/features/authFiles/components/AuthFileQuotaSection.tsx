@@ -239,15 +239,15 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
         {resetQuotaAction}
         <Button
           type="button"
-          variant="secondary"
+          variant="ghost"
           size="sm"
-          className={styles.quotaResetCreditButton}
+          className={styles.quotaRefreshButton}
           onClick={() => void refreshQuotaForFile()}
           disabled={!canRefreshQuota || quotaStatus === 'loading'}
           loading={quotaStatus === 'loading'}
           title={t('auth_files.quota_refresh_hint')}
         >
-          {quotaStatus !== 'loading' && <IconRefreshCw size={14} />}
+          {quotaStatus !== 'loading' && <IconRefreshCw size={12} aria-hidden="true" />}
           {t('auth_files.quota_refresh_single')}
         </Button>
       </div>

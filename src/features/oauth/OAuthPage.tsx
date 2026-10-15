@@ -87,7 +87,9 @@ export function OAuthPage() {
       card.kind === 'plugin'
         ? t('auth_login.plugin_oauth_title', { name: card.title })
         : t(card.titleKey),
-    caption: captionOf(card),
+    caption: isSponsor(card)
+      ? `${card.domain} · ${t('auth_login.sponsor_kimi_caption')}`
+      : captionOf(card),
     icon: iconOf(card),
   });
 
@@ -139,15 +141,13 @@ export function OAuthPage() {
   const providerCount = providerCards.length;
   const sponsorCards = providerCards.filter(isSponsor);
   const regularCards = providerCards.filter((card) => !isSponsor(card));
-  // 赞助商卡占级联的第 0 位，其余磁贴顺延
-  const tileIndexOffset = sponsorCards.length > 0 ? 1 : 0;
+  const tileIndexOffset = sponsorCards.length;
 
   const sponsorSites: SponsorCardSite[] = sponsorCards.map((card) => {
     const status = flows.states[card.id]?.status;
     return {
       id: card.id,
       name: labelOf(card),
-      region: t(card.sponsor.siteKey),
       domain: card.domain ?? '',
       status,
       statusLabel: tileStatusLabel(status),
@@ -182,21 +182,22 @@ export function OAuthPage() {
         addedCount={flows.addedCount}
       />
 
-      {/* 赞助商独占首行：一张品牌卡收拢两站入口，其余提供商在下方紧凑网格 */}
-      {sponsorCards.length > 0 && (
-        <SponsorCard
-          title={KIMI_DISPLAY_NAME}
-          caption={t('auth_login.sponsor_kimi_caption')}
-          icon={iconOf(sponsorCards[0])}
-          signUpLabel={t('auth_login.sponsor_sign_up')}
-          sites={sponsorSites}
-          onOpen={(siteId) => {
-            const card = sponsorCards.find((sponsor) => sponsor.id === siteId);
-            if (card) openProvider(card);
-          }}
-        />
-      )}
-      <div className={styles.grid}>{regularCards.map(renderTile)}</div>
+      <div className={styles.grid}>
+        {sponsorCards.length > 0 && (
+          <SponsorCard
+            title={KIMI_DISPLAY_NAME}
+            caption={t('auth_login.sponsor_kimi_caption')}
+            icon={iconOf(sponsorCards[0])}
+            signUpLabel={t('auth_login.sponsor_sign_up')}
+            sites={sponsorSites}
+            onOpen={(siteId) => {
+              const card = sponsorCards.find((sponsor) => sponsor.id === siteId);
+              if (card) openProvider(card);
+            }}
+          />
+        )}
+        {regularCards.map(renderTile)}
+      </div>
 
       <section className={styles.section} aria-labelledby={otherMethodsId}>
         <h2 className={styles.sectionLabel} id={otherMethodsId} data-reveal>

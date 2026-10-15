@@ -39,8 +39,8 @@ export interface BuiltInOAuthProviderCard {
   /** 区分同品牌的不同站点，磁贴副行展示。 */
   domain?: string;
   /**
-   * 赞助商：同品牌的各站点合并进画廊首行的一张品牌卡，每站一个登录入口 + 开放平台注册链接
-   * （目前是 Kimi 国内站 / 国际站）。`siteKey` 是卡内站点短名（品牌名由卡片标题承载）。
+   * 赞助商：各站点在画廊前部显示为紧凑磁贴，保留登录及开放平台注册入口
+   * （目前是 Kimi 国内站 / 国际站）。`siteKey` 是本地化的站点短名。
    */
   sponsor?: SponsorSite;
   /** Kiro's Builder ID, IDC, and token import flow remains on the legacy form. */
