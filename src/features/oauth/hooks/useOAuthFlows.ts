@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore, useNotificationStore } from '@/stores';
 import { oauthApi, pluginsApi } from '@/services/api';
-import { freebuffAuthApi, type FreebuffStatusRequest } from '@/services/api/oauth';
 import { getErrorMessage, isRecord } from '@/utils/helpers';
 import { notifyAuthFilesChanged } from '@/features/authFiles/authFilesEvents';
 import { createOAuthAttempts, type OAuthAttempt } from '../oauthAttempts';
@@ -30,9 +29,6 @@ export interface ProviderFlowState {
   /** 本地校验失败（未提交到后端），内联展示在输入框下。 */
   callbackValidation?: string;
   oauthProxyUrl?: string;
-  fingerprintId?: string;
-  fingerprintHash?: string;
-  expiresAt?: string;
 }
 
 interface UseOAuthFlowsOptions {
@@ -171,28 +167,9 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
     }, SUCCESS_RESET_DELAY_MS);
   };
 
-  const startPolling = (
-    provider: string,
-    state: string,
-    attempt: OAuthAttempt,
-    freebuff?: FreebuffStatusRequest
-  ) => {
+  const startPolling = (provider: string, state: string, attempt: OAuthAttempt) => {
     attempt.poll(
-      async () => {
-        if (provider === 'freebuff' && freebuff) {
-          const response = await freebuffAuthApi.getStatus(freebuff, attempt.signal);
-          return {
-            status:
-              response.status === 'pending'
-                ? 'wait'
-                : response.token_added
-                  ? 'ok'
-                  : 'error',
-            error: response.error,
-          };
-        }
-        return oauthApi.getAuthStatus(state, attempt.signal);
-      },
+      () => oauthApi.getAuthStatus(state, attempt.signal),
       (res) => {
         if (res.status === 'ok') {
           completeProviderAuth(provider);
@@ -290,52 +267,8 @@ export function useOAuthFlows({ providerCards, isFocused }: UseOAuthFlowsOptions
       callbackValidation: undefined,
       callbackUrl: '',
       callbackSubmitting: false,
-      fingerprintId: undefined,
-      fingerprintHash: undefined,
-      expiresAt: undefined,
     });
     try {
-      if (provider === 'freebuff') {
-        const response = await freebuffAuthApi.startAuth({
-          ...(proxyUrl ? { proxyUrl } : {}),
-          signal: attempt.signal,
-        });
-        if (!attempt.isCurrent()) return;
-        const fingerprintId = response.fingerprint_id?.trim();
-        const fingerprintHash = response.fingerprint_hash?.trim();
-        const expiresAt = response.expires_at?.trim();
-        const url = response.url || response.login_url || '';
-        if (!fingerprintId || !fingerprintHash || !expiresAt) {
-          const message = t('auth_login.missing_state');
-          updateProviderState(provider, {
-            url,
-            state: response.state,
-            status: 'error',
-            error: message,
-            polling: false,
-          });
-          notify(provider, message, 'error');
-          return;
-        }
-        const statusRequest: FreebuffStatusRequest = {
-          fingerprintId,
-          fingerprintHash,
-          expiresAt,
-          ...(proxyUrl ? { proxyUrl } : {}),
-        };
-        updateProviderState(provider, {
-          url,
-          state: response.state || fingerprintId,
-          status: 'waiting',
-          polling: true,
-          fingerprintId,
-          fingerprintHash,
-          expiresAt,
-        });
-        startPolling(provider, fingerprintId, attempt, statusRequest);
-        return;
-      }
-
       const res = await oauthApi.startAuth(provider, {
         ...(proxyUrl ? { proxyUrl } : {}),
         signal: attempt.signal,

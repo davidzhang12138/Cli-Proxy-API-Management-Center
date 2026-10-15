@@ -28,12 +28,9 @@ describe('Devin OAuth login UI', () => {
     );
     expect(page).toContain('Devin');
     expect(page).not.toContain('auth_login.');
-    for (const label of ['Charm Hyper', 'Context Code', 'Cline', 'Freebuff', 'Kiro']) {
+    for (const label of ['Charm Hyper', 'Cline']) {
       expect(page).toContain(label);
     }
-    expect(OAUTH_PROVIDERS.find((provider) => provider.id === 'kiro')).toMatchObject({
-      legacyPath: '/oauth/legacy',
-    });
 
     const devin = OAUTH_PROVIDERS.find((provider) => provider.id === 'devin');
     expect(devin && supportsManualCallback(devin)).toBe(true);

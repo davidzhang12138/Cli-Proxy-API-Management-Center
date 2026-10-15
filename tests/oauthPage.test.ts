@@ -111,6 +111,9 @@ describe('plugin OAuth tiles', () => {
         plugin({ id: 'c', oauthProvider: 'off', effectiveEnabled: false }),
         plugin({ id: 'd', oauthProvider: 'nooauth', supportsOAuth: false }),
         plugin({ id: 'e', oauthProvider: undefined }),
+        plugin({ id: 'removed-kiro', oauthProvider: 'kiro' }),
+        plugin({ id: 'removed-freebuff', oauthProvider: 'freebuff' }),
+        plugin({ id: 'removed-context', oauthProvider: 'context-code' }),
       ],
       'http://127.0.0.1:8317'
     );
@@ -138,6 +141,11 @@ describe('OAuth provider gallery', () => {
         expect(markup).toContain(label);
       }
       expect(markup).toContain('Vertex AI');
+      for (const label of ['Kiro', 'Freebuff', 'Context Code']) {
+        expect(markup).not.toContain(label);
+      }
+      expect(OAUTH_PROVIDERS).toHaveLength(10);
+      expect(markup).toContain(i18n.t('auth_login.meta_providers', { count: 10 }));
       expect(markup).not.toMatch(/auth_login\.|vertex_import\./);
       // 每个磁贴都是打开对话框的按钮
       expect(markup.match(/aria-haspopup="dialog"/g)?.length).toBe(OAUTH_PROVIDERS.length + 1);

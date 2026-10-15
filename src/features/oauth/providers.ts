@@ -16,10 +16,7 @@ import iconGrok from '@/assets/icons/grok.svg';
 import iconGrokDark from '@/assets/icons/grok-dark.svg';
 import iconDevin from '@/assets/icons/devin.svg';
 import iconDevinDark from '@/assets/icons/devin-dark.svg';
-import iconKiro from '@/assets/icons/kiro.svg';
-import iconFreebuff from '@/assets/icons/freebuff.svg';
 import iconCrush from '@/assets/icons/crush.png';
-import iconContextCode from '@/assets/icons/context-code.svg';
 import iconCline from '@/assets/icons/cline.svg';
 
 export type ThemedIcon = string | { light: string; dark: string };
@@ -29,7 +26,7 @@ export type OAuthFlowKind = 'device' | 'browser';
 
 export interface BuiltInOAuthProviderCard {
   kind: 'builtin';
-  id: BuiltInOAuthProvider | 'freebuff' | 'kiro';
+  id: Exclude<BuiltInOAuthProvider, 'context-code'>;
   /** 磁贴短名：品牌名是常量（与仪表盘 providerLabel 一致），区域站点走 i18n。 */
   label: string | { key: string };
   /** 对话框标题，沿用 `auth_login.<id>_oauth_title`。 */
@@ -43,8 +40,6 @@ export interface BuiltInOAuthProviderCard {
    * （目前是 Kimi 国内站 / 国际站）。`siteKey` 是本地化的站点短名。
    */
   sponsor?: SponsorSite;
-  /** Kiro's Builder ID, IDC, and token import flow remains on the legacy form. */
-  legacyPath?: string;
 }
 
 export interface SponsorSite {
@@ -144,40 +139,21 @@ export const OAUTH_PROVIDERS: BuiltInOAuthProviderCard[] = [
   },
   {
     kind: 'builtin',
-    id: 'context-code',
-    label: 'Context Code',
-    titleKey: 'auth_login.context_code_oauth_title',
-    icon: iconContextCode,
-    flow: 'browser',
-  },
-  {
-    kind: 'builtin',
     id: 'cline',
     label: 'Cline',
     titleKey: 'auth_login.cline_oauth_title',
     icon: iconCline,
     flow: 'browser',
   },
-  {
-    kind: 'builtin',
-    id: 'freebuff',
-    label: 'Freebuff',
-    titleKey: 'auth_login.freebuff_oauth_title',
-    icon: iconFreebuff,
-    flow: 'browser',
-  },
-  {
-    kind: 'builtin',
-    id: 'kiro',
-    label: 'Kiro',
-    titleKey: 'auth_login.kiro_oauth_title',
-    icon: iconKiro,
-    flow: 'browser',
-    legacyPath: '/oauth/legacy',
-  },
 ];
 
-const BUILTIN_PROVIDER_IDS = new Set<string>(OAUTH_PROVIDERS.map((provider) => provider.id));
+// Keep removed built-ins reserved so plugin discovery cannot restore their login tiles.
+const BUILTIN_PROVIDER_IDS = new Set<string>([
+  ...OAUTH_PROVIDERS.map((provider) => provider.id),
+  'kiro',
+  'freebuff',
+  'context-code',
+]);
 
 /** 后端接受手动回调提交的内置提供商；插件提供商一律允许。 */
 export const CALLBACK_SUPPORTED = new Set<string>([

@@ -108,10 +108,6 @@ export function OAuthPage() {
           : undefined;
 
   const openProvider = (card: OAuthProviderCard) => {
-    if (card.kind === 'builtin' && card.legacyPath) {
-      navigate(card.legacyPath);
-      return;
-    }
     focusedRef.current = card.id;
     setDialog({ kind: 'oauth', id: card.id });
     setDialogOpen(true);
